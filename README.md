@@ -17,6 +17,29 @@ npm start
 Electron is pinned to version 45.0.0. Keep Electron and its bundled Chromium
 security updates current.
 
+## Renderer architecture
+
+The renderer is organized by Feature-Sliced Design layers under
+`src/renderer/`:
+
+- `app/` creates the application context and global navigation.
+- `pages/` assembles the access and vault screens.
+- `widgets/` composes larger screen areas such as the vault browser.
+- `features/` holds user actions such as vault access, login editing, backup,
+  password generation, and copy/delete/icon operations.
+- `entities/` contains profile and login models and their UI rendering.
+- `shared/` contains cross-cutting DOM, password-visibility, and password-tool
+  utilities.
+
+Dependencies flow down from `app` to `pages`, `widgets` and `features`, then
+`entities` and `shared`. `index.html` stays at the project root as Electron's
+document entry point. Because this renderer has no bundler, its local slices
+register their APIs under an internal `window.mnemoRenderer` namespace and are
+loaded in dependency order there. The renderer has no Node.js access; sensitive
+operations still go through the narrow `vaultApp` preload API. `main.js` and
+`preload.js` remain outside the renderer feature layers because they belong to
+separate Electron processes.
+
 ## Current security boundary
 
 - The renderer loads only the packaged local HTML, CSS, and JavaScript.
@@ -65,7 +88,6 @@ credentials or adding network access.
 
 ## Not decided yet
 
-The project license, other item types, authenticator, browser integration, and
-any future sync protocol still need design. The password strength display is a
-rough heuristic, not a security guarantee. Do not use this prototype for real
-passwords.
+Other item types, authenticator, browser integration, and any future sync
+protocol still need design. The password strength display is a rough heuristic,
+not a security guarantee. Do not use this prototype for real passwords.
