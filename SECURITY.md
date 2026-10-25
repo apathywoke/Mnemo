@@ -1,0 +1,81 @@
+# Mnemo security notes
+
+## Status
+
+This is an unaudited prototype. It supports encrypted login entries, search,
+editing, deletion, encrypted backup, and restore. Do not use it for real
+passwords until the design has received independent security review.
+
+## Initial design commitments
+
+- No analytics, telemetry, crash reporting, account, sync backend, or
+  background network activity.
+- UI code runs in a sandboxed renderer without Node.js integration.
+- Electron capabilities are exposed through a small, typed preload API.
+- Secrets must not be written to logs, console output, diagnostics, or crash
+  reports.
+- The master passphrase is not persisted. Node's asynchronous scrypt derives a
+  wrapping key using a fresh 16-byte salt and parameters N=2^17, r=8, p=1.
+- The UI accepts master passphrases of at least 7 characters. This is only a
+  minimum input limit, not a recommended secure length; use a longer, unique
+  passphrase because short or common phrases are easier to guess offline.
+- A random 256-bit vault key is wrapped with AES-256-GCM; vault data is
+  separately encrypted with AES-256-GCM and authenticated metadata.
+- Login records have bounded fields and are validated before entering the
+  encrypted vault. Search runs locally over names, usernames, and website URLs.
+- Each profile has an independent encrypted vault file and master passphrase.
+  Profile names and IDs are stored in a local, permission-restricted registry
+  in plain text; profile names are not secret vault data.
+- The renderer receives decrypted entries while the vault is open. Keys and
+  entry data are cleared from managed buffers and UI fields on lock where
+  possible, but JavaScript strings and objects cannot be reliably zeroized.
+- Copying a username or password writes it to the system clipboard and clears
+  it after 30 seconds if its plain-text contents still match the copied value.
+  If another app replaces that text, the app leaves the new clipboard contents
+  alone. Locking the vault queues the same best-effort cleanup. Other clipboard
+  managers or macOS Universal Clipboard may retain or sync copied text outside
+  this app's control; the app cannot guarantee its removal from those services.
+- The encrypted file is versioned and written to a temporary file before being
+  renamed into place with restrictive file permissions. The prototype supports
+  one running app instance.
+- Exported `.vault` files contain the encrypted envelope as-is; no plaintext is
+  written to the backup. A backup uses the same master passphrase as the local
+  vault. Restore verifies the file and passphrase before replacing the local
+  vault, and asks for confirmation first when a local vault already exists.
+- The in-memory vault locks after five minutes without keyboard or pointer
+  activity, when macOS reports screen lock or suspend, when the window closes,
+  and when the app exits.
+- Site icons require an explicit click on **Load site icon**. The main process
+  first requests the saved domain's `/favicon.ico` endpoint. If that is missing or small,
+  it reads the homepage and tries at most five PNG, JPEG, or ICO icon links hosted
+  on that same domain. PNG-backed ICO files and uncompressed 24/32-bit ICO images
+  are supported.
+  Requests carry no cookies or referrer and use no
+  third-party favicon service. HTTPS redirects are followed only to the same
+  host or its `www` variant, with a three-redirect limit. The site can see the
+  device's IP address, and the domain may be visible to the configured DNS
+  resolver. Only public HTTPS hosts are allowed; the app resolves and pins a
+  public IPv4 address, limits response size, checks image dimensions before
+  decoding, prefers higher-resolution variants without enlarging small icons,
+  preserves aspect ratio, converts the result to PNG, and saves it within the
+  encrypted vault. These requests are not repeated unless the user explicitly
+  loads or updates the icon.
+- There is no independent backup passphrase or recovery mechanism for a
+  forgotten master passphrase.
+- Deleting a profile unlinks its encrypted vault file. It does not guarantee
+  secure erasure from APFS snapshots, Time Machine backups, SSD remapping, or
+  other copies of that file.
+
+## Before storing real credentials
+
+Document a threat model, review file permissions, clipboard behavior, and
+backup recovery, and obtain independent security review before treating this as
+a real password manager. Changes that add network access must document every
+connection and must not add telemetry by default.
+
+## Reporting a vulnerability
+
+Before making this repository public, configure a private reporting route (for
+example, GitHub private vulnerability reporting) and link it here. Until then,
+report security issues to the project maintainer privately rather than opening
+a public issue with exploit details.

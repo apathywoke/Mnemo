@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Mnemo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="brand-panel" aria-label="Mnemo">
+        <div class="brand-heading">
+          <div class="wordmark" aria-label="Mnemo">
+            <span>MNE</span>MO<span class="wordmark-dot">.</span>
+          </div>
+          <span class="brand-caption">PRIVATE BY DESIGN</span>
+        </div>
+
+        <div class="brand-art" aria-hidden="true">
+          <span class="guide guide-horizontal"></span>
+          <span class="guide guide-vertical"></span>
+          <svg viewBox="0 0 180 180" fill="none">
+            <g stroke="currentColor" stroke-width="2.5" stroke-linecap="square">
+              <path d="M90 18v46M90 116v46M18 90h46M116 90h46" />
+              <path d="m39 39 33 33m36 36 33 33M141 39l-33 33m-36 36-33 33" />
+            </g>
+          </svg>
+        </div>
+
+        <footer class="brand-footer">
+          <span>MNEMO</span>
+          <span>01 <i></i> PRIVATE</span>
+        </footer>
+      </aside>
+
+      <section class="workspace">
+        <header class="workspace-header">
+          <span class="eyebrow">SECURE ACCESS</span>
+          <div class="local-badge"><span></span> Stored on this Mac</div>
+        </header>
+
+        <section class="content" aria-live="polite">
+        <section id="profiles-panel" class="vault-panel profiles-panel" hidden>
+          <p class="eyebrow section-label">LOCAL PROFILES</p>
+          <h2>Choose a vault</h2>
+          <p class="description">
+            Each profile has its own encrypted vault and master passphrase.
+            Profile names are stored locally; vault contents stay encrypted.
+          </p>
+          <div id="profile-list" class="profile-list"></div>
+          <div class="profile-actions">
+            <button id="new-profile-button" type="button" class="secondary-button">
+              Create new vault
+            </button>
+            <button id="restore-profile-button" type="button" class="text-button">
+              Restore a backup as a new vault
+            </button>
+          </div>
+        </section>
+
+        <section id="setup-panel" class="vault-panel" hidden>
+          <p class="eyebrow section-label">NEW PROFILE</p>
+          <h2>Create a vault</h2>
+          <p class="description">
+            Choose a unique master passphrase with at least 7 characters.
+            Longer passphrases are safer. It encrypts your vault and is never
+            stored by the app.
+          </p>
+          <div class="recovery-warning" role="note">
+            <span class="recovery-warning-mark" aria-hidden="true">!</span>
+            <div>
+              <strong>Your master passphrase cannot be recovered</strong>
+              <p>If you lose it, this app cannot unlock your vault or backups. Keep it somewhere safe.</p>
+            </div>
+          </div>
+          <form id="create-form" class="vault-form">
+            <label for="profile-name">Vault name</label>
+            <input
+              id="profile-name"
+              type="text"
+              maxlength="64"
+              autocomplete="off"
+              required
+            />
+            <label for="create-passphrase">Master passphrase</label>
+            <div class="secret-input-row">
+              <input
+                id="create-passphrase"
+                type="password"
+                autocomplete="new-password"
+                minlength="7"
+                maxlength="1024"
+                required
+              />
+              <button type="button" class="password-visibility-toggle" data-password-visibility-for="create-passphrase" aria-label="Show password" aria-controls="create-passphrase" aria-pressed="false" title="Show password">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+              </button>
+            </div>
+            <label for="confirm-passphrase">Confirm master passphrase</label>
+            <div class="secret-input-row">
+              <input
+                id="confirm-passphrase"
+                type="password"
+                autocomplete="new-password"
+                minlength="7"
+                maxlength="1024"
+                required
+              />
+              <button type="button" class="password-visibility-toggle" data-password-visibility-for="confirm-passphrase" aria-label="Show password" aria-controls="confirm-passphrase" aria-pressed="false" title="Show password">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+              </button>
+            </div>
+            <p id="create-error" class="form-error" role="alert" hidden></p>
+            <button
+              type="submit"
+              class="primary-button"
+              aria-label="Create encrypted vault"
+            >Create</button>
+          </form>
+          <button id="setup-restore-button" type="button" class="text-button">
+            Restore from backup
+          </button>
+          <button id="setup-back-button" type="button" class="text-button" hidden>
+            Back to profiles
+          </button>
+        </section>
+
+        <section id="unlock-panel" class="vault-panel" hidden>
+          <div class="unlock-context">
+            <button
+              id="unlock-profiles-button"
+              type="button"
+              class="back-button"
+              aria-label="Back to vault list"
+              title="Back to vault list"
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M19 12H5m0 0 7 7m-7-7 7-7" />
+              </svg>
+            </button>
+            <p class="eyebrow section-label">
+              MNEMO · <span id="unlock-profile-name"></span>
+            </p>
+          </div>
+          <h2>Vault locked</h2>
+          <p class="description">Enter your master passphrase to unlock your vault.</p>
+          <form id="unlock-form" class="vault-form">
+            <label for="unlock-passphrase">Master passphrase</label>
+            <div class="secret-input-row">
+              <input
+                id="unlock-passphrase"
+                type="password"
+                autocomplete="current-password"
+                maxlength="1024"
+                required
+              />
+              <button type="button" class="password-visibility-toggle" data-password-visibility-for="unlock-passphrase" aria-label="Show password" aria-controls="unlock-passphrase" aria-pressed="false" title="Show password">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+              </button>
+            </div>
+            <p id="unlock-error" class="form-error" role="alert" hidden></p>
+            <button
+              type="submit"
+              class="primary-button"
+              aria-label="Unlock vault"
+            >Unlock</button>
+          </form>
+          <button id="unlock-restore-button" type="button" class="text-button">
+            Restore from backup
+          </button>
+        </section>
+
+        <section id="restore-panel" class="vault-panel" hidden>
+          <p class="eyebrow section-label">RESTORE</p>
+          <h2>Open an encrypted backup</h2>
+          <p id="restore-description" class="description">
+            Choose a backup file and enter the master passphrase used to encrypt
+            it. If a vault already exists on this Mac, you’ll be asked to confirm
+            before replacing it.
+          </p>
+          <div class="recovery-warning" role="note">
+            <span class="recovery-warning-mark" aria-hidden="true">!</span>
+            <div>
+              <strong>Backups need the original master passphrase</strong>
+              <p>There is no reset or recovery. If you lose it, the backup cannot be opened.</p>
+            </div>
+          </div>
+          <form id="restore-form" class="vault-form">
+            <div id="restore-profile-name-field" class="restore-profile-name-field" hidden>
+              <label for="restore-profile-name">Name for this vault</label>
+              <input
+                id="restore-profile-name"
+                type="text"
+                maxlength="64"
+                autocomplete="off"
+              />
+            </div>
+            <label for="restore-passphrase">Backup master passphrase</label>
+            <div class="secret-input-row">
+              <input
+                id="restore-passphrase"
+                type="password"
+                autocomplete="current-password"
+                maxlength="1024"
+                required
+              />
+              <button type="button" class="password-visibility-toggle" data-password-visibility-for="restore-passphrase" aria-label="Show password" aria-controls="restore-passphrase" aria-pressed="false" title="Show password">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+              </button>
+            </div>
+            <p id="restore-error" class="form-error" role="alert" hidden></p>
+            <button
+              type="submit"
+              class="primary-button"
+              aria-label="Choose and restore encrypted backup"
+            >Continue</button>
+          </form>
+          <button id="restore-cancel-button" type="button" class="text-button">
+            Back
+          </button>
+        </section>
+
+        <section id="open-panel" class="vault-panel vault-dashboard" hidden>
+          <header class="dashboard-header">
+            <div>
+              <p class="eyebrow section-label">
+                YOUR VAULT · <span id="active-profile-name"></span>
+              </p>
+              <h2>Logins</h2>
+            </div>
+            <div class="dashboard-actions">
+              <button id="backup-button" type="button" class="quiet-button">
+                Backup
+              </button>
+              <button id="switch-profile-button" type="button" class="quiet-button">
+                Switch vault
+              </button>
+              <button id="lock-button" type="button" class="quiet-button">
+                Lock
+              </button>
+              <button id="create-entry-button" type="button" class="new-entry-button">
+                <span aria-hidden="true">+</span> New login
+              </button>
+            </div>
+          </header>
+
+          <div class="recovery-warning backup-recovery-warning" role="note">
+            <span class="recovery-warning-mark" aria-hidden="true">!</span>
+            <div>
+              <strong>Keep your master passphrase safe</strong>
+              <p>Every backup requires this same passphrase. Mnemo cannot recover it if lost.</p>
+            </div>
+          </div>
+          <p id="backup-status" class="backup-status" aria-live="polite" hidden></p>
+
+          <div class="vault-browser">
+            <aside class="entry-browser" aria-label="Vault logins">
+              <div class="search-box">
+                <span aria-hidden="true">⌕</span>
+                <label class="visually-hidden" for="entry-search">Search logins</label>
+                <input id="entry-search" type="search" placeholder="Search vault" />
+                <kbd>⌘ K</kbd>
+              </div>
+              <div class="entry-list-heading">
+                <span>ALL LOGINS</span>
+                <span id="entry-count">0</span>
+              </div>
+              <div id="entry-list" class="entry-list" role="list"></div>
+              <div id="empty-list" class="empty-list" hidden>
+                <p>No logins yet</p>
+                <button id="empty-create-button" type="button" class="text-button">
+                  Add your first login
+                </button>
+              </div>
+              <p id="no-search-results" class="no-results" hidden>
+                No logins match your search.
+              </p>
+            </aside>
+
+            <div class="entry-detail-area">
+              <section id="entry-detail" class="entry-detail" hidden>
+                <div class="detail-toolbar">
+                  <span class="detail-kind">LOGIN</span>
+                  <div>
+                    <button id="fetch-site-icon-button" type="button" class="detail-action">
+                      Load site icon
+                    </button>
+                    <button id="edit-entry-button" type="button" class="detail-action">
+                      Edit
+                    </button>
+                    <button id="delete-entry-button" type="button" class="detail-action danger-action">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+                <div class="detail-title-block">
+                  <div id="detail-icon" class="detail-icon" aria-hidden="true">A</div>
+                  <h3 id="detail-name"></h3>
+                  <p id="detail-url" class="detail-url"></p>
+                </div>
+                <div class="detail-fields">
+                  <div class="detail-field">
+                    <label>USERNAME</label>
+                    <div class="detail-value-row">
+                      <span id="detail-username" class="detail-value"></span>
+                      <button id="copy-username-button" type="button" class="copy-button">Copy</button>
+                    </div>
+                  </div>
+                  <div class="detail-field">
+                    <label>PASSWORD</label>
+                    <div class="detail-value-row">
+                      <span id="detail-password" class="detail-value secret-value">••••••••••••</span>
+                      <button id="toggle-password-button" type="button" class="copy-button password-visibility-toggle" aria-label="Show password" aria-pressed="false" title="Show password">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                      </button>
+                      <button id="copy-password-button" type="button" class="copy-button">Copy</button>
+                    </div>
+                  </div>
+                  <div id="detail-notes-field" class="detail-field" hidden>
+                    <label>NOTES</label>
+                    <p id="detail-notes" class="detail-notes"></p>
+                  </div>
+                </div>
+                <p id="copy-status" class="copy-status" aria-live="polite" hidden></p>
+              </section>
+              <section id="detail-empty" class="detail-empty">
+                <div class="detail-empty-mark" aria-hidden="true">＋</div>
+                <p>Select a login to view its details</p>
+                <span>Your vault is encrypted and stays on this Mac.</span>
+              </section>
+            </div>
+          </div>
+
+          <dialog id="entry-dialog" class="app-dialog">
+            <form id="entry-form" class="entry-form">
+              <div class="dialog-heading">
+                <div>
+                  <p class="eyebrow section-label">LOGIN DETAILS</p>
+                  <h3 id="entry-dialog-title">New login</h3>
+                </div>
+                <button id="close-entry-dialog" type="button" class="dialog-close" aria-label="Close dialog">×</button>
+              </div>
+              <input id="entry-id" type="hidden" />
+              <label for="entry-name">Name</label>
+              <input id="entry-name" type="text" maxlength="200" autocomplete="off" required />
+              <label for="entry-url">Website</label>
+              <input id="entry-url" type="text" maxlength="2048" inputmode="url" placeholder="https://example.com" autocomplete="url" />
+              <label for="entry-username">Username</label>
+              <input id="entry-username" type="text" maxlength="1024" autocomplete="username" />
+              <label for="entry-password">Password</label>
+              <div class="password-input-row">
+                <input id="entry-password" type="password" maxlength="4096" autocomplete="new-password" required />
+                <button type="button" class="password-visibility-toggle" data-password-visibility-for="entry-password" aria-label="Show password" aria-controls="entry-password" aria-pressed="false" title="Show password">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                </button>
+              </div>
+              <div id="password-strength" class="password-strength" data-strength="empty">
+                <div class="password-strength-heading">
+                  <span>Password strength</span>
+                  <span id="password-strength-label" aria-live="polite">Enter a password</span>
+                </div>
+                <div
+                  id="password-strength-meter"
+                  class="password-strength-track"
+                  role="meter"
+                  aria-label="Entered password strength"
+                  aria-valuemin="0"
+                  aria-valuemax="3"
+                  aria-valuenow="0"
+                >
+                  <span></span>
+                </div>
+              </div>
+              <p class="password-strength-note">This is a rough estimate, not a guarantee that a password is safe.</p>
+              <section class="password-tools" aria-label="Password tools">
+                <div class="password-tools-heading">
+                  <div>
+                    <h4>Password generator</h4>
+                    <p>Generate a unique password on this device.</p>
+                  </div>
+                  <button id="generate-password-button" type="button" class="generate-password-button">
+                    Generate
+                  </button>
+                </div>
+                <div class="password-length-heading">
+                  <label for="password-length">Length</label>
+                  <output id="password-length-value" for="password-length">20</output>
+                </div>
+                <input id="password-length" class="password-length-slider" type="range" min="8" max="64" value="20" />
+                <div class="password-generator-options" role="group" aria-label="Password character options">
+                  <label><input id="password-uppercase" type="checkbox" checked /> Uppercase</label>
+                  <label><input id="password-numbers" type="checkbox" checked /> Numbers</label>
+                  <label><input id="password-symbols" type="checkbox" checked /> Symbols</label>
+                </div>
+                <div id="generated-password-strength" class="password-strength" data-strength="empty">
+                  <div class="password-strength-heading">
+                    <span>Estimated generated strength</span>
+                    <span id="generated-password-strength-label" aria-live="polite">Calculating…</span>
+                  </div>
+                  <div
+                    id="generated-password-strength-meter"
+                    class="password-strength-track"
+                    role="meter"
+                    aria-label="Estimated generated password strength"
+                    aria-valuemin="0"
+                    aria-valuemax="3"
+                    aria-valuenow="0"
+                  >
+                    <span></span>
+                  </div>
+                </div>
+                <p class="password-tools-note">Estimate uses the selected length and character types. Nothing is sent anywhere.</p>
+              </section>
+              <label for="entry-notes">Notes</label>
+              <textarea id="entry-notes" maxlength="16384" rows="3"></textarea>
+              <p id="entry-form-error" class="form-error" role="alert" hidden></p>
+              <div class="dialog-actions">
+                <button id="cancel-entry-button" type="button" class="quiet-button">Cancel</button>
+                <button type="submit" class="dialog-save-button">Save login</button>
+              </div>
+            </form>
+          </dialog>
+
+          <dialog id="delete-dialog" class="app-dialog confirm-dialog">
+            <div class="confirm-content">
+              <p class="eyebrow section-label">DELETE LOGIN</p>
+              <h3>Delete this login?</h3>
+              <p>This action cannot be undone.</p>
+              <div class="dialog-actions">
+                <button id="cancel-delete-button" type="button" class="quiet-button">Cancel</button>
+                <button id="confirm-delete-button" type="button" class="delete-confirm-button">Delete</button>
+              </div>
+            </div>
+          </dialog>
+        </section>
+
+        <section id="fatal-panel" class="vault-panel" hidden>
+          <p class="eyebrow section-label">COULD NOT OPEN</p>
+          <h2>Check your vault</h2>
+          <p id="fatal-message" class="description">
+            Could not read the vault status.
+          </p>
+          <button id="retry-button" type="button" class="secondary-button">
+            Try again
+          </button>
+        </section>
+
+        <dialog id="delete-profile-dialog" class="app-dialog confirm-dialog" aria-labelledby="delete-profile-title">
+          <div class="confirm-content">
+            <p class="eyebrow section-label">DELETE VAULT</p>
+            <h3 id="delete-profile-title">Delete this vault?</h3>
+            <p>
+              This removes the vault and its encrypted file from this app's local
+              storage. Backup files are not affected, and you cannot undo this
+              in the app.
+            </p>
+            <label for="delete-profile-confirm-input">
+              Type <strong id="delete-profile-name-confirm"></strong> to confirm
+            </label>
+            <input
+              id="delete-profile-confirm-input"
+              class="profile-delete-confirm-input"
+              type="text"
+              maxlength="64"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <p id="delete-profile-error" class="form-error" role="alert" hidden></p>
+            <div class="dialog-actions">
+              <button id="cancel-profile-delete-button" type="button" class="quiet-button">
+                Cancel
+              </button>
+              <button id="confirm-profile-delete-button" type="button" class="danger-confirm-button" disabled>
+                Delete vault
+              </button>
+            </div>
+          </div>
+        </dialog>
+
+        <p class="version">App version <span id="app-version">…</span></p>
+        </section>
+
+        <footer class="workspace-footer">
+          <span>NO SYNC OR TELEMETRY</span>
+          <span>PROTOTYPE · NOT FOR REAL PASSWORDS</span>
+        </footer>
+      </section>
+    </main>
+    <script src="./password-tools.js"></script>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

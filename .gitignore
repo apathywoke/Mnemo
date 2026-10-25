@@ -1,0 +1,27 @@
+node_modules/
+dist/
+release/
+.DS_Store
+coverage/
+*.log
+npm-debug.log*
+
+# Local credentials and application data
+.env
+.env.*
+!.env.example
+*.vault
+vault.json
+profiles.json
+vaults/
+*.tmp
+*.deleting
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Editor and operating-system files
+.idea/
+.vscode/
+Thumbs.db
