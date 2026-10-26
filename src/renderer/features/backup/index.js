@@ -1,23 +1,39 @@
 (() => {
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
+  const { show: showToast } = ns.shared.toast;
 
   function bind(ctx) {
     const button = $("#backup-button");
-    const status = $("#backup-status");
+    const warning = $("#backup-recovery-warning");
+    const dismissWarningButton = $("#dismiss-backup-warning");
+    const warningDismissalKey = "mnemo.backup-recovery-warning.dismissed";
+
+    try {
+      warning.hidden = window.sessionStorage.getItem(warningDismissalKey) === "true";
+    } catch {
+      // Keep the warning usable even when browser storage is unavailable.
+    }
+
+    dismissWarningButton.addEventListener("click", () => {
+      warning.hidden = true;
+      try {
+        window.sessionStorage.setItem(warningDismissalKey, "true");
+      } catch {
+        // The dismissal remains effective for the current renderer session.
+      }
+    });
+
     button.addEventListener("click", async () => {
-      status.hidden = true;
       button.disabled = true;
       button.textContent = "Saving…";
       try {
         const result = await ctx.api.exportBackup();
         if (!result.canceled) {
-          status.textContent = "Encrypted backup saved. Keep the same master passphrase safe; it cannot be recovered if lost.";
-          status.hidden = false;
+          showToast("Encrypted backup saved. Keep your master passphrase safe; Mnemo cannot recover it if lost.");
         }
       } catch (cause) {
-        status.textContent = cause.message || "Could not save the backup.";
-        status.hidden = false;
+        showToast(cause.message || "Could not save the backup.", { type: "error" });
       } finally {
         button.disabled = false;
         button.textContent = "Backup";

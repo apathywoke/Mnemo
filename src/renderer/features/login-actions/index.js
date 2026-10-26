@@ -2,23 +2,19 @@
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
   const { setToggleButton } = ns.shared.passwordVisibility;
+  const { show: showToast } = ns.shared.toast;
 
   function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetail, updateSiteIconButton }) {
     const state = ctx.state.vault;
-    const copyStatus = $("#copy-status");
     const deleteDialog = $("#delete-dialog");
 
     async function copyValue(value) {
       if (!value) return;
       try {
         await ctx.api.copySecret(value);
-        copyStatus.textContent = "Copied. Clipboard clears in 30 seconds.";
-        copyStatus.hidden = false;
-        if (ctx.state.ui.copyStatusTimer) clearTimeout(ctx.state.ui.copyStatusTimer);
-        ctx.state.ui.copyStatusTimer = setTimeout(() => { copyStatus.hidden = true; }, 4000);
+        showToast("Copied. Clipboard clears in 30 seconds.");
       } catch {
-        copyStatus.textContent = "Could not copy this value.";
-        copyStatus.hidden = false;
+        showToast("Could not copy this value.", { type: "error" });
       }
     }
 
@@ -35,10 +31,10 @@
         deleteDialog.close();
         state.selectedEntryId = null;
         await refreshEntries(null, true);
+        showToast("Login deleted.");
       } catch (cause) {
         deleteDialog.close();
-        copyStatus.textContent = cause.message || "Could not delete this login.";
-        copyStatus.hidden = false;
+        showToast(cause.message || "Could not delete this login.", { type: "error" });
       } finally {
         button.disabled = false;
       }
@@ -65,7 +61,6 @@
       if (!requestedEntry?.url || state.fetchingFaviconForId !== null) return;
       state.fetchingFaviconForId = requestedEntry.id;
       updateSiteIconButton();
-      copyStatus.hidden = true;
       try {
         const result = await ctx.api.fetchSiteIcon(requestedEntry.id);
         if (result.canceled) return;
@@ -75,13 +70,11 @@
         renderEntryList();
         if (state.selectedEntryId === requestedEntry.id) {
           renderEntryDetail(requestedEntry.id);
-          copyStatus.textContent = `Icon from ${result.hostname} saved inside the encrypted vault.`;
-          copyStatus.hidden = false;
+          showToast("Icon from " + result.hostname + " saved inside the encrypted vault.");
         }
       } catch (cause) {
         if (state.selectedEntryId === requestedEntry.id) {
-          copyStatus.textContent = cause.message || "Could not load the site icon.";
-          copyStatus.hidden = false;
+          showToast(cause.message || "Could not load the site icon.", { type: "error" });
         }
       } finally {
         state.fetchingFaviconForId = null;

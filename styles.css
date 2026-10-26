@@ -193,6 +193,37 @@ a:focus-visible {
   min-height: 28px;
 }
 
+.workspace-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.settings-button {
+  box-sizing: border-box;
+  display: inline-grid;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  place-items: center;
+  padding: 0;
+  line-height: 0;
+  vertical-align: middle;
+}
+
+.settings-button svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .eyebrow {
   color: #8b8b8b;
   font-size: 9px;
@@ -414,7 +445,8 @@ h2 {
   border: 0;
 }
 
-.password-visibility-toggle {
+.password-visibility-toggle,
+.password-copy-toggle {
   display: grid;
   width: 32px;
   min-width: 32px;
@@ -434,18 +466,21 @@ h2 {
     background-color 140ms ease;
 }
 
-.password-visibility-toggle:hover {
+.password-visibility-toggle:hover,
+.password-copy-toggle:hover {
   border-color: #393939;
   background: #171717;
   color: #f0f0f0;
 }
 
-.password-visibility-toggle:focus-visible {
+.password-visibility-toggle:focus-visible,
+.password-copy-toggle:focus-visible {
   outline: 1px solid #eee;
   outline-offset: 2px;
 }
 
-.password-visibility-toggle svg {
+.password-visibility-toggle svg,
+.password-copy-toggle svg {
   width: 16px;
   height: 16px;
   fill: none;
@@ -664,9 +699,135 @@ h2 {
   line-height: 1.5;
 }
 
-.form-error[hidden],
-.backup-status[hidden] {
+.form-error[hidden] {
   display: none;
+}
+
+.toast-region {
+  position: fixed;
+  z-index: 1000;
+  right: 26px;
+  bottom: 24px;
+  width: min(340px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast-notification {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 13px;
+  border: 1px solid #373737;
+  border-radius: 13px;
+  background: rgb(24 24 24 / 96%);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 40%);
+  color: #d5d5d5;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0;
+  transform: translateY(9px);
+  transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: auto;
+  backdrop-filter: blur(14px);
+}
+
+.toast-notification::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(255 255 255 / 12%);
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: toast-background-countdown 2500ms cubic-bezier(0.35, 0.2, 0.65, 0.8) forwards;
+  pointer-events: none;
+}
+
+.toast-error::before {
+  background: rgb(232 120 120 / 12%);
+}
+
+.toast-info::before {
+  background: rgb(230 230 230 / 8%);
+}
+
+.toast-icon,
+.toast-message,
+.toast-dismiss {
+  position: relative;
+  z-index: 1;
+}
+
+.toast-notification.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes toast-background-countdown {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.toast-icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: #70c58b;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.toast-error .toast-icon {
+  color: #e87878;
+}
+
+.toast-info .toast-icon {
+  color: #aaa;
+}
+
+.toast-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast-dismiss {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+}
+
+.toast-dismiss:hover {
+  border-color: #444;
+  color: #eee;
+}
+
+.toast-dismiss:focus-visible {
+  outline: 1px solid #eee;
+  outline-offset: 2px;
+}
+
+.toast-dismiss svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
 .status-card {
@@ -702,12 +863,6 @@ h2 {
   color: var(--muted);
   font-size: 10px;
   line-height: 1.5;
-}
-
-.backup-status {
-  margin: 12px 0 0;
-  color: #d4d4d4;
-  font-size: 11px;
 }
 
 .secondary-button {
@@ -806,6 +961,15 @@ h2 {
   gap: 8px;
 }
 
+.backup-recovery-warning[hidden] {
+  display: none;
+}
+
+.backup-recovery-warning > div {
+  flex: 1;
+  min-width: 0;
+}
+
 .backup-recovery-warning .recovery-warning-mark {
   width: 17px;
   height: 17px;
@@ -815,6 +979,42 @@ h2 {
 
 .backup-recovery-warning p {
   margin-top: 1px;
+}
+
+.backup-warning-dismiss {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  align-self: center;
+  place-items: center;
+  margin-right: -3px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: #ab9d74;
+  cursor: pointer;
+}
+
+.backup-warning-dismiss:hover {
+  border-color: #554721;
+  background: #211c10;
+  color: #e3d5a9;
+}
+
+.backup-warning-dismiss:focus-visible {
+  outline: 1px solid #e3d5a9;
+  outline-offset: 2px;
+}
+
+.backup-warning-dismiss svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
 .dashboard-header h2 {
@@ -1178,7 +1378,8 @@ h2 {
   font-size: 9px;
 }
 
-.copy-button.password-visibility-toggle {
+.copy-button.password-visibility-toggle,
+.copy-button.password-copy-toggle {
   min-height: 32px;
   padding: 0;
 }
@@ -1190,16 +1391,6 @@ h2 {
   font-size: 11px;
   line-height: 1.7;
   white-space: pre-wrap;
-}
-
-.copy-status {
-  margin: 20px 0 0;
-  color: #bdbdbd;
-  font-size: 10px;
-}
-
-.copy-status[hidden] {
-  display: none;
 }
 
 .detail-empty {
@@ -1263,6 +1454,20 @@ h2 {
 
 #entry-dialog {
   width: min(92vw, 560px);
+}
+
+#settings-dialog {
+  width: min(92vw, 420px);
+  min-height: 210px;
+}
+
+.settings-dialog-content {
+  min-height: 210px;
+  padding: 25px 28px 24px;
+}
+
+.settings-dialog .dialog-heading {
+  margin-bottom: 0;
 }
 
 .app-dialog[open] {
@@ -1375,7 +1580,7 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 14px;
+  margin-top: 24px;
   padding: 15px 16px 12px;
   border: 1px solid #292929;
   border-radius: 11px;
@@ -1480,7 +1685,7 @@ h2 {
 }
 
 .password-strength-note {
-  margin: -3px 0 0;
+  margin: 5px 0 0;
   color: #777;
   font-size: 9px;
   line-height: 1.45;

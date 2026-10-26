@@ -1,6 +1,7 @@
 (() => {
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
+  const { show: showToast } = ns.shared.toast;
 
   function init(ctx, { onDeleted }) {
     const dialog = $("#delete-profile-dialog");
@@ -43,6 +44,7 @@
         await ctx.api.deleteProfile(profile.id);
         close();
         await onDeleted();
+        showToast("Vault deleted.");
       } catch (cause) {
         ctx.setError(error, cause.message || "Could not delete this vault.");
       } finally {

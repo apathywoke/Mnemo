@@ -1,6 +1,7 @@
 (() => {
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
+  const { show: showToast } = ns.shared.toast;
 
   function create(ctx) {
     const state = ctx.state.access;
@@ -143,9 +144,14 @@
     }
 
     async function lockVault() {
-      await ctx.api.lockVault();
-      ctx.clearSensitiveFields();
-      await refreshState();
+      try {
+        await ctx.api.lockVault();
+        ctx.clearSensitiveFields();
+        await refreshState();
+        showToast("Vault locked.");
+      } catch (cause) {
+        showToast(cause.message || "Could not lock the vault.", { type: "error" });
+      }
     }
 
     ns.features.vaultAccess.bind(ctx, {

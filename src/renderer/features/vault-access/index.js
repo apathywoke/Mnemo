@@ -2,6 +2,7 @@
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
   const { conceal } = ns.shared.passwordVisibility;
+  const { show: showToast } = ns.shared.toast;
 
   function bind(ctx, access) {
     const createForm = $("#create-form");
@@ -28,11 +29,13 @@
         ctx.state.access.selectedProfileName = created.profile.name;
         ctx.clearSensitiveFields();
         await access.refreshState();
+        showToast("Vault created and unlocked.");
       } catch (cause) {
         $("#create-passphrase").value = "";
         $("#confirm-passphrase").value = "";
         if (cause.message === "The vault was created but remained locked.") {
           await access.refreshProfiles();
+          showToast("Vault created, but it stayed locked. Select it to unlock.");
           return;
         }
         ctx.setError($("#create-error"), cause.message || "Could not create the vault.");
@@ -53,6 +56,7 @@
         await ctx.api.unlockVault($("#unlock-passphrase").value);
         ctx.clearSensitiveFields();
         await access.refreshState();
+        showToast("Vault unlocked.");
       } catch (cause) {
         ctx.setError($("#unlock-error"), cause.message || "Could not unlock the vault.");
         $("#unlock-passphrase").value = "";
@@ -70,8 +74,9 @@
       const button = restoreForm.querySelector("button[type='submit']");
       button.disabled = true;
       button.textContent = "Checking…";
+      const restoringNewProfile = ctx.state.access.restoringNewProfile;
       try {
-        if (ctx.state.access.restoringNewProfile) {
+        if (restoringNewProfile) {
           const restored = await ctx.api.restoreNewProfile(
             $("#restore-profile-name").value,
             $("#restore-passphrase").value,
@@ -87,10 +92,12 @@
         }
         ctx.clearSensitiveFields();
         await access.refreshState();
+        showToast(restoringNewProfile ? "Backup restored as a new vault." : "Vault restored from backup.");
       } catch (cause) {
         $("#restore-passphrase").value = "";
         if (cause.message === "The vault was restored but the vault remained locked.") {
           await access.refreshProfiles();
+          showToast("Backup restored, but the vault stayed locked. Unlock it to continue.");
           return;
         }
         ctx.setError($("#restore-error"), cause.message || "Could not restore the vault.");

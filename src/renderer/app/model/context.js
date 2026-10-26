@@ -22,7 +22,6 @@
           fetchingFaviconForId: null,
         },
         ui: {
-          copyStatusTimer: null,
           lastActivitySentAt: 0,
           backNavigationInProgress: false,
         },
@@ -75,8 +74,6 @@
         $("#detail-notes-field").hidden = true;
         ns.entities.login.setSiteIcon($("#detail-icon"), "", "");
         ns.shared.passwordVisibility.setToggleButton($("#toggle-password-button"), false);
-        $("#copy-status").hidden = true;
-        $("#backup-status").hidden = true;
         for (const id of ["entry-dialog", "delete-dialog"]) {
           const dialog = $(`#${id}`);
           if (dialog.open) dialog.close();

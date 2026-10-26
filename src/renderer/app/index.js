@@ -2,6 +2,8 @@
   const ns = window.mnemoRenderer;
   const ctx = ns.app.createContext();
 
+  ns.features.settings.bind();
+
   // Page composition follows FSD direction: pages compose widgets and features;
   // the app layer wires pages together and owns application-wide navigation.
   ctx.pages.vault = ns.pages.vault.create(ctx);

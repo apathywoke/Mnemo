@@ -41,7 +41,25 @@
       <section class="workspace">
         <header class="workspace-header">
           <span class="eyebrow">SECURE ACCESS</span>
-          <div class="local-badge"><span></span> Stored on this Mac</div>
+          <div class="workspace-header-controls">
+            <button id="settings-button" type="button" class="quiet-button settings-button" aria-label="Settings" aria-haspopup="dialog" aria-controls="settings-dialog" title="Settings">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <g fill="currentColor" stroke="none">
+                  <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2"/>
+                  <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(45 12 12)"/>
+                  <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(90 12 12)"/>
+                  <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(135 12 12)"/>
+                  <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(180 12 12)"/>
+                  <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(225 12 12)"/>
+                  <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(270 12 12)"/>
+                  <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(315 12 12)"/>
+                </g>
+                <circle cx="12" cy="12" r="6.2" fill="#101010" stroke="currentColor" stroke-width="1.8"/>
+                <circle cx="12" cy="12" r="2.4" fill="#101010" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+            </button>
+            <div class="local-badge"><span></span> Stored on this Mac</div>
+          </div>
         </header>
 
         <section class="content" aria-live="polite">
@@ -249,15 +267,16 @@
             </div>
           </header>
 
-          <div class="recovery-warning backup-recovery-warning" role="note">
+          <div id="backup-recovery-warning" class="recovery-warning backup-recovery-warning" role="note">
             <span class="recovery-warning-mark" aria-hidden="true">!</span>
             <div>
               <strong>Keep your master passphrase safe</strong>
               <p>Every backup requires this same passphrase. Mnemo cannot recover it if lost.</p>
             </div>
+            <button id="dismiss-backup-warning" class="backup-warning-dismiss" type="button" aria-label="Dismiss this warning" title="Dismiss this warning">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+            </button>
           </div>
-          <p id="backup-status" class="backup-status" aria-live="polite" hidden></p>
-
           <div class="vault-browser">
             <aside class="entry-browser" aria-label="Vault logins">
               <div class="search-box">
@@ -308,7 +327,9 @@
                     <label>USERNAME</label>
                     <div class="detail-value-row">
                       <span id="detail-username" class="detail-value"></span>
-                      <button id="copy-username-button" type="button" class="copy-button">Copy</button>
+                      <button id="copy-username-button" type="button" class="copy-button password-copy-toggle" aria-label="Copy username" title="Copy username">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+                      </button>
                     </div>
                   </div>
                   <div class="detail-field">
@@ -318,7 +339,9 @@
                       <button id="toggle-password-button" type="button" class="copy-button password-visibility-toggle" aria-label="Show password" aria-pressed="false" title="Show password">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
                       </button>
-                      <button id="copy-password-button" type="button" class="copy-button">Copy</button>
+                      <button id="copy-password-button" type="button" class="copy-button password-copy-toggle" aria-label="Copy password" title="Copy password">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+                      </button>
                     </div>
                   </div>
                   <div id="detail-notes-field" class="detail-field" hidden>
@@ -326,7 +349,6 @@
                     <p id="detail-notes" class="detail-notes"></p>
                   </div>
                 </div>
-                <p id="copy-status" class="copy-status" aria-live="polite" hidden></p>
               </section>
               <section id="detail-empty" class="detail-empty">
                 <div class="detail-empty-mark" aria-hidden="true">＋</div>
@@ -491,8 +513,21 @@
         </footer>
       </section>
     </main>
+    <dialog id="settings-dialog" class="app-dialog settings-dialog" aria-labelledby="settings-dialog-title">
+      <div class="settings-dialog-content">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow section-label">APPLICATION</p>
+            <h3 id="settings-dialog-title">Settings</h3>
+          </div>
+          <button id="close-settings-dialog" type="button" class="dialog-close" aria-label="Close settings">×</button>
+        </div>
+      </div>
+    </dialog>
+    <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     <script src="./src/renderer/app/namespace.js"></script>
     <script src="./src/renderer/shared/lib/dom.js"></script>
+    <script src="./src/renderer/shared/ui/toast-notifications.js"></script>
     <script src="./src/renderer/shared/lib/password-tools.js"></script>
     <script src="./src/renderer/shared/ui/password-visibility.js"></script>
     <script src="./src/renderer/entities/vault-profile/model/profile.js"></script>
@@ -507,6 +542,7 @@
     <script src="./src/renderer/features/login-actions/index.js"></script>
     <script src="./src/renderer/features/vault-access/index.js"></script>
     <script src="./src/renderer/features/backup/index.js"></script>
+    <script src="./src/renderer/features/settings/index.js"></script>
     <script src="./src/renderer/widgets/vault-browser/index.js"></script>
     <script src="./src/renderer/pages/access/index.js"></script>
     <script src="./src/renderer/pages/vault/index.js"></script>

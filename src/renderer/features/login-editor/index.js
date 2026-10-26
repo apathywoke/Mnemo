@@ -2,6 +2,7 @@
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
   const { conceal } = ns.shared.passwordVisibility;
+  const { show: showToast } = ns.shared.toast;
 
   function init(ctx, { getEntry, refreshEntries, passwordGenerator }) {
     const form = $("#entry-form");
@@ -51,6 +52,7 @@
       const button = form.querySelector("button[type='submit']");
       button.disabled = true;
       button.textContent = "Saving…";
+      const wasEditing = Boolean($("#entry-id").value);
       try {
         const savedEntry = await ctx.api.saveEntry({
           id: $("#entry-id").value,
@@ -62,6 +64,7 @@
         });
         dialog.close();
         await refreshEntries(savedEntry.id);
+        showToast(wasEditing ? "Login updated." : "Login saved.");
       } catch (cause) {
         ctx.setError(error, cause.message || "Could not save this login.");
       } finally {

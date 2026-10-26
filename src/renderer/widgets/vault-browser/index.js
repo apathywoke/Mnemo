@@ -62,7 +62,6 @@
         updateSiteIconButton,
       });
       ns.shared.passwordVisibility.setToggleButton($("#toggle-password-button"), false);
-      $("#copy-status").hidden = true;
       renderEntryList();
     }
 

@@ -7,6 +7,10 @@
       if (ctx.state.ui.backNavigationInProgress) return;
       ctx.state.ui.backNavigationInProgress = true;
       try {
+        if ($("#settings-dialog").open) {
+          $("#settings-dialog").close();
+          return;
+        }
         if ($("#entry-dialog").open) {
           $("#entry-dialog").close();
           return;
@@ -65,6 +69,7 @@
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         const canGoBack =
+          $("#settings-dialog").open ||
           $("#entry-dialog").open ||
           $("#delete-dialog").open ||
           ctx.pages.access.isProfileDeleteDialogOpen() ||
