@@ -32,14 +32,23 @@ test("vault lifecycle, encrypted entries, validation, icon storage, and locking"
   assert.equal(login.name, "Example account");
   assert.equal(login.url, "https://example.com/login");
   assert.equal(login.favicon, "");
+  assert.equal(Object.hasOwn(login, "password"), false);
 
   const encrypted = await fs.readFile(filePath, "utf8");
   assert.equal(encrypted.includes(login.password), false);
   assert.equal(encrypted.includes(login.username), false);
 
-  const copiedEntry = store.getEntries()[0];
+  const copiedEntry = store.listEntries()[0];
   copiedEntry.name = "mutated copy";
-  assert.equal(store.getEntries()[0].name, "Example account");
+  assert.equal(store.listEntries()[0].name, "Example account");
+  assert.deepEqual(Object.keys(copiedEntry).sort(), [
+    "createdAt", "favicon", "id", "name", "type", "updatedAt", "url", "username",
+  ]);
+  assert.equal(store.getEntry(login.id).notes, "local test data");
+  assert.equal(Object.hasOwn(store.getEntry(login.id), "password"), false);
+  assert.equal(store.revealPassword(login.id), "test-password-value");
+  assert.throws(() => store.revealPassword("not-an-id"), /Invalid login entry/);
+  assert.equal(JSON.stringify(store.vaultData).includes("test-password-value"), false);
 
   await assert.rejects(
     store.saveEntry(makeLogin({ name: "   " })),
@@ -76,10 +85,14 @@ test("vault lifecycle, encrypted entries, validation, icon storage, and locking"
   assert.equal(edited.id, login.id);
   assert.equal(edited.createdAt, login.createdAt);
   assert.equal(edited.favicon, favicon);
-  assert.equal(store.getEntries()[0].name, "Renamed account");
+  assert.equal(store.listEntries()[0].name, "Renamed account");
+  assert.equal(store.revealPassword(login.id), "updated-password");
+
+  await store.saveEntry({ ...makeLogin({ id: login.id, name: "Kept password" }), password: "" });
+  assert.equal(store.revealPassword(login.id), "updated-password");
 
   await store.deleteEntry(login.id);
-  assert.deepEqual(store.getEntries(), []);
+  assert.deepEqual(store.listEntries(), []);
   await assert.rejects(store.deleteEntry(login.id), /no longer exists/);
   await assert.rejects(store.deleteEntry("not-an-id"), /Invalid login entry/);
 
@@ -90,13 +103,14 @@ test("vault lifecycle, encrypted entries, validation, icon storage, and locking"
     unlocked: false,
     entryCount: 0,
   });
-  assert.throws(() => store.getEntries(), /Unlock the vault first/);
+  assert.throws(() => store.listEntries(), /Unlock the vault first/);
+  assert.throws(() => store.revealPassword(login.id), /Unlock the vault first/);
   await assert.rejects(store.unlock("wrong passphrase"), /Could not open the vault/);
 
   const unlocked = await store.unlock(PASSPHRASE);
   assert.equal(unlocked.unlocked, true);
   assert.equal(unlocked.entryCount, 1);
-  assert.equal(store.getEntries()[0].password, "test-password-value");
+  assert.equal(store.revealPassword(store.listEntries()[0].id), "test-password-value");
 });
 
 test("backup export and restore reject tampering and wrong passphrases", async (t) => {
@@ -131,7 +145,7 @@ test("backup export and restore reject tampering and wrong passphrases", async (
   const status = await restored.restoreBackup(backupPath, PASSPHRASE);
   assert.equal(status.unlocked, true);
   assert.equal(status.entryCount, 1);
-  assert.equal(restored.getEntries()[0].password, "test-password-value");
+  assert.equal(restored.revealPassword(restored.listEntries()[0].id), "test-password-value");
 
   const restoredBytes = await fs.readFile(restored.filePath, "utf8");
   assert.equal(restoredBytes, originalBytes);
@@ -154,7 +168,47 @@ test("backup restoration is serialized with entry mutations", async (t) => {
   await Promise.all([restore, saveAfterRestore]);
 
   assert.deepEqual(
-    new Set(target.getEntries().map((entry) => entry.name)),
+    new Set(target.listEntries().map((entry) => entry.name)),
     new Set(["From backup", "Saved during restore"]),
   );
+});
+
+test("schema 1 vaults with plain password fields are upgraded to sealed passwords", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new VaultStore(path.join(directory, "legacy.vault"));
+  await store.create(PASSPHRASE);
+  const { id } = await store.saveEntry(makeLogin());
+
+  // Rewrite the vault as schema 1, the format used before per-entry sealing.
+  const legacyEntries = store.vaultData.entries.map((entry) => ({
+    ...entry,
+    password: store.revealPassword(entry.id),
+  }));
+  await store.persistVaultData({ schemaVersion: 1, entries: legacyEntries });
+  store.lock();
+
+  await store.unlock(PASSPHRASE);
+  assert.equal(store.vaultData.schemaVersion, 2);
+  assert.equal(typeof store.vaultData.entries[0].password, "object");
+  assert.equal(store.revealPassword(id), "test-password-value");
+
+  await store.saveEntry(makeLogin({ id, name: "Upgraded", password: "" }));
+  store.lock();
+  await store.unlock(PASSPHRASE);
+  assert.equal(store.vaultData.schemaVersion, 2);
+  assert.equal(store.revealPassword(id), "test-password-value");
+});
+
+test("sealed passwords are bound to their entry ID", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new VaultStore(path.join(directory, "bound.vault"));
+  await store.create(PASSPHRASE);
+  const first = await store.saveEntry(makeLogin({ name: "First", password: "first-secret" }));
+  const second = await store.saveEntry(makeLogin({ name: "Second", password: "second-secret" }));
+
+  const [firstEntry, secondEntry] = ["First", "Second"].map((name) =>
+    store.vaultData.entries.find((entry) => entry.name === name));
+  secondEntry.password = firstEntry.password;
+  assert.equal(store.revealPassword(first.id), "first-secret");
+  assert.throws(() => store.revealPassword(second.id), /Could not decrypt/);
 });

@@ -15,7 +15,17 @@ const { fetchSiteFavicon, getFaviconHost } = require("./favicon-fetcher");
 
 const APP_PAGE = path.join(__dirname, "index.html");
 const AUTO_LOCK_MS = 5 * 60 * 1000;
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+const CLIPBOARD_CLEAR_MS = 30_000;
+const COPYABLE_ENTRY_FIELDS = new Set(["username", "password"]);
+// Chromium's remote debugging switches have no Electron fuse. A local process
+// that relaunches the app with them could drive the unlocked renderer and call
+// the preload API, so packaged builds refuse to start with them.
+const REMOTE_DEBUGGING_SWITCHES = ["remote-debugging-port", "remote-debugging-pipe"];
+const launchedWithRemoteDebugging =
+  app.isPackaged === true &&
+  REMOTE_DEBUGGING_SWITCHES.some((name) => app.commandLine.hasSwitch(name));
+const hasSingleInstanceLock =
+  !launchedWithRemoteDebugging && app.requestSingleInstanceLock();
 let mainWindow = null;
 let vaultStore = null;
 let profileManager = null;
@@ -25,6 +35,19 @@ let autoLockTimer = null;
 let clipboardClearTimer = null;
 let ownedClipboardText = null;
 let clipboardOperationQueue = Promise.resolve();
+// Native dialogs that display vault data; lockVault() closes them so a revealed
+// password does not stay on screen after the vault locks.
+const openVaultDialogs = new Set();
+
+async function showVaultDialog(options) {
+  const controller = new AbortController();
+  openVaultDialogs.add(controller);
+  try {
+    return await dialog.showMessageBox(mainWindow, { ...options, signal: controller.signal });
+  } finally {
+    openVaultDialogs.delete(controller);
+  }
+}
 
 function enqueueClipboardOperation(operation) {
   const result = clipboardOperationQueue.then(operation);
@@ -55,6 +78,18 @@ async function clearOwnedClipboardNow() {
   }
 }
 
+function copyToClipboardTemporarily(value) {
+  return enqueueClipboardOperation(async () => {
+    await clearOwnedClipboardNow();
+    await clipboard.writeText(value);
+    ownedClipboardText = value;
+    clipboardClearTimer = setTimeout(() => {
+      void clearTemporaryClipboard();
+    }, CLIPBOARD_CLEAR_MS);
+    return { clearsAfterMs: CLIPBOARD_CLEAR_MS };
+  });
+}
+
 function clearTemporaryClipboard() {
   return enqueueClipboardOperation(clearOwnedClipboardNow);
 }
@@ -63,6 +98,8 @@ function lockVault(notifyRenderer = false) {
   lockEpoch += 1;
   const wasUnlocked = vaultStore?.isUnlocked() ?? false;
   clearAutoLockTimer();
+  for (const controller of openVaultDialogs) controller.abort();
+  openVaultDialogs.clear();
   clearTemporaryClipboard();
   vaultStore?.lock();
 
@@ -108,9 +145,13 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
       webSecurity: true,
+      devTools: !app.isPackaged,
     },
   });
 
+  // WebRTC ICE traffic bypasses webRequest and CSP connect-src; keep it from
+  // opening direct UDP connections (the session proxy below blocks the rest).
+  mainWindow.webContents.setWebRTCIPHandlingPolicy?.("disable_non_proxied_udp");
   mainWindow.once("ready-to-show", () => mainWindow.show());
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   mainWindow.webContents.on("will-navigate", (event, targetUrl) => {
@@ -145,7 +186,9 @@ function registerHandler(channel, handler) {
   });
 }
 
-if (!hasSingleInstanceLock) {
+if (launchedWithRemoteDebugging) {
+  app.exit(1);
+} else if (!hasSingleInstanceLock) {
   app.quit();
 } else {
   app.on("second-instance", () => {
@@ -165,6 +208,14 @@ if (!hasSingleInstanceLock) {
     session.defaultSession.setPermissionRequestHandler(
       (_webContents, _permission, callback) => callback(false),
     );
+    // Without a check handler Electron reports every permission (including
+    // clipboard-read) as granted to synchronous checks.
+    session.defaultSession.setPermissionCheckHandler(() => false);
+    session.defaultSession.setDevicePermissionHandler?.(() => false);
+    // The renderer never needs the network. Route any Chromium traffic that
+    // escapes webRequest (WebRTC TURN/STUN over TCP) to a closed local port.
+    // The favicon fetcher uses Node's https module and is unaffected.
+    void session.defaultSession.setProxy?.({ proxyRules: "socks5://127.0.0.1:9" });
 
     powerMonitor.on("lock-screen", () => lockVault(true));
     powerMonitor.on("suspend", () => lockVault(true));
@@ -247,19 +298,22 @@ if (!hasSingleInstanceLock) {
       }
       return status;
     });
-    registerHandler("vault:get-entries", () => vaultStore.getEntries());
+    // The renderer gets entry metadata only. Passwords are decrypted in this
+    // process on an explicit copy or reveal and are never returned over IPC.
+    registerHandler("vault:list-entries", () => vaultStore.listEntries());
+    registerHandler("vault:get-entry", (entryId) => vaultStore.getEntry(entryId));
     registerHandler("vault:save-entry", (entry) =>
       vaultStore.saveEntry(entry),
     );
     registerHandler("vault:fetch-site-icon", async (entryId) => {
       if (!vaultStore.isUnlocked()) throw new Error("Unlock the vault first.");
-      const entry = vaultStore.getEntries().find((item) => item.id === entryId);
-      if (!entry || !entry.url) {
+      const entry = vaultStore.getEntry(entryId);
+      if (!entry.url) {
         throw new Error("Add a website address to this login first.");
       }
 
       const hostname = getFaviconHost(entry.url);
-      const confirmation = await dialog.showMessageBox(mainWindow, {
+      const confirmation = await showVaultDialog({
         type: "info",
         title: "Load website icon?",
         message: `Request the icon from ${hostname}?`,
@@ -280,25 +334,32 @@ if (!hasSingleInstanceLock) {
       };
     });
     registerHandler("vault:delete-entry", (id) => vaultStore.deleteEntry(id));
-    registerHandler("clipboard:copy-secret", (value) => {
-      if (
-        !vaultStore.isUnlocked() ||
-        typeof value !== "string" ||
-        value.length === 0 ||
-        value.length > 65536
-      ) {
+    registerHandler("vault:copy-entry-field", (entryId, field) => {
+      if (!COPYABLE_ENTRY_FIELDS.has(field)) {
         throw new Error("Could not copy this value.");
       }
-
-      return enqueueClipboardOperation(async () => {
-        await clearOwnedClipboardNow();
-        await clipboard.writeText(value);
-        ownedClipboardText = value;
-        clipboardClearTimer = setTimeout(() => {
-          void clearTemporaryClipboard();
-        }, 30_000);
-        return { clearsAfterMs: 30_000 };
+      const value = field === "password"
+        ? vaultStore.revealPassword(entryId)
+        : vaultStore.getEntry(entryId).username;
+      if (!value) throw new Error("Could not copy this value.");
+      return copyToClipboardTemporarily(value);
+    });
+    registerHandler("vault:reveal-password", async (entryId) => {
+      const entry = vaultStore.getEntry(entryId);
+      const password = vaultStore.revealPassword(entry.id);
+      // Shown in a native dialog owned by the main process, so the plaintext
+      // never enters the renderer's JavaScript heap or DOM.
+      await showVaultDialog({
+        type: "none",
+        title: entry.name,
+        message: entry.name,
+        detail: password,
+        buttons: ["Done"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
       });
+      return { shown: true };
     });
     registerHandler("vault:export-backup", async () => {
       const selection = await dialog.showSaveDialog(mainWindow, {
@@ -312,6 +373,11 @@ if (!hasSingleInstanceLock) {
       return { canceled: false };
     });
     registerHandler("vault:restore-backup", async (passphrase) => {
+      // Bind to the vault that was open when the request started; a profile
+      // switch or lock while the dialogs are open cancels the restore.
+      const store = vaultStore;
+      const restoreEpoch = lockEpoch;
+      const isStale = () => store !== vaultStore || lockEpoch !== restoreEpoch;
       const selection = await dialog.showOpenDialog(mainWindow, {
         title: "Choose encrypted backup",
         buttonLabel: "Choose Backup",
@@ -321,8 +387,9 @@ if (!hasSingleInstanceLock) {
       if (selection.canceled || selection.filePaths.length === 0) {
         return { canceled: true };
       }
+      if (isStale()) throw new Error("Restore was interrupted because the vault was locked.");
 
-      if ((await vaultStore.getStatus()).vaultExists) {
+      if ((await store.getStatus()).vaultExists) {
         const confirmation = await dialog.showMessageBox(mainWindow, {
           type: "warning",
           title: "Replace the current vault?",
@@ -335,8 +402,13 @@ if (!hasSingleInstanceLock) {
         });
         if (confirmation.response !== 1) return { canceled: true };
       }
+      if (isStale()) throw new Error("Restore was interrupted because the vault was locked.");
 
-      await vaultStore.restoreBackup(selection.filePaths[0], passphrase);
+      await store.restoreBackup(selection.filePaths[0], passphrase);
+      if (isStale()) {
+        store.lock();
+        throw new Error("Restore was interrupted because the vault was locked.");
+      }
       return { canceled: false };
     });
     registerHandler("vault:lock", () => {

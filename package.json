@@ -6,9 +6,14 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test"
+    "test": "node --test",
+    "dist:mac": "electron-builder --mac --config electron-builder.config.js",
+    "pack:mac:local": "MNEMO_LOCAL_TEST_BUILD=1 electron-builder --mac dir --config electron-builder.config.js -c.forceCodeSigning=false -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false",
+    "verify:mac": "node scripts/verify-mac-release.js"
   },
   "devDependencies": {
-    "electron": "45.0.0"
+    "@electron/fuses": "2.1.3",
+    "electron": "45.0.0",
+    "electron-builder": "26.17.0"
   }
 }

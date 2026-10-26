@@ -14,6 +14,8 @@
       form.reset();
       $("#entry-id").value = "";
       passwordInput.value = "";
+      passwordInput.required = true;
+      passwordInput.placeholder = "";
       conceal(form);
       error.hidden = true;
       $("#password-length-value").value = $("#password-length").value;
@@ -28,16 +30,27 @@
       $("#entry-name").focus();
     }
 
-    function openEdit() {
-      const entry = getEntry(ctx.state.vault.selectedEntryId);
-      if (!entry) return;
+    async function openEdit() {
+      const summary = getEntry(ctx.state.vault.selectedEntryId);
+      if (!summary) return;
+      let entry;
+      try {
+        entry = await ctx.api.getEntry(summary.id);
+      } catch (cause) {
+        showToast(cause.message || "Could not open this login.", { type: "error" });
+        return;
+      }
+      if (ctx.state.vault.selectedEntryId !== entry.id) return;
       clearForm();
       $("#entry-dialog-title").textContent = "Edit login";
       $("#entry-id").value = entry.id;
       $("#entry-name").value = entry.name;
       $("#entry-url").value = entry.url;
       $("#entry-username").value = entry.username;
-      passwordInput.value = entry.password;
+      // The current password stays in the main process; leaving the field
+      // empty keeps it.
+      passwordInput.required = false;
+      passwordInput.placeholder = "Leave blank to keep the current password";
       $("#entry-notes").value = entry.notes;
       conceal(form);
       passwordGenerator.updatePasswordStrength();
