@@ -43,42 +43,55 @@
           : "Load site icon";
     }
 
+    async function loadSelectedNotes(id) {
+      try {
+        const details = await ctx.api.getEntry(id);
+        if (state.selectedEntryId !== id) return;
+        state.selectedEntryNotes = details.notes;
+        ns.entities.login.renderDetail(getEntry(id), detailUi, {
+          notes: details.notes,
+          updateSiteIconButton,
+        });
+      } catch {
+        // The list stays usable; the vault may have locked meanwhile.
+      }
+    }
+
     function renderEntryDetail(id) {
       const entry = getEntry(id);
       if (!entry) {
         state.selectedEntryId = null;
-        state.passwordVisible = false;
-        ns.entities.login.renderDetail(null, detailUi, {
-          passwordVisible: false,
-          updateSiteIconButton,
-        });
+        state.selectedEntryNotes = "";
+        ns.entities.login.renderDetail(null, detailUi, { updateSiteIconButton });
         renderEntryList();
         return;
       }
+      const notes = state.selectedEntryId === entry.id ? state.selectedEntryNotes : "";
+      const needsNotes = state.selectedEntryId !== entry.id;
       state.selectedEntryId = entry.id;
-      state.passwordVisible = false;
-      ns.entities.login.renderDetail(entry, detailUi, {
-        passwordVisible: false,
-        updateSiteIconButton,
-      });
-      ns.shared.passwordVisibility.setToggleButton($("#toggle-password-button"), false);
+      state.selectedEntryNotes = notes;
+      ns.entities.login.renderDetail(entry, detailUi, { notes, updateSiteIconButton });
       renderEntryList();
+      if (needsNotes) void loadSelectedNotes(entry.id);
     }
 
     async function refreshEntries(preferredId = null, selectFirst = false) {
-      state.entries = await ctx.api.getEntries();
+      state.entries = await ctx.api.listEntries();
+      const previousId = state.selectedEntryId;
+      // Saved entries may have changed notes; clearing the selection makes
+      // renderEntryDetail fetch them again.
+      state.selectedEntryId = null;
       const nextId = preferredId && getEntry(preferredId)
         ? preferredId
-        : state.selectedEntryId && getEntry(state.selectedEntryId)
-          ? state.selectedEntryId
+        : previousId && getEntry(previousId)
+          ? previousId
           : selectFirst
             ? state.entries[0]?.id ?? null
             : null;
       renderEntryList();
       if (nextId) renderEntryDetail(nextId);
       else {
-        state.selectedEntryId = null;
-        state.passwordVisible = false;
+        state.selectedEntryNotes = "";
         detailUi.detail.hidden = true;
         detailUi.empty.hidden = false;
       }
@@ -87,7 +100,7 @@
     function clear() {
       state.entries = [];
       state.selectedEntryId = null;
-      state.passwordVisible = false;
+      state.selectedEntryNotes = "";
       state.fetchingFaviconForId = null;
       $("#entry-search").value = "";
       renderEntryList();

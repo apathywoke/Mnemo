@@ -15,8 +15,13 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   const webRequestOptions = [];
   const sentToRenderer = [];
   let browserWindow;
+  let permissionCheckHandler;
   let clipboardText = "";
   let messageResponse = 0;
+  const messageBoxes = [];
+  let holdDialogs = false;
+  let webRtcPolicy;
+  let proxyConfig;
   let openSelection = { canceled: true, filePaths: [] };
   let saveSelection = { canceled: true, filePath: undefined };
   const app = Object.assign(appEvents, {
@@ -34,6 +39,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
         this.options = options;
         this.webContents = new EventEmitter();
         this.webContents.setWindowOpenHandler = () => {};
+        this.webContents.setWebRTCIPHandlingPolicy = (policy) => { webRtcPolicy = policy; };
         this.webContents.isDestroyed = () => false;
         this.webContents.send = (...args) => sentToRenderer.push(args);
         this.loadFile = () => Promise.resolve();
@@ -54,7 +60,13 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
       clear: async () => { clipboardText = ""; },
     },
     dialog: {
-      showMessageBox: async () => ({ response: messageResponse }),
+      showMessageBox: async (_window, options) => {
+        messageBoxes.push(options);
+        if (holdDialogs) {
+          await new Promise((resolve) => options.signal.addEventListener("abort", resolve));
+        }
+        return { response: messageResponse };
+      },
       showOpenDialog: async () => openSelection,
       showSaveDialog: async () => saveSelection,
     },
@@ -69,6 +81,8 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
           onBeforeRequest: (...args) => webRequestOptions.push(args),
         },
         setPermissionRequestHandler() {},
+        setPermissionCheckHandler(handler) { permissionCheckHandler = handler; },
+        setProxy: async (config) => { proxyConfig = config; },
       },
     },
     nativeImage: { createFromBuffer: () => ({ isEmpty: () => true }) },
@@ -96,6 +110,10 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal(browserWindow.options.webPreferences.contextIsolation, true);
   assert.equal(browserWindow.options.webPreferences.sandbox, true);
   assert.equal(webRequestOptions.length, 1);
+  assert.equal(permissionCheckHandler(null, "clipboard-read"), false);
+  assert.equal(webRtcPolicy, "disable_non_proxied_udp");
+  assert.match(proxyConfig.proxyRules, /^socks5:\/\/127\.0\.0\.1:/);
+  assert.equal(browserWindow.options.webPreferences.devTools, true);
   assert.equal(handlers.has("vault:fetch-site-icon"), true);
 
   const trustedFrame = { url: pathToFileURL(path.join(__dirname, "..", "index.html")).href };
@@ -119,19 +137,48 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal((await invoke("vault:get-status")).entryCount, 0);
 
   const saved = await invoke("vault:save-entry", makeLogin());
-  assert.equal((await invoke("vault:get-entries")).length, 1);
+  assert.equal(Object.hasOwn(saved, "password"), false);
+  const listed = await invoke("vault:list-entries");
+  assert.equal(listed.length, 1);
+  assert.equal(JSON.stringify(listed).includes("test-password-value"), false);
+  assert.equal(Object.hasOwn(listed[0], "notes"), false);
+  assert.equal((await invoke("vault:get-entry", saved.id)).notes, "local test data");
+  assert.equal(JSON.stringify(await invoke("vault:get-entry", saved.id)).includes("test-password-value"), false);
   messageResponse = 0;
   assert.deepEqual(await invoke("vault:fetch-site-icon", saved.id), { canceled: true });
   assert.deepEqual(await invoke("vault:export-backup"), { canceled: true });
   assert.deepEqual(await invoke("vault:restore-backup", "correct horse battery staple"), { canceled: true });
 
-  assert.deepEqual(await invoke("clipboard:copy-secret", "clipboard-secret"), { clearsAfterMs: 30000 });
-  assert.equal(clipboardText, "clipboard-secret");
+  assert.equal(handlers.has("clipboard:copy-secret"), false);
+  assert.deepEqual(await invoke("vault:copy-entry-field", saved.id, "username"), { clearsAfterMs: 30000 });
+  assert.equal(clipboardText, "user@example.com");
+  await assert.rejects(invoke("vault:copy-entry-field", saved.id, "notes"), /Could not copy/);
+  await assert.rejects(untrustedInvoke("vault:copy-entry-field", saved.id, "password"), /untrusted frame/);
+  assert.deepEqual(await invoke("vault:copy-entry-field", saved.id, "password"), { clearsAfterMs: 30000 });
+  assert.equal(clipboardText, "test-password-value");
+
+  messageBoxes.length = 0;
+  assert.deepEqual(await invoke("vault:reveal-password", saved.id), { shown: true });
+  assert.equal(messageBoxes.length, 1);
+  assert.equal(messageBoxes[0].detail, "test-password-value");
+
+  // A revealed password must not outlive the unlocked session.
+  holdDialogs = true;
+  const pendingReveal = invoke("vault:reveal-password", saved.id);
+  await new Promise((resolve) => setImmediate(resolve));
+  const heldDialog = messageBoxes.at(-1);
+  assert.equal(heldDialog.signal.aborted, false);
+  powerMonitor.emit("lock-screen");
+  assert.equal(heldDialog.signal.aborted, true);
+  assert.deepEqual(sentToRenderer.splice(0), [["vault:auto-locked"]]);
+  await pendingReveal;
+  holdDialogs = false;
+  await invoke("vault:unlock", "correct horse battery staple");
   assert.equal((await invoke("vault:lock")).unlocked, false);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(clipboardText, "");
-  await assert.rejects(invoke("clipboard:copy-secret", "secret"), /Could not copy/);
-  await assert.rejects(invoke("vault:get-entries"), /Unlock the vault first/);
+  await assert.rejects(invoke("vault:copy-entry-field", saved.id, "password"), /Unlock the vault first/);
+  await assert.rejects(invoke("vault:list-entries"), /Unlock the vault first/);
 
   await invoke("profiles:choose");
   assert.deepEqual(await invoke("profiles:restore-new", "Imported", "correct horse battery staple"), { canceled: true });
@@ -140,7 +187,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal(selected.unlocked, false);
   await invoke("vault:unlock", "correct horse battery staple");
   await invoke("vault:delete-entry", saved.id);
-  assert.equal((await invoke("vault:get-entries")).length, 0);
+  assert.equal((await invoke("vault:list-entries")).length, 0);
   await assert.rejects(invoke("profiles:delete", profileId), /Lock the current vault/);
 
   assert.equal((await invoke("vault:lock")).unlocked, false);

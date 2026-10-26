@@ -2,7 +2,8 @@
 
 ## Status
 
-This is an unaudited prototype. It supports encrypted login entries, search,
+This is a prototype. It has had an internal review and has a written threat
+model (`docs/THREAT_MODEL.md`), but no independent third-party audit. It supports encrypted login entries, search,
 editing, deletion, encrypted backup, and restore. Do not use it for real
 passwords until the design has received independent security review.
 
@@ -26,9 +27,18 @@ passwords until the design has received independent security review.
 - Each profile has an independent encrypted vault file and master passphrase.
   Profile names and IDs are stored in a local, permission-restricted registry
   in plain text; profile names are not secret vault data.
-- The renderer receives decrypted entries while the vault is open. Keys and
-  entry data are cleared from managed buffers and UI fields on lock where
-  possible, but JavaScript strings and objects cannot be reliably zeroized.
+- The renderer receives only entry metadata (name, username, website, icon,
+  timestamps). Notes are fetched for the selected entry. Passwords never cross
+  IPC: the main process decrypts one password when the user copies it, or
+  shows it in a native dialog owned by the main process. Editing a login
+  leaves the password field empty, and an empty field keeps the stored value.
+- Inside the encrypted vault data (schema 2), each password is sealed again
+  with AES-256-GCM under the vault key, with the entry ID as associated data,
+  so unlocking does not decrypt every password. Schema 1 vaults and backups are
+  upgraded in memory on unlock and written as schema 2 on the next save.
+- Keys and entry data are cleared from managed buffers and UI fields on lock
+  where possible, but JavaScript strings and objects cannot be reliably
+  zeroized.
 - Copying a username or password writes it to the system clipboard and clears
   it after 30 seconds if its plain-text contents still match the copied value.
   If another app replaces that text, the app leaves the new clipboard contents
@@ -60,6 +70,12 @@ passwords until the design has received independent security review.
   preserves aspect ratio, converts the result to PNG, and saves it within the
   encrypted vault. These requests are not repeated unless the user explicitly
   loads or updates the icon.
+- Release builds are signed with a Developer ID certificate and the hardened
+  runtime, notarized, and have Electron fuses set: `RunAsNode`,
+  `EnableNodeCliInspectArguments`, and `EnableNodeOptionsEnvironmentVariable`
+  are off; `OnlyLoadAppFromAsar` and embedded asar integrity validation are on.
+  Packaged builds refuse to start with Chromium remote-debugging switches. See
+  `docs/RELEASING.md`.
 - There is no independent backup passphrase or recovery mechanism for a
   forgotten master passphrase.
 - Deleting a profile unlinks its encrypted vault file. It does not guarantee
@@ -68,9 +84,9 @@ passwords until the design has received independent security review.
 
 ## Before storing real credentials
 
-Document a threat model, review file permissions, clipboard behavior, and
-backup recovery, and obtain independent security review before treating this as
-a real password manager. Changes that add network access must document every
+The threat model is in `docs/THREAT_MODEL.md`, including the residual risks
+and open findings from the internal review. Obtain an independent third-party
+security review before treating this as a real password manager. Changes that add network access must document every
 connection and must not add telemetry by default.
 
 ## Reporting a vulnerability

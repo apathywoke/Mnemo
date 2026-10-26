@@ -12,6 +12,11 @@ const {
 const scryptAsync = promisify(scrypt);
 const FORMAT = "local-vault";
 const FORMAT_VERSION = 1;
+// Schema 1 stored passwords as plain strings inside the encrypted vault data.
+// Schema 2 additionally seals each password under the vault key, bound to its
+// entry ID, so unlocking does not decrypt every password at once.
+const VAULT_SCHEMA_VERSION = 2;
+const LEGACY_VAULT_SCHEMA_VERSION = 1;
 const KDF = Object.freeze({ name: "scrypt", N: 2 ** 17, r: 8, p: 1 });
 const KEY_BYTES = 32;
 const SALT_BYTES = 16;
@@ -30,6 +35,9 @@ const ENTRY_LIMITS = Object.freeze({
   url: 2048,
   notes: 16384,
 });
+const TEXT_FIELDS = Object.freeze(["name", "username", "url", "notes"]);
+// UTF-8 needs at most three bytes per UTF-16 code unit.
+const MAX_SEALED_PASSWORD_BYTES = ENTRY_LIMITS.password * 3;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_PASSPHRASE_BYTES = 1024;
 const MIN_PASSPHRASE_CHARACTERS = 7;
@@ -108,6 +116,48 @@ function decryptGcm(record, key, aad, exactCiphertextLength = null) {
   decipher.setAAD(aad);
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+}
+
+function getPasswordAad(entryId) {
+  return Buffer.from(
+    `local-vault:entry-password:v${VAULT_SCHEMA_VERSION}:${entryId}`,
+    "utf8",
+  );
+}
+
+function sealPassword(password, dataKey, entryId) {
+  const plaintext = Buffer.from(password, "utf8");
+  try {
+    return encryptGcm(plaintext, dataKey, getPasswordAad(entryId));
+  } finally {
+    plaintext.fill(0);
+  }
+}
+
+function openPassword(record, dataKey, entryId) {
+  const plaintext = decryptGcm(record, dataKey, getPasswordAad(entryId));
+  try {
+    return plaintext.toString("utf8");
+  } finally {
+    plaintext.fill(0);
+  }
+}
+
+function isValidSealedPassword(record) {
+  if (
+    !hasExactKeys(record, ["name", "nonce", "tag", "ciphertext"]) ||
+    record.name !== "aes-256-gcm"
+  ) {
+    return false;
+  }
+  try {
+    decodeBase64(record.nonce, NONCE_BYTES, NONCE_BYTES);
+    decodeBase64(record.tag, TAG_BYTES, TAG_BYTES);
+    decodeBase64(record.ciphertext, 1, MAX_SEALED_PASSWORD_BYTES);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function validatePassphrase(passphrase) {
@@ -203,15 +253,16 @@ function parseEnvelope(envelope) {
 function validateVaultData(value) {
   return (
     hasExactKeys(value, ["schemaVersion", "entries"]) &&
-    value.schemaVersion === 1 &&
+    (value.schemaVersion === VAULT_SCHEMA_VERSION ||
+      value.schemaVersion === LEGACY_VAULT_SCHEMA_VERSION) &&
     Array.isArray(value.entries) &&
     value.entries.length <= MAX_ENTRIES &&
-    value.entries.every(isValidLoginEntry) &&
+    value.entries.every((entry) => isValidLoginEntry(entry, value.schemaVersion)) &&
     new Set(value.entries.map((entry) => entry.id)).size === value.entries.length
   );
 }
 
-function isValidLoginEntry(entry) {
+function isValidLoginEntry(entry, schemaVersion) {
   if (
     (!hasExactKeys(entry, [
       "id",
@@ -248,7 +299,7 @@ function isValidLoginEntry(entry) {
 
   if (!isValidFavicon(entry.favicon ?? "")) return false;
 
-  for (const field of Object.keys(ENTRY_LIMITS)) {
+  for (const field of TEXT_FIELDS) {
     if (
       typeof entry[field] !== "string" ||
       entry[field].length > ENTRY_LIMITS[field]
@@ -258,8 +309,49 @@ function isValidLoginEntry(entry) {
   }
 
   if (!entry.name.trim()) return false;
-  if (!entry.password) return false;
+  if (schemaVersion === LEGACY_VAULT_SCHEMA_VERSION) {
+    if (
+      typeof entry.password !== "string" ||
+      entry.password.length === 0 ||
+      entry.password.length > ENTRY_LIMITS.password
+    ) {
+      return false;
+    }
+  } else if (!isValidSealedPassword(entry.password)) {
+    return false;
+  }
   return isAllowedWebsite(entry.url);
+}
+
+function upgradeVaultData(vaultData, dataKey) {
+  if (vaultData.schemaVersion === VAULT_SCHEMA_VERSION) return vaultData;
+  // The legacy password strings already exist in memory after parsing; this
+  // seals them so later reads go through revealPassword(). The next save
+  // writes schema 2.
+  return {
+    schemaVersion: VAULT_SCHEMA_VERSION,
+    entries: vaultData.entries.map((entry) => ({
+      ...entry,
+      password: sealPassword(entry.password, dataKey, entry.id),
+    })),
+  };
+}
+
+function toEntrySummary(entry) {
+  return {
+    id: entry.id,
+    type: entry.type,
+    name: entry.name,
+    username: entry.username,
+    url: entry.url,
+    favicon: entry.favicon ?? "",
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
+  };
+}
+
+function toEntryDetails(entry) {
+  return { ...toEntrySummary(entry), notes: entry.notes };
 }
 
 function isValidFavicon(value) {
@@ -319,7 +411,6 @@ function normalizeLoginInput(input) {
 
   const name = input.name.trim();
   if (!name) throw new Error("Enter a name for this login.");
-  if (!input.password) throw new Error("Enter a password for this login.");
 
   let url = input.url.trim();
   if (url && !/^[a-z][a-z\d+.-]*:\/\//i.test(url)) url = `https://${url}`;
@@ -389,7 +480,7 @@ class VaultStore {
       if (this.sessionEpoch !== sessionEpoch) {
         throw new Error("Creation was interrupted because the vault was locked.");
       }
-      const vaultData = { schemaVersion: 1, entries: [] };
+      const vaultData = { schemaVersion: VAULT_SCHEMA_VERSION, entries: [] };
       const envelope = makeEnvelope(vaultData, wrappingKey, dataKey, salt);
       await this.writeEnvelope(envelope);
       if (this.sessionEpoch !== sessionEpoch) {
@@ -431,12 +522,37 @@ class VaultStore {
     return this.getStatus();
   }
 
-  getEntries() {
+  // Returns display metadata only. Passwords and notes stay in the main process
+  // until a caller asks for one entry explicitly.
+  listEntries() {
     this.requireUnlocked();
     return this.vaultData.entries
       .slice()
       .sort((left, right) => right.updatedAt - left.updatedAt)
-      .map((entry) => ({ ...entry }));
+      .map(toEntrySummary);
+  }
+
+  getEntry(id) {
+    return toEntryDetails(this.findEntry(id));
+  }
+
+  revealPassword(id) {
+    const entry = this.findEntry(id);
+    try {
+      return openPassword(entry.password, this.dataKey, entry.id);
+    } catch {
+      throw new Error("Could not decrypt this password.");
+    }
+  }
+
+  findEntry(id) {
+    this.requireUnlocked();
+    if (typeof id !== "string" || !UUID_PATTERN.test(id)) {
+      throw new Error("Invalid login entry.");
+    }
+    const entry = this.vaultData.entries.find((item) => item.id === id);
+    if (!entry) throw new Error("This login no longer exists.");
+    return entry;
   }
 
   async saveEntry(input) {
@@ -457,13 +573,21 @@ class VaultStore {
       const existing = existingIndex >= 0
         ? this.vaultData.entries[existingIndex]
         : null;
+      // An empty password while editing keeps the sealed value, so the editor
+      // never needs the current password in the renderer.
+      if (!existing && !normalized.password) {
+        throw new Error("Enter a password for this login.");
+      }
+      const id = existing?.id ?? randomUUID();
       const timestamp = Math.max(Date.now(), existing?.createdAt ?? 0);
       const savedEntry = {
-        id: existing?.id ?? randomUUID(),
+        id,
         type: "login",
         name: normalized.name,
         username: normalized.username,
-        password: normalized.password,
+        password: normalized.password
+          ? sealPassword(normalized.password, this.dataKey, id)
+          : existing.password,
         url: normalized.url,
         notes: normalized.notes,
         favicon: existing?.favicon ?? "",
@@ -474,9 +598,9 @@ class VaultStore {
       if (existingIndex >= 0) entries[existingIndex] = savedEntry;
       else entries.push(savedEntry);
 
-      const nextVaultData = { schemaVersion: 1, entries };
+      const nextVaultData = { schemaVersion: VAULT_SCHEMA_VERSION, entries };
       await this.persistVaultData(nextVaultData);
-      return { ...savedEntry };
+      return toEntryDetails(savedEntry);
     });
   }
 
@@ -504,8 +628,8 @@ class VaultStore {
       };
       const entries = this.vaultData.entries.slice();
       entries[existingIndex] = savedEntry;
-      await this.persistVaultData({ schemaVersion: 1, entries });
-      return { ...savedEntry };
+      await this.persistVaultData({ schemaVersion: VAULT_SCHEMA_VERSION, entries });
+      return toEntrySummary(savedEntry);
     });
   }
 
@@ -521,7 +645,7 @@ class VaultStore {
         throw new Error("This login no longer exists.");
       }
 
-      await this.persistVaultData({ schemaVersion: 1, entries });
+      await this.persistVaultData({ schemaVersion: VAULT_SCHEMA_VERSION, entries });
     });
   }
 
@@ -647,7 +771,11 @@ class VaultStore {
       const vaultData = JSON.parse(plaintext.toString("utf8"));
       if (!validateVaultData(vaultData)) throw new Error("Invalid vault data");
 
-      const opened = { envelope, vaultData, dataKey };
+      const opened = {
+        envelope,
+        vaultData: upgradeVaultData(vaultData, dataKey),
+        dataKey,
+      };
       dataKey = null;
       return opened;
     } catch {

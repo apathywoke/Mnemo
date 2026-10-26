@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; webrtc 'block'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
@@ -336,7 +336,7 @@
                     <label>PASSWORD</label>
                     <div class="detail-value-row">
                       <span id="detail-password" class="detail-value secret-value">••••••••••••</span>
-                      <button id="toggle-password-button" type="button" class="copy-button password-visibility-toggle" aria-label="Show password" aria-pressed="false" title="Show password">
+                      <button id="toggle-password-button" type="button" class="copy-button password-visibility-toggle" aria-label="Show password in a separate window" aria-haspopup="dialog" title="Show password">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
                       </button>
                       <button id="copy-password-button" type="button" class="copy-button password-copy-toggle" aria-label="Copy password" title="Copy password">

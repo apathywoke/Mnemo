@@ -1,17 +1,15 @@
 (() => {
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
-  const { setToggleButton } = ns.shared.passwordVisibility;
   const { show: showToast } = ns.shared.toast;
 
   function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetail, updateSiteIconButton }) {
     const state = ctx.state.vault;
     const deleteDialog = $("#delete-dialog");
 
-    async function copyValue(value) {
-      if (!value) return;
+    async function copyField(entryId, field) {
       try {
-        await ctx.api.copySecret(value);
+        await ctx.api.copyEntryField(entryId, field);
         showToast("Copied. Clipboard clears in 30 seconds.");
       } catch {
         showToast("Could not copy this value.", { type: "error" });
@@ -40,20 +38,24 @@
       }
     });
 
-    $("#toggle-password-button").addEventListener("click", () => {
+    // The main process shows the password in a native dialog; it is not
+    // returned to this renderer.
+    $("#toggle-password-button").addEventListener("click", async () => {
       const entry = getEntry(state.selectedEntryId);
       if (!entry) return;
-      state.passwordVisible = !state.passwordVisible;
-      $("#detail-password").textContent = state.passwordVisible ? entry.password : "••••••••••••";
-      setToggleButton($("#toggle-password-button"), state.passwordVisible);
+      try {
+        await ctx.api.revealPassword(entry.id);
+      } catch (cause) {
+        showToast(cause.message || "Could not show this password.", { type: "error" });
+      }
     });
     $("#copy-username-button").addEventListener("click", () => {
       const entry = getEntry(state.selectedEntryId);
-      if (entry) void copyValue(entry.username);
+      if (entry?.username) void copyField(entry.id, "username");
     });
     $("#copy-password-button").addEventListener("click", () => {
       const entry = getEntry(state.selectedEntryId);
-      if (entry) void copyValue(entry.password);
+      if (entry) void copyField(entry.id, "password");
     });
 
     $("#fetch-site-icon-button").addEventListener("click", async () => {

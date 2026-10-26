@@ -9,8 +9,12 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
   const invocations = [];
   const sent = [];
   const listeners = new Map();
+  const mainWorldScripts = [];
   const electronStub = {
     contextBridge: {
+      executeInMainWorld(script) {
+        mainWorldScripts.push(script);
+      },
       exposeInMainWorld(name, api) {
         exposedName = name;
         exposedApi = api;
@@ -42,15 +46,25 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
   }
 
   assert.equal(exposedName, "vaultApp");
+  assert.equal(mainWorldScripts.length, 1);
+  const fakeWindow = { RTCPeerConnection() {}, webkitRTCPeerConnection() {}, RTCDataChannel() {}, fetch() {} };
+  globalThis.window = fakeWindow;
+  try {
+    mainWorldScripts[0].func();
+  } finally {
+    delete globalThis.window;
+  }
+  assert.deepEqual(Object.keys(fakeWindow), ["fetch"]);
   assert.deepEqual(Object.keys(exposedApi).sort(), [
     "chooseProfile",
-    "copySecret",
+    "copyEntryField",
     "createProfile",
     "deleteEntry",
     "deleteProfile",
     "exportBackup",
     "fetchSiteIcon",
-    "getEntries",
+    "getEntry",
+    "listEntries",
     "getVersion",
     "getVaultStatus",
     "lockVault",
@@ -58,6 +72,7 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
     "reportActivity",
     "restoreBackup",
     "restoreNewProfile",
+    "revealPassword",
     "saveEntry",
     "selectProfile",
     "unlockVault",
@@ -71,11 +86,13 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
     ["createProfile", "profiles:create", ["name", "passphrase"]],
     ["restoreNewProfile", "profiles:restore-new", ["name", "passphrase"]],
     ["getVaultStatus", "vault:get-status", []],
-    ["getEntries", "vault:get-entries", []],
+    ["listEntries", "vault:list-entries", []],
+    ["getEntry", "vault:get-entry", ["entry-id"]],
     ["saveEntry", "vault:save-entry", [{ name: "entry" }]],
     ["fetchSiteIcon", "vault:fetch-site-icon", ["entry-id"]],
     ["deleteEntry", "vault:delete-entry", ["entry-id"]],
-    ["copySecret", "clipboard:copy-secret", ["secret"]],
+    ["copyEntryField", "vault:copy-entry-field", ["entry-id", "password"]],
+    ["revealPassword", "vault:reveal-password", ["entry-id"]],
     ["unlockVault", "vault:unlock", ["passphrase"]],
     ["exportBackup", "vault:export-backup", []],
     ["restoreBackup", "vault:restore-backup", ["passphrase"]],
