@@ -18,7 +18,7 @@
         vault: {
           entries: [],
           selectedEntryId: null,
-          passwordVisible: false,
+          selectedEntryNotes: "",
           fetchingFaviconForId: null,
         },
         ui: {
@@ -73,7 +73,6 @@
         $("#detail-notes").textContent = "";
         $("#detail-notes-field").hidden = true;
         ns.entities.login.setSiteIcon($("#detail-icon"), "", "");
-        ns.shared.passwordVisibility.setToggleButton($("#toggle-password-button"), false);
         for (const id of ["entry-dialog", "delete-dialog"]) {
           const dialog = $(`#${id}`);
           if (dialog.open) dialog.close();

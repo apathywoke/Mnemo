@@ -48,7 +48,7 @@ test("profiles create, list, restore, mark opened, and delete", async (t) => {
   const restored = await manager.restoreProfile("Imported", backupPath, PASSPHRASE);
   assert.equal(restored.profile.name, "Imported");
   assert.equal(restored.vaultStore.isUnlocked(), true);
-  assert.deepEqual(restored.vaultStore.getEntries(), created.vaultStore.getEntries());
+  assert.deepEqual(restored.vaultStore.listEntries(), created.vaultStore.listEntries());
   assert.equal((await manager.listProfiles()).length, 2);
 
   const markedAt = await manager.markOpened(restored.profile.id);

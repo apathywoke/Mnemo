@@ -17,6 +17,13 @@ npm start
 Electron is pinned to version 45.0.0. Keep Electron and its bundled Chromium
 security updates current.
 
+## Release builds
+
+`npm run dist:mac` produces signed, notarized `.dmg` and `.zip` builds with
+hardened Electron fuses and asar integrity checks. It needs a Developer ID
+certificate and App Store Connect API key; see `docs/RELEASING.md`.
+`npm run pack:mac:local` makes an ad-hoc-signed local test build.
+
 ## Renderer architecture
 
 The renderer is organized by Feature-Sliced Design layers under
@@ -60,7 +67,9 @@ separate Electron processes.
   The app accepts a minimum of seven characters, but a longer unique
   passphrase is much safer against offline guessing.
 - Login data is encrypted before it is written to disk. While the vault is
-  unlocked, the main and renderer processes hold the entry data in memory.
+  unlocked, the main process holds the decrypted vault index; each password
+  stays sealed until it is copied or shown. The renderer receives entry
+  metadata only and never receives passwords.
 - Copied usernames and passwords are cleared from the system clipboard after
   30 seconds if its plain-text contents still match the copied value. If
   another app replaces that text, the app leaves the new clipboard contents

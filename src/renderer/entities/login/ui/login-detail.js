@@ -2,7 +2,9 @@
   const ns = window.mnemoRenderer;
   const { setSiteIcon } = ns.entities.login;
 
-  function renderLoginDetail(entry, ui, { passwordVisible, updateSiteIconButton }) {
+  // `entry` is a summary from listEntries(); `notes` arrive separately from
+  // getEntry(). The password is never part of renderer state.
+  function renderLoginDetail(entry, ui, { notes = "", updateSiteIconButton }) {
     if (!entry) {
       ui.detail.hidden = true;
       ui.empty.hidden = false;
@@ -14,9 +16,9 @@
     ui.name.textContent = entry.name;
     ui.url.textContent = entry.url;
     ui.username.textContent = entry.username || "—";
-    ui.password.textContent = passwordVisible ? entry.password : "••••••••••••";
-    ui.notes.textContent = entry.notes;
-    ui.notesField.hidden = !entry.notes;
+    ui.password.textContent = "••••••••••••";
+    ui.notes.textContent = notes;
+    ui.notesField.hidden = !notes;
     ui.copyUsername.disabled = !entry.username;
     ui.detail.hidden = false;
     ui.empty.hidden = true;

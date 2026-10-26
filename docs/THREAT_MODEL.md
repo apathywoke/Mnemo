@@ -1,0 +1,201 @@
+# Mnemo threat model
+
+Status: draft for the prototype, written alongside the Electron hardening
+work (fuses, metadata-only renderer, signing and notarization). Review it
+again whenever a trigger at the end of this document applies.
+
+## 1. What Mnemo protects
+
+| Asset | Where it lives | Notes |
+| --- | --- | --- |
+| Entry passwords | Vault file (encrypted, then sealed per entry); main-process memory while unlocked; clipboard for up to 30 s after a copy | Highest value. |
+| Other entry fields: name, username, website, notes, site icon | Vault file (encrypted); main-process memory while unlocked; renderer memory and DOM for the visible list or selected entry | Usernames and websites reveal which accounts exist. |
+| Master passphrase | Typed into the renderer, sent once over IPC, then dropped | Never stored. |
+| Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock | Unwraps everything. |
+| Encrypted backups (`.vault`) | Wherever the user saves them | Same envelope and passphrase as the local vault. |
+| Profile registry (`profiles.json`) | Application support folder, `0600` | Profile names in plain text, not secret by design. |
+| Integrity of the shipped app | Signed, notarized `Mnemo.app` | A modified app can steal everything the user types. |
+
+## 2. System and trust boundaries
+
+```
+ ┌──────────────────────── macOS user account ─────────────────────────┐
+ │                                                                     │
+ │  Renderer (sandboxed Chromium, contextIsolation, CSP, no Node)       │
+ │    sees: entry metadata, the selected entry's notes, passphrase     │
+ │          while it is typed                                          │
+ │    ── preload `vaultApp` (fixed method list, contextBridge) ──      │  B1
+ │  Main process (Node.js, trusted)                                    │
+ │    holds: data key, decrypted vault index, sealed passwords         │
+ │    ── fs (0700 dir / 0600 files) ──── vault files, profiles.json    │  B2
+ │    ── clipboard ───────────────────── other apps, Universal Clip.   │  B3
+ │    ── HTTPS (user-initiated only) ─── website for its favicon       │  B4
+ │    ── native dialogs ──────────────── reveal password, file pickers │
+ └─────────────────────────────────────────────────────────────────────┘
+   B5: build machine → Developer ID signature → notarization → user's Mac
+```
+
+- **B1, renderer → main.** The renderer is treated as compromisable (for
+  example by a future XSS bug or a malicious vault value). Every IPC handler
+  checks that the sender is the app's own main frame loaded from the packaged
+  `index.html`, and validates its arguments. The renderer cannot ask for a
+  password in plain text: copy and reveal are performed by the main process.
+- **B2, main → disk.** Everything secret is encrypted before it is written.
+  Writes are atomic (temp file plus rename) with restrictive permissions.
+- **B3, main → clipboard.** Leaves the app's control once written.
+- **B4, main → network.** Only the explicit "Load site icon" action. Renderer
+  network access is blocked by CSP and by `webRequest`.
+- **B5, supply chain.** Signing, notarization, fuses, and asar integrity make
+  tampering with an installed copy detectable by macOS and by Electron.
+
+## 3. Assumptions
+
+- macOS, the user account, and the kernel are not compromised while the vault
+  is unlocked. Mnemo cannot defend against malware running as the same user
+  with Accessibility, screen-recording, or debugger rights, or as root.
+- The user picks a master passphrase that resists offline guessing. The app
+  enforces only a 7-character minimum.
+- Apple's code-signing, notarization, and Gatekeeper checks work as designed.
+- Electron 45 / Chromium are kept current; sandbox escapes are fixed upstream.
+
+## 4. Adversaries
+
+| ID | Adversary | Capability |
+| --- | --- | --- |
+| A1 | Offline attacker | Has a copy of a vault file or backup (stolen disk, cloud or Time Machine copy, lost USB stick). Unlimited offline compute. |
+| A2 | Malicious or compromised website | Controls responses when the user loads that site's icon; may control DNS for its domain. |
+| A3 | Attacker controlling renderer JavaScript | Arbitrary JS in the renderer via an XSS bug, a malicious value in an imported backup, or a Chromium renderer bug, without a sandbox escape. |
+| A4 | Local process, same user, vault **locked** | Can read and write files in the user's home, launch the app with arbitrary arguments and environment, and modify files inside an app bundle the user can write to. |
+| A5 | Local process, same user, vault **unlocked** | As A4, while the user is working in Mnemo. |
+| A6 | Opportunistic physical or visual access | Unlocked, unattended Mac; shoulder surfing; screen sharing. |
+| A7 | Distribution attacker | Modifies the app in transit or on a download mirror, or re-signs it. |
+
+## 5. Threats and mitigations
+
+### A1, offline attacker
+
+| Threat | Mitigation | Residual risk |
+| --- | --- | --- |
+| Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM | A weak passphrase still falls. The 7-character minimum is a usability floor, not a strength guarantee. |
+| Tamper with a vault or backup to plant data or downgrade parameters | AES-GCM with the header (format, version, KDF parameters, salt) as AAD; strict schema and size validation before and after decryption; fixed KDF parameters | None known. |
+| Swap sealed passwords between entries | Each password is sealed with the entry ID in its AAD; a swapped value fails authentication | None known. |
+| Recover deleted vaults | Not addressed: deletion unlinks the file | APFS snapshots, Time Machine, and SSD remapping may keep old encrypted copies. These remain protected by their passphrase. |
+
+### A2, malicious website (favicon fetch)
+
+| Threat | Mitigation | Residual risk |
+| --- | --- | --- |
+| SSRF to the local network or loopback | Public HTTPS hosts only; DNS resolved and a public IPv4 address pinned; redirects only to the same host or its `www` variant, at most three | IPv6-only sites cannot provide icons. |
+| Image-parser exploit or decompression bomb | Response size limits; dimensions checked before decoding; only PNG, JPEG, and limited ICO accepted; re-encoded to PNG; stored PNG revalidated | Relies on Electron's `nativeImage` decoders. |
+| Tracking | Requires an explicit click with a confirmation dialog; no cookies or referrer; no third-party favicon service | The site learns the user's IP address and that the icon was requested. |
+
+### A3, compromised renderer
+
+| Threat | Mitigation | Residual risk |
+| --- | --- | --- |
+| Read all passwords in bulk | **New in this change.** The renderer receives metadata only (`listEntries`); passwords never cross IPC. `copyEntryField` writes to the clipboard from the main process; `revealPassword` shows a native dialog. The renderer cannot read the clipboard back: permission requests and permission checks are both denied, so `navigator.clipboard.readText()` fails and `document.execCommand("paste")` returns `false` (verified in the running app). | An attacker can still read usernames, websites, and the selected entry's notes, and can call `getEntry` for every ID to read all notes. It can trigger copies or reveal dialogs, which the user sees. |
+| Write arbitrary clipboard contents (for example, a malicious command) | The old `copySecret(value)` API is removed; only an entry's username or password can be copied | None known. |
+| Modify or delete entries, or export a backup | Possible through the preload API while unlocked; export and restore always show a native file dialog | A compromised renderer can corrupt or delete data. Keep backups. |
+| Read the master passphrase | Typed into the renderer by design | A compromised renderer during unlock sees the passphrase. |
+| Exfiltrate what it can read (metadata, notes, passphrase) | CSP `connect-src 'none'`; `webRequest` cancels HTTP(S) and WebSocket; WebRTC removed from the page, UDP restricted, and the session proxied to a closed port; DevTools disabled in packaged builds | DNS prefetch or other Chromium side channels not covered here. |
+| Escape to Node.js or the filesystem | `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`; narrow preload; no `webview`; window opening and navigation denied; strict CSP (`script-src 'self'`, `connect-src 'none'`); remote requests cancelled | Depends on Chromium's sandbox. |
+| Spoof IPC from another frame | Handlers accept only the main frame whose URL is the packaged `index.html` | None known. |
+
+### A4, local process while locked
+
+| Threat | Mitigation | Residual risk |
+| --- | --- | --- |
+| Run the signed binary as Node (`ELECTRON_RUN_AS_NODE`) to inherit its identity | `RunAsNode` fuse off | None known. |
+| Inject code with `NODE_OPTIONS`, `--inspect`, or `--inspect-brk` | `EnableNodeOptionsEnvironmentVariable` and `EnableNodeCliInspectArguments` fuses off | None known. |
+| Launch with `--remote-debugging-port` or `--remote-debugging-pipe` and drive the renderer | Packaged builds exit at startup when either switch is present | Other Chromium switches (`--js-flags`, `--disable-web-security`, and so on) are not filtered. They cannot reach Node.js and do not change the main-process checks, but should be reviewed. |
+| Modify `app.asar` or plant `Resources/app/` to backdoor the app | `EnableEmbeddedAsarIntegrityValidation` and `OnlyLoadAppFromAsar` fuses on; the asar hash is inside the signed `Info.plist`; hardened runtime with library validation (no `disable-library-validation` entitlement) | An attacker who can rewrite the whole bundle and re-sign it ad hoc produces an app that Gatekeeper does not trust; a quarantined download fails assessment, but a local unquarantined copy may still launch. Install in `/Applications` and keep it owned by an admin. |
+| Replace the vault file or `profiles.json` | AES-GCM authentication; schema validation; registry validation | The attacker can delete or roll back vaults (old encrypted copy). Rollback is not detected. |
+| Read clipboard leftovers | Copied values are cleared after 30 s, and on lock, if unchanged | Clipboard managers and Universal Clipboard may keep copies. |
+
+### A5, local process while unlocked
+
+Out of scope beyond best effort. A same-user process with debugger,
+Accessibility, or screen-recording rights can read the main process's memory,
+watch the screen, or log keystrokes. The hardened runtime (no
+`get-task-allow`, no `allow-dyld-environment-variables`) blocks casual
+debugger attachment and `DYLD_*` injection into the signed release build, and
+auto-lock limits how long secrets stay in memory.
+
+### A6, physical or visual access
+
+| Threat | Mitigation | Residual risk |
+| --- | --- | --- |
+| Unattended unlocked app | Auto-lock after 5 minutes without input, on screen lock, sleep, window close, and quit | Up to 5 minutes of exposure. |
+| Shoulder surfing | Passwords masked; reveal is an explicit action in a separate dialog | The dialog shows the password until dismissed. |
+
+### A7, distribution
+
+| Threat | Mitigation | Residual risk |
+| --- | --- | --- |
+| Trojanized download | Developer ID signature, hardened runtime, notarization with a stapled ticket, Gatekeeper | Users who bypass Gatekeeper are not protected. There is no auto-update channel yet, so updates are manual. |
+| Shipping an unsigned or misconfigured build | `forceCodeSigning`; the `afterSign` hook verifies fuses, asar integrity, the signature, entitlements, the ticket, and Gatekeeper; tests pin the fuse and entitlement configuration | Build-machine compromise is out of scope. Signing keys must be protected; prefer App Store Connect API keys stored in a secrets manager. |
+| Compromised npm dependency | No runtime dependencies; build tools pinned to exact versions with a lockfile; `npm audit` clean at the time of writing | Build-time dependencies (electron-builder) run with developer privileges. |
+
+## 6. Out of scope
+
+- Malware running as root, kernel compromise, or hardware attacks such as
+  cold boot.
+- Recovering a forgotten master passphrase. There is no recovery by design.
+- Sync, sharing, browser autofill, and multi-device use. These features do not
+  exist yet.
+- Side channels in Node.js or Chromium crypto implementations.
+
+## 7. Known residual risks and follow-ups
+
+1. **`file://` privileges.** `GrantFileProtocolExtraPrivileges` stays on because
+   `loadFile()` from `app.asar` fails without it. Move the UI to a custom
+   `app://` protocol (`protocol.handle`) and then turn the fuse off.
+2. **Notes are not sealed per entry.** They are decrypted with the vault index
+   and can be read by a compromised renderer one entry at a time. Seal them like
+   passwords if notes are expected to hold secrets.
+3. **Memory hygiene.** JavaScript strings (the passphrase in the renderer,
+   decrypted passwords during copy, schema 1 vaults during upgrade) cannot be
+   zeroized.
+4. **Rollback.** Replacing a vault with an older encrypted copy is not
+   detected.
+5. **Profile deletion** is confirmed only in the renderer; add a native
+   confirmation in the main process.
+6. **Favicon decoding** runs in the main process; move it to a sandboxed
+   process.
+7. **Passphrase strength.** Consider a stronger minimum or an entropy-based
+   check, and consider raising scrypt cost or moving to Argon2id.
+
+## 8. Internal review (2026-10-26)
+
+A separate reviewer with no access to the implementation discussion audited
+the whole app (not only this change). It was an internal review, **not** an
+independent third-party audit; that is still required before real use. It
+found no Critical or High issues.
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| 1 | Medium | The reveal-password dialog stayed open after auto-lock, screen lock, or sleep | **Fixed.** Vault dialogs use an `AbortController`; `lockVault()` closes them. Covered by a test. |
+| 2 | Medium | A compromised renderer could exfiltrate metadata and the master passphrase through WebRTC (STUN/TURN), which bypasses `webRequest` and CSP `connect-src` | **Fixed.** The preload removes `RTCPeerConnection`, `webkitRTCPeerConnection`, and `RTCDataChannel` (verified in the running app); the IP handling policy is `disable_non_proxied_udp`; the session proxy points to a closed local port; CSP adds `webrtc 'block'`. |
+| 3 | Low | No permission check handler, so checks report "granted" | **Fixed.** Permission checks and device permissions are denied; clipboard reads verified to fail in the running app. |
+| 4 | Low | Restore read the global vault after awaiting dialogs and ignored the lock epoch; profile deletion is confirmed only in the renderer | **Partly fixed.** Restore binds to the vault and epoch at the start and aborts if either changes. Profile deletion still needs a native confirmation, ideally with the profile's passphrase. |
+| 5 | Low | DevTools available in packaged builds (self-XSS through the console) | **Fixed.** `devTools` is disabled when packaged. |
+| 6 | Low/Info | `file://` origin with `GrantFileProtocolExtraPrivileges` makes CSP `'self'` cover any local file | **Open.** See follow-up 1 in section 7. |
+| 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Open.** Move decoding to a sandboxed `utilityProcess` or to the renderer. |
+| 8 | Info | Release verification checked entitlements only on the outer app | **Fixed.** Every nested `.app`/`.framework` is checked, and `app.asar.unpacked` is rejected. |
+| 9 | Info | Clipboard text is not marked concealed or transient; vault rollback is not detected; 7-character passphrase minimum | **Open.** Already listed in section 7; concealed clipboard types need a small native helper. |
+
+The reviewer confirmed: IPC sender checks on every handler, a fixed preload
+surface, input validation, that passwords never reach the renderer, a DOM
+built with `textContent`, AES-GCM nonce and AAD use (including the per-entry
+password binding), lock-epoch handling for unlock, create, and restore-new,
+atomic `0600` writes, DNS pinning and redirect limits in the favicon fetcher,
+the fuse and entitlement configuration, and no logging of secrets.
+
+## 9. When to revisit this document
+
+- Adding any network feature (sync, breach checks, updates).
+- Adding browser autofill or a browser extension bridge.
+- Changing the vault format, KDF, or key hierarchy.
+- Adding IPC methods or widening what the renderer receives.
+- Upgrading Electron across a major version (review new fuses).
+- Before the first public release, and after the independent audit.
