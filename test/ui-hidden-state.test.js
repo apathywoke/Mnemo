@@ -33,7 +33,7 @@ test("vault creation, backup, and restore explain how access can be recovered", 
   assert.match(html, /Mnemo cannot recover your master passphrase/);
   assert.match(html, /recovery key\. It is the only way back in/);
   assert.match(html, /Backups open with their master passphrase or recovery key/);
-  assert.match(html, /Every backup requires this same passphrase/);
+  assert.match(html, /Every backup opens with the master passphrase or the recovery key/);
 });
 
 test("password strength UI describes its estimate as a heuristic", async () => {

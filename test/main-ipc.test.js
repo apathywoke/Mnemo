@@ -19,6 +19,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   let clipboardText = "";
   let messageResponse = 0;
   const messageBoxes = [];
+  const nativeThemeStub = { themeSource: "system" };
   let holdDialogs = false;
   let webRtcPolicy;
   let proxyConfig;
@@ -75,6 +76,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
       on(channel, handler) { ipcEvents.set(channel, handler); },
     },
     powerMonitor,
+    nativeTheme: nativeThemeStub,
     session: {
       defaultSession: {
         webRequest: {
@@ -136,9 +138,14 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   );
 
   assert.equal(await invoke("app:get-version"), "0.1.0-test");
-  assert.deepEqual(await invoke("settings:get"), { language: "en" });
+  assert.deepEqual(await invoke("settings:get"), { language: "en", theme: "system" });
+  assert.equal(nativeThemeStub.themeSource, "system");
+  assert.deepEqual(await invoke("settings:set-theme", "light"), { language: "en", theme: "light" });
+  assert.equal(nativeThemeStub.themeSource, "light");
+  await assert.rejects(invoke("settings:set-theme", "sepia"), /\[mnemo:errors\.saveSettings\]/);
+  await invoke("settings:set-theme", "system");
   await assert.rejects(invoke("settings:set-language", "fr"), /\[mnemo:errors\.saveSettings\]/);
-  assert.deepEqual(await invoke("settings:set-language", "de"), { language: "de" });
+  assert.deepEqual(await invoke("settings:set-language", "de"), { language: "de", theme: "system" });
   await assert.rejects(
     invoke("profiles:create", "Primary", "short"),
     /\[mnemo:errors\.passphraseTooShort\] Die Master-Passphrase muss mindestens 7 Zeichen lang sein\./,
@@ -199,10 +206,52 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.deepEqual(await invoke("vault:copy-entry-field", saved.id, "password"), { clearsAfterMs: 30000 });
   assert.equal(clipboardText, "test-password-value");
 
+  // One-time codes: only the code crosses IPC, and it can be copied.
+  await assert.rejects(invoke("vault:get-totp", saved.id), /\[mnemo:errors\.totpMissing\]/);
+  await invoke("vault:save-entry", {
+    ...makeLogin({ id: saved.id, password: "" }),
+    totp: "otpauth://totp/Example?secret=JBSWY3DPEHPK3PXP",
+    removeTotp: false,
+  });
+  const totp = await invoke("vault:get-totp", saved.id);
+  assert.deepEqual(Object.keys(totp).sort(), ["code", "expiresAt", "period"]);
+  assert.match(totp.code, /^\d{6}$/);
+  assert.equal((await invoke("vault:list-entries"))[0].hasTotp, true);
+  await invoke("vault:copy-entry-field", saved.id, "totp");
+  assert.match(clipboardText, /^\d{6}$/);
+
+  // Items: secrets are copied or shown by main, never returned.
+  const card = await invoke("vault:save-item", {
+    id: "", type: "card", name: "Visa", notes: "",
+    fields: { cardholder: "Alice", number: "4242424242424242", expiry: "07/28", cvv: "123", pin: "" },
+  });
+  assert.equal(JSON.stringify(card).includes("4242424242424242"), false);
+  assert.equal(JSON.stringify(await invoke("vault:list-entries")).includes("4242424242424242"), false);
+  await invoke("vault:copy-entry-field", card.id, "number");
+  assert.equal(clipboardText, "4242424242424242");
+  await invoke("vault:copy-entry-field", card.id, "cardholder");
+  assert.equal(clipboardText, "Alice");
+  await assert.rejects(invoke("vault:copy-entry-field", card.id, "last4"), /\[mnemo:errors\.copyValue\]/);
+  await assert.rejects(invoke("vault:copy-entry-field", card.id, "pin"), /\[mnemo:errors\.copyValue\]/);
+  messageBoxes.length = 0;
+  assert.deepEqual(await invoke("vault:reveal-field", card.id, "cvv"), { shown: true });
+  assert.equal(messageBoxes.at(-1).detail, "123");
+  await invoke("vault:reveal-field", card.id, "number");
+  assert.equal(messageBoxes.at(-1).detail, "4242 4242 4242 4242");
+  assert.match(messageBoxes.at(-1).message, /^Visa · Card number\n/);
+  await assert.rejects(invoke("vault:reveal-field", card.id, "cardholder"), /\[mnemo:errors\.copyValue\]/);
+  await assert.rejects(
+    invoke("vault:save-item", { id: "", type: "card", name: "Bad", notes: "", fields: { number: "12" } }),
+    /\[mnemo:errors\.cardNumber\]/,
+  );
+  await invoke("vault:delete-entry", card.id);
+
   messageBoxes.length = 0;
   assert.deepEqual(await invoke("vault:reveal-password", saved.id), { shown: true });
   assert.equal(messageBoxes.length, 1);
+  // The value is the whole detail text, so selecting it copies it exactly.
   assert.equal(messageBoxes[0].detail, "test-password-value");
+  assert.match(messageBoxes[0].message, /^Example account · Password\n.*30 seconds/);
 
   // A revealed password must not outlive the unlocked session.
   holdDialogs = true;

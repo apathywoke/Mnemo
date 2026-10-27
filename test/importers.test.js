@@ -62,7 +62,7 @@ test("Bitwarden JSON imports logins and counts what it skips", async (t) => {
     encrypted: false,
     items: [
       { type: 1, name: "Bank", notes: "n", login: { username: "alice", password: "pw1", totp: "otpauth://x", uris: [{ uri: "androidapp://bank" }, { uri: "https://bank.example/login" }] } },
-      { type: 1, name: "", login: { username: "bob", password: "pw2", uris: [{ uri: "mail.example" }] } },
+      { type: 1, name: "", login: { username: "bob", password: "pw2", totp: "JBSWY3DPEHPK3PXP", uris: [{ uri: "mail.example" }] } },
       { type: 1, name: "No password", login: { username: "c", password: "" } },
       { type: 2, name: "Secure note" },
       { type: 3, name: "Card" },
@@ -70,10 +70,11 @@ test("Bitwarden JSON imports logins and counts what it skips", async (t) => {
   }));
   const result = await parseImportFile("bitwarden", filePath);
   assert.deepEqual(result.logins, [
-    { name: "Bank", username: "alice", password: "pw1", url: "https://bank.example/login", notes: "n" },
-    { name: "mail.example", username: "bob", password: "pw2", url: "mail.example", notes: "" },
+    { name: "Bank", username: "alice", password: "pw1", url: "https://bank.example/login", notes: "n", totp: "" },
+    { name: "mail.example", username: "bob", password: "pw2", url: "mail.example", notes: "", totp: "JBSWY3DPEHPK3PXP" },
   ]);
-  assert.deepEqual(result.stats, { found: 3, nonLogin: 2, noPassword: 1, archived: 0, totpNotImported: 1 });
+  // "otpauth://x" is not a valid TOTP link, so it is counted and dropped.
+  assert.deepEqual(result.stats, { found: 3, nonLogin: 2, noPassword: 1, archived: 0, withTotp: 1, totpNotImported: 1 });
 });
 
 test("Bitwarden encrypted exports and wrong files are rejected clearly", async (t) => {
@@ -94,7 +95,7 @@ test("Bitwarden CSV imports logins only", async (t) => {
   ].join("\n"));
   const result = await parseImportFile("bitwarden", filePath);
   assert.deepEqual(result.logins, [
-    { name: "Mail", username: "me@example.com", password: "secret", url: "https://mail.example", notes: "line1\nline2" },
+    { name: "Mail", username: "me@example.com", password: "secret", url: "https://mail.example", notes: "line1\nline2", totp: "" },
   ]);
   assert.equal(result.stats.nonLogin, 1);
 });
@@ -126,7 +127,7 @@ test("1Password 1PUX archives are read through export.data", async (t) => {
                   { designation: "password", value: "pw" },
                 ],
                 notesPlain: "hello",
-                sections: [{ fields: [{ value: { totp: "otpauth://totp" } }] }],
+                sections: [{ fields: [{ value: { totp: "otpauth://totp/Forum:fan?secret=JBSWY3DPEHPK3PXP" } }] }],
               },
             },
           },
@@ -143,10 +144,10 @@ test("1Password 1PUX archives are read through export.data", async (t) => {
   }));
   const result = await parseImportFile("onepassword", filePath);
   assert.deepEqual(result.logins, [
-    { name: "Forum", username: "fan", password: "pw", url: "https://forum.example", notes: "hello" },
-    { name: "Wi-Fi", username: "", password: "wifi-pw", url: "", notes: "" },
+    { name: "Forum", username: "fan", password: "pw", url: "https://forum.example", notes: "hello", totp: "otpauth://totp/Forum:fan?secret=JBSWY3DPEHPK3PXP" },
+    { name: "Wi-Fi", username: "", password: "wifi-pw", url: "", notes: "", totp: "" },
   ]);
-  assert.deepEqual(result.stats, { found: 2, nonLogin: 1, noPassword: 0, archived: 1, totpNotImported: 1 });
+  assert.deepEqual(result.stats, { found: 2, nonLogin: 1, noPassword: 0, archived: 1, withTotp: 1, totpNotImported: 0 });
 
   const broken = await writeFile(t, "broken.1pux", Buffer.from("not a zip"));
   await assert.rejects(parseImportFile("onepassword", broken), /not a supported 1Password export/);

@@ -3,8 +3,8 @@
   const { secondaryLabel, filter } = ns.entities.login;
   const { setSiteIcon } = ns.entities.login;
 
-  function renderLoginList({ entries, selectedId, query, container, count, empty, noResults, onSelect }) {
-    const filteredEntries = filter(entries, query);
+  function renderLoginList({ entries, selectedId, query, typeFilter = "all", container, count, empty, noResults, onSelect }) {
+    const filteredEntries = filter(entries, query, typeFilter);
     container.replaceChildren();
     count.textContent = String(entries.length);
     empty.hidden = entries.length !== 0;
@@ -20,7 +20,8 @@
       const icon = document.createElement("span");
       icon.className = "entry-row-icon";
       icon.setAttribute("aria-hidden", "true");
-      setSiteIcon(icon, entry.favicon, Array.from(entry.name)[0] ?? "•");
+      if (entry.type && entry.type !== "login") ns.entities.login.setItemIcon(icon, entry.type);
+      else setSiteIcon(icon, entry.favicon, Array.from(entry.name)[0] ?? "•");
       const copy = document.createElement("span");
       copy.className = "entry-row-copy";
       const name = document.createElement("span");

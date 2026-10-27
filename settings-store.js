@@ -4,14 +4,16 @@ const { randomBytes } = require("node:crypto");
 
 const SETTINGS_VERSION = 1;
 const MAX_SETTINGS_BYTES = 4096;
+const THEMES = Object.freeze(["system", "dark", "light"]);
+const DEFAULT_THEME = "system";
 
-// Non-secret application preferences (currently only the UI language), kept
+// Non-secret application preferences (interface language and theme), kept
 // next to the profile registry in the per-user application data folder.
 class SettingsStore {
   constructor(directory, { isSupportedLanguage, defaultLanguage }) {
     this.filePath = path.join(directory, "settings.json");
     this.isSupportedLanguage = isSupportedLanguage;
-    this.settings = { language: defaultLanguage };
+    this.settings = { language: defaultLanguage, theme: DEFAULT_THEME };
     this.writeQueue = Promise.resolve();
   }
 
@@ -20,11 +22,14 @@ class SettingsStore {
       const stats = await fs.stat(this.filePath);
       if (stats.size > MAX_SETTINGS_BYTES) return this.get();
       const parsed = JSON.parse(await fs.readFile(this.filePath, "utf8"));
-      if (
-        parsed?.version === SETTINGS_VERSION &&
-        this.isSupportedLanguage(parsed.language)
-      ) {
-        this.settings = { language: parsed.language };
+      if (parsed?.version === SETTINGS_VERSION) {
+        // Each value falls back on its own, so a bad theme keeps the language.
+        this.settings = {
+          language: this.isSupportedLanguage(parsed.language)
+            ? parsed.language
+            : this.settings.language,
+          theme: THEMES.includes(parsed.theme) ? parsed.theme : DEFAULT_THEME,
+        };
       }
     } catch {
       // Missing or unreadable settings fall back to the defaults.
@@ -40,13 +45,26 @@ class SettingsStore {
     if (!this.isSupportedLanguage(language)) {
       return Promise.reject(new Error("Could not save the settings."));
     }
-    const next = { language };
-    const write = this.writeQueue.then(() => this.write(next));
-    this.writeQueue = write.catch(() => {});
-    return write.then(() => {
+    return this.update({ language });
+  }
+
+  setTheme(theme) {
+    if (!THEMES.includes(theme)) {
+      return Promise.reject(new Error("Could not save the settings."));
+    }
+    return this.update({ theme });
+  }
+
+  // Queued so that quick successive changes each build on the last one.
+  update(patch) {
+    const write = this.writeQueue.then(async () => {
+      const next = { ...this.settings, ...patch };
+      await this.write(next);
       this.settings = next;
       return this.get();
     });
+    this.writeQueue = write.catch(() => {});
+    return write;
   }
 
   async write(settings) {
@@ -68,3 +86,4 @@ class SettingsStore {
 }
 
 module.exports = SettingsStore;
+module.exports.THEMES = THEMES;

@@ -110,6 +110,23 @@ passwords until the design has received independent security review.
   app offers to move it to the Trash; it cannot securely erase it.
 - Deleting the open vault from Settings requires the master passphrase and a
   native confirmation dialog in the main process.
+- Besides logins, the vault holds cards, secure notes, identities, and SSH
+  keys. Their secret fields (card number, security code, PIN, document
+  number, SSH private key and its passphrase) are sealed one by one with
+  AES-256-GCM under the vault key, bound to the item ID and the field name,
+  and never sent to the renderer: they are copied or shown in a native
+  dialog by the main process. Other fields (cardholder, expiry, the last four
+  card digits, identity details, public keys, and the text of secure notes)
+  are protected by the vault encryption and shown in the interface like
+  login notes. SSH fingerprints are computed from the public key, which is
+  derived from OpenSSH and unencrypted PEM private keys when not provided.
+- One-time codes (TOTP, RFC 6238) are stored per login like passwords:
+  sealed with AES-256-GCM under the vault key, bound to the entry ID with a
+  separate purpose label. The secret never reaches the renderer; the main
+  process returns only the current code and its expiry. Fetching codes does
+  not count as activity, so an open code does not delay auto-lock. Keeping
+  passwords and second factors in one vault means a single compromised vault
+  exposes both; users who want them separate can keep codes elsewhere.
 - Touch ID unlock is opt-in per vault and needs the master passphrase plus a
   successful Touch ID check to turn on. The vault key is then encrypted with
   Electron `safeStorage`, whose key lives in the macOS login Keychain under

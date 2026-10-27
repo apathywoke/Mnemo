@@ -8,6 +8,8 @@ again whenever a trigger at the end of this document applies.
 
 | Asset | Where it lives | Notes |
 | --- | --- | --- |
+| Card numbers, security codes, PINs, document numbers, SSH private keys | Vault file (encrypted, then sealed per item and field); main-process memory while unlocked; clipboard after a copy | Same protection as passwords; never sent to the renderer. Secure note text and identity details are not sealed separately and reach the renderer when the item is opened. |
+| One-time code (TOTP) secrets | Vault file (encrypted, then sealed per entry); main-process memory while unlocked | Same protection as passwords; only current codes reach the renderer. |
 | Entry passwords | Vault file (encrypted, then sealed per entry); main-process memory while unlocked; clipboard for up to 30 s after a copy | Highest value. |
 | Other entry fields: name, username, website, notes, site icon | Vault file (encrypted); main-process memory while unlocked; renderer memory and DOM for the visible list or selected entry | Usernames and websites reveal which accounts exist. |
 | Master passphrase | Typed into the renderer, sent once over IPC, then dropped | Never stored. |
