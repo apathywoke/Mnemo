@@ -2205,6 +2205,26 @@ h2 {
   margin-top: 18px;
 }
 
+.touchid-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 18px 0 4px;
+}
+
+.touchid-button[hidden] {
+  display: none;
+}
+
+.touchid-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
 /* Settings: vault sections */
 .settings-vault[hidden],
 .settings-vault-locked[hidden],

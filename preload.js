@@ -39,6 +39,10 @@ contextBridge.exposeInMainWorld("vaultApp", {
     ipcRenderer.invoke("vault:copy-entry-field", id, field),
   revealPassword: (id) => ipcRenderer.invoke("vault:reveal-password", id),
   unlockVault: (passphrase) => ipcRenderer.invoke("vault:unlock", passphrase),
+  unlockWithTouchId: () => ipcRenderer.invoke("vault:unlock-biometric"),
+  getTouchIdStatus: () => ipcRenderer.invoke("biometric:status"),
+  enableTouchId: (passphrase) => ipcRenderer.invoke("biometric:enable", passphrase),
+  disableTouchId: () => ipcRenderer.invoke("biometric:disable"),
   recoverVault: (recoveryKey, newPassphrase) =>
     ipcRenderer.invoke("vault:recover", recoveryKey, newPassphrase),
   getRecoveryStatus: () => ipcRenderer.invoke("vault:get-recovery-status"),

@@ -412,6 +412,27 @@
     "errors.importBitwarden": "This file is not a supported Bitwarden export.",
     "errors.importOnePassword": "This file is not a supported 1Password export.",
     "errors.importBitwardenEncrypted": "This Bitwarden export is encrypted. Export your vault again as unencrypted JSON or CSV.",
+
+    // Touch ID
+    "touchId.unlock": "Unlock with Touch ID",
+    "touchId.title": "Touch ID",
+    "touchId.enable": "Turn on Touch ID…",
+    "touchId.disable": "Turn off Touch ID",
+    "touchId.enabled": "Touch ID unlocks this vault. The vault key is stored in the macOS Keychain, so the vault is then also protected by your Mac login password. Turn it off on shared Macs.",
+    "touchId.disabled": "Unlock this vault with your fingerprint instead of typing the master passphrase. The master passphrase still works and is needed to turn this on.",
+    "touchId.unavailable": "Touch ID is not available on this Mac, or no fingerprint is set up in System Settings.",
+    "touchId.prompt": "Enter your master passphrase, then confirm with Touch ID.",
+    "touchId.confirm": "Turn on",
+    "toast.touchIdEnabled": "Touch ID is on for this vault.",
+    "toast.touchIdDisabled": "Touch ID is off for this vault.",
+    "biometric.reasonUnlock": "unlock the vault “{name}”",
+    "biometric.reasonEnable": "turn on Touch ID for the vault “{name}”",
+    "errors.touchIdEnable": "Could not turn on Touch ID.",
+    "errors.touchIdDisable": "Could not turn off Touch ID.",
+    "errors.touchIdUnavailable": "Touch ID is not available on this Mac.",
+    "errors.touchIdCanceled": "Touch ID was canceled or did not match.",
+    "errors.touchIdNotEnabled": "Touch ID is not turned on for this vault.",
+    "errors.touchIdInvalid": "Touch ID can no longer unlock this vault. Unlock it with your master passphrase and turn Touch ID on again.",
   };
 
   const de = {
@@ -812,6 +833,27 @@
     "errors.importBitwarden": "Diese Datei ist kein unterstützter Bitwarden-Export.",
     "errors.importOnePassword": "Diese Datei ist kein unterstützter 1Password-Export.",
     "errors.importBitwardenEncrypted": "Dieser Bitwarden-Export ist verschlüsselt. Exportieren Sie Ihren Tresor erneut als unverschlüsseltes JSON oder CSV.",
+
+    // Touch ID
+    "touchId.unlock": "Mit Touch ID entsperren",
+    "touchId.title": "Touch ID",
+    "touchId.enable": "Touch ID aktivieren…",
+    "touchId.disable": "Touch ID deaktivieren",
+    "touchId.enabled": "Touch ID entsperrt diesen Tresor. Der Tresorschlüssel liegt im macOS-Schlüsselbund, der Tresor ist dann also auch durch Ihr Mac-Anmeldepasswort geschützt. Auf gemeinsam genutzten Macs deaktivieren.",
+    "touchId.disabled": "Entsperren Sie diesen Tresor per Fingerabdruck statt mit der Master-Passphrase. Die Master-Passphrase funktioniert weiterhin und wird zum Aktivieren benötigt.",
+    "touchId.unavailable": "Touch ID ist auf diesem Mac nicht verfügbar, oder in den Systemeinstellungen ist kein Fingerabdruck eingerichtet.",
+    "touchId.prompt": "Geben Sie Ihre Master-Passphrase ein und bestätigen Sie dann mit Touch ID.",
+    "touchId.confirm": "Aktivieren",
+    "toast.touchIdEnabled": "Touch ID ist für diesen Tresor aktiviert.",
+    "toast.touchIdDisabled": "Touch ID ist für diesen Tresor deaktiviert.",
+    "biometric.reasonUnlock": "den Tresor „{name}“ entsperren",
+    "biometric.reasonEnable": "Touch ID für den Tresor „{name}“ aktivieren",
+    "errors.touchIdEnable": "Touch ID konnte nicht aktiviert werden.",
+    "errors.touchIdDisable": "Touch ID konnte nicht deaktiviert werden.",
+    "errors.touchIdUnavailable": "Touch ID ist auf diesem Mac nicht verfügbar.",
+    "errors.touchIdCanceled": "Touch ID wurde abgebrochen oder nicht erkannt.",
+    "errors.touchIdNotEnabled": "Touch ID ist für diesen Tresor nicht aktiviert.",
+    "errors.touchIdInvalid": "Touch ID kann diesen Tresor nicht mehr entsperren. Entsperren Sie ihn mit Ihrer Master-Passphrase und aktivieren Sie Touch ID erneut.",
   };
 
   const ru = {
@@ -1212,6 +1254,27 @@
     "errors.importBitwarden": "Этот файл не похож на поддерживаемый экспорт Bitwarden.",
     "errors.importOnePassword": "Этот файл не похож на поддерживаемый экспорт 1Password.",
     "errors.importBitwardenEncrypted": "Этот экспорт Bitwarden зашифрован. Экспортируйте хранилище заново в незашифрованный JSON или CSV.",
+
+    // Touch ID
+    "touchId.unlock": "Разблокировать с Touch ID",
+    "touchId.title": "Touch ID",
+    "touchId.enable": "Включить Touch ID…",
+    "touchId.disable": "Отключить Touch ID",
+    "touchId.enabled": "Touch ID разблокирует это хранилище. Ключ хранилища лежит в связке ключей macOS, поэтому его защищает и пароль входа в Mac. На общих компьютерах лучше отключить.",
+    "touchId.disabled": "Разблокируйте хранилище отпечатком пальца вместо ввода мастер-пароля. Мастер-пароль продолжит работать; он нужен, чтобы включить эту функцию.",
+    "touchId.unavailable": "Touch ID недоступен на этом Mac, или в Системных настройках не добавлен отпечаток.",
+    "touchId.prompt": "Введите мастер-пароль, затем подтвердите отпечатком.",
+    "touchId.confirm": "Включить",
+    "toast.touchIdEnabled": "Touch ID включён для этого хранилища.",
+    "toast.touchIdDisabled": "Touch ID отключён для этого хранилища.",
+    "biometric.reasonUnlock": "разблокировать хранилище «{name}»",
+    "biometric.reasonEnable": "включить Touch ID для хранилища «{name}»",
+    "errors.touchIdEnable": "Не удалось включить Touch ID.",
+    "errors.touchIdDisable": "Не удалось отключить Touch ID.",
+    "errors.touchIdUnavailable": "Touch ID недоступен на этом Mac.",
+    "errors.touchIdCanceled": "Touch ID отменён или отпечаток не распознан.",
+    "errors.touchIdNotEnabled": "Touch ID не включён для этого хранилища.",
+    "errors.touchIdInvalid": "Touch ID больше не может разблокировать это хранилище. Откройте его мастер-паролем и включите Touch ID заново.",
   };
 
   const catalog = Object.freeze({

@@ -86,6 +86,15 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
       },
     },
     nativeImage: { createFromBuffer: () => ({ isEmpty: () => true }) },
+    safeStorage: {
+      isEncryptionAvailable: () => true,
+      encryptString: (text) => Buffer.from(`sealed:${text}`),
+      decryptString: (buffer) => buffer.toString().replace(/^sealed:/, ""),
+    },
+    systemPreferences: {
+      canPromptTouchID: () => true,
+      promptTouchID: async () => {},
+    },
   };
 
   const originalLoad = Module._load;
@@ -158,6 +167,14 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   const rotated = await invoke("vault:create-recovery-key", "correct horse battery staple");
   assert.notEqual(rotated.recoveryKey, created.recoveryKey);
   await invoke("recovery:dismiss");
+
+  // Touch ID: enabling needs the passphrase; unlocking releases the key.
+  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false });
+  await assert.rejects(invoke("biometric:enable", "wrong passphrase"), /\[mnemo:errors\.passphraseIncorrect\]/);
+  assert.deepEqual(await invoke("biometric:enable", "correct horse battery staple"), { enabled: true });
+  assert.equal((await invoke("vault:lock")).unlocked, false);
+  assert.equal((await invoke("vault:unlock-biometric")).unlocked, true);
+  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: true });
 
   const saved = await invoke("vault:save-entry", makeLogin());
   assert.equal(Object.hasOwn(saved, "password"), false);

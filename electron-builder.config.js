@@ -39,6 +39,7 @@ module.exports = {
     "profile-manager.js",
     "settings-store.js",
     "importers.js",
+    "biometric-unlock.js",
     "favicon-fetcher.js",
     "index.html",
     "styles.css",

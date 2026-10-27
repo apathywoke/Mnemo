@@ -110,6 +110,16 @@ passwords until the design has received independent security review.
   app offers to move it to the Trash; it cannot securely erase it.
 - Deleting the open vault from Settings requires the master passphrase and a
   native confirmation dialog in the main process.
+- Touch ID unlock is opt-in per vault and needs the master passphrase plus a
+  successful Touch ID check to turn on. The vault key is then encrypted with
+  Electron `safeStorage`, whose key lives in the macOS login Keychain under
+  the app's signature, and stored in `biometric/<profile>.key` (`0600`). It
+  is released only in the main process after `promptTouchID` succeeds. This
+  is a convenience trade-off: Touch ID is enforced by the app rather than by
+  the Keychain item, and someone who can unlock your macOS login keychain
+  (for example, with your Mac login password) could recover the vault key
+  without the master passphrase. Restoring a backup into the vault or
+  deleting the vault removes the stored key.
 - Deleting a profile unlinks its encrypted vault file. It does not guarantee
   secure erasure from APFS snapshots, Time Machine backups, SSD remapping, or
   other copies of that file.

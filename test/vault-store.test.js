@@ -408,3 +408,25 @@ test("imported logins are sealed, deduplicated, and validated", async (t) => {
   assert.equal(byKey.find((login) => login.name === "New").password, "new-pw");
   await assert.rejects(VaultStore.readBackupLogins(backupPath, "wrong passphrase"), /Could not open the vault/);
 });
+
+test("the vault opens with its data key, and a wrong key is refused", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new VaultStore(path.join(directory, "datakey.vault"));
+  await store.create(PASSPHRASE);
+  const { id } = await store.saveEntry(makeLogin());
+  const dataKey = store.exportDataKey();
+  assert.notEqual(dataKey, store.dataKey);
+  store.lock();
+  assert.throws(() => store.exportDataKey(), /Unlock the vault first/);
+
+  const status = await store.unlockWithDataKey(dataKey);
+  assert.equal(status.unlocked, true);
+  assert.equal(store.revealPassword(id), "test-password-value");
+  store.lock();
+
+  await assert.rejects(
+    store.unlockWithDataKey(Buffer.alloc(32, 1)),
+    /Touch ID can no longer unlock this vault/,
+  );
+  await assert.rejects(store.unlockWithDataKey(Buffer.alloc(16)), /Touch ID can no longer/);
+});

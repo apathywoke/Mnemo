@@ -12,7 +12,7 @@ again whenever a trigger at the end of this document applies.
 | Other entry fields: name, username, website, notes, site icon | Vault file (encrypted); main-process memory while unlocked; renderer memory and DOM for the visible list or selected entry | Usernames and websites reveal which accounts exist. |
 | Master passphrase | Typed into the renderer, sent once over IPC, then dropped | Never stored. |
 | Recovery key (256-bit) | Shown once in the renderer; kept in main memory until the user confirms it is saved; optionally in a user-saved text file; on paper | Opens the vault and resets the passphrase. |
-| Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock | Unwraps everything. |
+| Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock; if Touch ID is on, also in `biometric/<profile>.key`, encrypted with a Keychain-held key | Unwraps everything. |
 | Encrypted backups (`.vault`) | Wherever the user saves them | Same envelope and passphrase as the local vault. |
 | Profile registry (`profiles.json`) | Application support folder, `0600` | Profile names in plain text, not secret by design. |
 | Integrity of the shipped app | Signed, notarized `Mnemo.app` | A modified app can steal everything the user types. |
@@ -115,6 +115,7 @@ again whenever a trigger at the end of this document applies.
 | Launch with `--remote-debugging-port` or `--remote-debugging-pipe` and drive the renderer | Packaged builds exit at startup when either switch is present | Other Chromium switches (`--js-flags`, `--disable-web-security`, and so on) are not filtered. They cannot reach Node.js and do not change the main-process checks, but should be reviewed. |
 | Modify `app.asar` or plant `Resources/app/` to backdoor the app | `EnableEmbeddedAsarIntegrityValidation` and `OnlyLoadAppFromAsar` fuses on; the asar hash is inside the signed `Info.plist`; hardened runtime with library validation (no `disable-library-validation` entitlement) | An attacker who can rewrite the whole bundle and re-sign it ad hoc produces an app that Gatekeeper does not trust; a quarantined download fails assessment, but a local unquarantined copy may still launch. Install in `/Applications` and keep it owned by an admin. |
 | Replace the vault file or `profiles.json` | AES-GCM authentication; schema validation; registry validation | The attacker can delete or roll back vaults (old encrypted copy). Rollback is not detected. |
+| Read the Touch ID key file and ask the Keychain for its key | The Keychain item belongs to the signed app; another app gets a macOS Keychain prompt. The file is `0600` and bound to its profile ID | A user who clicks "Always Allow", or an attacker who knows the login password and has the disk, can decrypt the vault key without Touch ID or the master passphrase. Touch ID is checked by the app, not by the Keychain item. |
 | Read clipboard leftovers | Copied values are cleared after 30 s, and on lock, if unchanged | Clipboard managers and Universal Clipboard may keep copies. |
 
 ### A5, local process while unlocked
@@ -169,7 +170,12 @@ auto-lock limits how long secrets stay in memory.
    only in the renderer; add a native confirmation there too.
 6. **Favicon decoding** runs in the main process; move it to a sandboxed
    process.
-7. **Passphrase strength.** Consider a stronger minimum or an entropy-based
+7. **Touch ID binding.** Replace the `safeStorage` backend with a Secure
+   Enclave key whose access control requires biometry (current set), so the
+   Keychain itself refuses to release the key without a fingerprint and the
+   key is invalidated when fingerprints change. Needs a native module, the
+   data protection keychain, and a provisioning profile.
+8. **Passphrase strength.** Consider a stronger minimum or an entropy-based
    check, and consider raising scrypt cost or moving to Argon2id.
 
 ## 8. Internal review (2026-10-26)

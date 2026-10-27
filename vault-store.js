@@ -616,6 +616,29 @@ class VaultStore {
     }
   }
 
+  // Unlocks with the vault key itself, as released from the Keychain after
+  // Touch ID. The key is copied; the caller should wipe its own buffer.
+  async unlockWithDataKey(dataKey) {
+    const sessionEpoch = this.sessionEpoch;
+    await this.mutationQueue;
+    const opened = await this.decryptVaultFile(this.filePath, { dataKey });
+    if (this.sessionEpoch !== sessionEpoch) {
+      opened.dataKey.fill(0);
+      throw new Error("Unlock was interrupted because the vault was locked.");
+    }
+    this.lock();
+    this.dataKey = opened.dataKey;
+    this.vaultData = opened.vaultData;
+    this.envelope = opened.envelope;
+    return this.getStatus();
+  }
+
+  // A copy of the vault key for Touch ID enrollment.
+  exportDataKey() {
+    this.requireUnlocked();
+    return Buffer.from(this.dataKey);
+  }
+
   // The recovery key created with the vault, handed out once.
   takeIssuedRecoveryKey() {
     const recoveryKey = this.issuedRecoveryKey;
@@ -1071,9 +1094,11 @@ class VaultStore {
     });
   }
 
-  // `secret` is the master passphrase (string) or { recoveryKeyBytes }.
+  // `secret` is the master passphrase (string), { recoveryKeyBytes }, or
+  // { dataKey } for a key released by Touch ID.
   async decryptVaultFile(filePath, secret) {
-    const usingRecoveryKey = typeof secret !== "string";
+    const usingRecoveryKey = Boolean(secret?.recoveryKeyBytes);
+    const usingDataKey = Boolean(secret?.dataKey);
     let wrappingKey = null;
     let dataKey = null;
     let plaintext = null;
@@ -1088,7 +1113,12 @@ class VaultStore {
       rawFile = await fs.readFile(filePath);
       const envelope = JSON.parse(rawFile.toString("utf8"));
       const parsed = parseEnvelope(envelope);
-      if (usingRecoveryKey) {
+      if (usingDataKey) {
+        parsed.salt.fill(0);
+        parsed.recoverySalt?.fill(0);
+        if (secret.dataKey.length !== KEY_BYTES) throw new Error("Invalid key");
+        dataKey = Buffer.from(secret.dataKey);
+      } else if (usingRecoveryKey) {
         if (!parsed.recoverySalt) {
           parsed.salt.fill(0);
           throw Object.assign(new Error("This vault has no recovery key."), { userFacing: true });
@@ -1130,6 +1160,9 @@ class VaultStore {
       return opened;
     } catch (error) {
       if (error?.userFacing) throw new Error(error.message);
+      if (usingDataKey) {
+        throw new Error("Touch ID can no longer unlock this vault. Unlock it with your master passphrase and turn Touch ID on again.");
+      }
       throw new Error(
         usingRecoveryKey
           ? "Could not open the vault with this recovery key. Check the key and make sure the vault file is intact."

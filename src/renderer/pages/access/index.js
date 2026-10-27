@@ -22,6 +22,9 @@
       button.disabled = true;
       try {
         await ctx.api.selectProfile(profile.id);
+        // Choosing a vault in the list starts Touch ID right away; returning
+        // to the unlock screen after locking does not.
+        state.offerTouchId = true;
         state.selectedProfileId = profile.id;
         state.selectedProfileName = profile.name;
         await refreshState();
@@ -83,6 +86,9 @@
           if (status.vaultExists) {
             $("#unlock-profile-name").textContent = state.selectedProfileName ?? "";
             ctx.showPanel("unlock");
+            const autoPrompt = state.offerTouchId === true;
+            state.offerTouchId = false;
+            void ctx.touchId.prepareUnlock({ autoPrompt });
           } else {
             await refreshProfiles();
           }

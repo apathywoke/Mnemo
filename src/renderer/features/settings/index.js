@@ -14,6 +14,11 @@
       confirm: "settings.recoveryConfirm",
       error: "errors.createRecoveryKey",
     },
+    touchid: {
+      prompt: "touchId.prompt",
+      confirm: "touchId.confirm",
+      error: "errors.touchIdEnable",
+    },
     export: {
       prompt: "settings.exportPrompt",
       confirm: "settings.exportConfirm",
@@ -69,7 +74,11 @@
     const confirmPassphrase = $("#settings-confirm-passphrase");
     const confirmSubmit = $("#settings-confirm-submit");
     const confirmError = $("#settings-confirm-error");
+    const touchIdStatus = $("#settings-touchid-status");
+    const touchIdEnable = $("#settings-touchid-enable");
+    const touchIdDisable = $("#settings-touchid-disable");
     let recoveryEnabled = null;
+    let touchId = null;
     let pendingAction = null;
 
     function renderVault() {
@@ -80,6 +89,13 @@
       recoveryButton.textContent = i18n.t(
         recoveryEnabled ? "settings.recoveryReplace" : "settings.recoveryCreate",
       );
+      touchIdStatus.textContent = touchId === null
+        ? ""
+        : i18n.t(!touchId.available
+          ? "touchId.unavailable"
+          : touchId.enabled ? "touchId.enabled" : "touchId.disabled");
+      touchIdEnable.hidden = !touchId?.available || touchId.enabled;
+      touchIdDisable.hidden = !touchId?.available || !touchId.enabled;
       if (pendingAction) {
         confirmPrompt.textContent = i18n.t(PASSPHRASE_ACTIONS[pendingAction].prompt);
         confirmSubmit.textContent = i18n.t(PASSPHRASE_ACTIONS[pendingAction].confirm);
@@ -114,9 +130,13 @@
       lockedHint.hidden = true;
       vaultSections.hidden = false;
       recoveryEnabled = null;
+      touchId = null;
       renderVault();
       try {
-        recoveryEnabled = (await ctx.api.getRecoveryStatus()).enabled;
+        [recoveryEnabled, touchId] = await Promise.all([
+          ctx.api.getRecoveryStatus().then((status) => status.enabled),
+          ctx.api.getTouchIdStatus(),
+        ]);
         renderVault();
       } catch {
         showVaultLocked();
@@ -142,6 +162,12 @@
         dialog.close();
         await ctx.recoveryKey.show(recoveryKey);
         showToast(i18n.t("toast.recoveryKeyCreated"));
+      } else if (action === "touchid") {
+        await ctx.api.enableTouchId(passphrase);
+        resetVaultActions();
+        touchId = { ...touchId, enabled: true };
+        renderVault();
+        showToast(i18n.t("toast.touchIdEnabled"));
       } else if (action === "export") {
         const result = await ctx.api.exportBackup(passphrase);
         resetVaultActions();
@@ -160,6 +186,19 @@
       button.addEventListener("click", () => askPassphrase(button.dataset.settingsAction));
     }
     $("#settings-confirm-cancel").addEventListener("click", resetVaultActions);
+    touchIdDisable.addEventListener("click", async () => {
+      touchIdDisable.disabled = true;
+      try {
+        await ctx.api.disableTouchId();
+        touchId = { ...touchId, enabled: false };
+        renderVault();
+        showToast(i18n.t("toast.touchIdDisabled"));
+      } catch (cause) {
+        showToast(i18n.errorText(cause, "errors.touchIdDisable"), { type: "error" });
+      } finally {
+        touchIdDisable.disabled = false;
+      }
+    });
     confirmForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const action = pendingAction;

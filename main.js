@@ -8,11 +8,14 @@ const {
   dialog,
   ipcMain,
   powerMonitor,
+  safeStorage,
   session,
   shell,
+  systemPreferences,
 } = require("electron");
 const ProfileManager = require("./profile-manager");
 const SettingsStore = require("./settings-store");
+const BiometricUnlock = require("./biometric-unlock");
 const { parseImportFile } = require("./importers");
 const i18nCatalog = require("./src/renderer/shared/i18n/messages");
 const { createTranslator, encodeIpcError } = require("./src/renderer/shared/i18n/translate");
@@ -35,6 +38,7 @@ const hasSingleInstanceLock =
 const translator = createTranslator(i18nCatalog);
 let language = translator.defaultLanguage;
 let settingsStore = null;
+let biometricUnlock = null;
 let settingsLoaded = Promise.resolve();
 let mainWindow = null;
 let vaultStore = null;
@@ -282,6 +286,10 @@ if (launchedWithRemoteDebugging) {
 
     profileManager = new ProfileManager(app.getPath("userData"));
     vaultStore = new VaultStore(profileManager.legacyVaultPath);
+    biometricUnlock = new BiometricUnlock(app.getPath("userData"), {
+      safeStorage,
+      systemPreferences,
+    });
 
     settingsStore = new SettingsStore(app.getPath("userData"), {
       isSupportedLanguage: translator.isSupported,
@@ -319,7 +327,9 @@ if (launchedWithRemoteDebugging) {
       if (activeProfileId !== null || vaultStore?.isUnlocked()) {
         throw new Error("Lock the current vault before deleting a profile.");
       }
-      return profileManager.deleteProfile(profileId);
+      const deleted = await profileManager.deleteProfile(profileId);
+      await biometricUnlock.disable(profileId).catch(() => {});
+      return deleted;
     });
     registerHandler("profiles:create", async (name, passphrase) => {
       if (activeProfileId !== null) {
@@ -448,6 +458,66 @@ if (launchedWithRemoteDebugging) {
       pendingRecoveryKey = null;
       return { dismissed: true };
     });
+    // Touch ID unlock for the selected profile. Status works while locked so
+    // the unlock screen can offer it.
+    registerHandler("biometric:status", async () => ({
+      available: biometricUnlock.isAvailable(),
+      enabled: activeProfileId !== null && (await biometricUnlock.isEnabled(activeProfileId)),
+    }));
+    registerHandler("biometric:enable", async (passphrase) => {
+      if (activeProfileId === null) throw new Error("Choose a valid vault profile.");
+      const store = vaultStore;
+      const profileId = activeProfileId;
+      store.requireUnlocked();
+      await store.verifyPassphrase(passphrase);
+      const dataKey = store.exportDataKey();
+      try {
+        await biometricUnlock.enable(
+          profileId,
+          dataKey,
+          tr("biometric.reasonEnable", { name: await activeProfileName() }),
+        );
+      } finally {
+        dataKey.fill(0);
+      }
+      return { enabled: true };
+    });
+    registerHandler("biometric:disable", async () => {
+      if (activeProfileId === null) throw new Error("Choose a valid vault profile.");
+      await biometricUnlock.disable(activeProfileId);
+      return { enabled: false };
+    });
+    registerHandler("vault:unlock-biometric", async () => {
+      if (activeProfileId === null) throw new Error("Choose a valid vault profile.");
+      const store = vaultStore;
+      const profileId = activeProfileId;
+      const unlockEpoch = lockEpoch;
+      const dataKey = await biometricUnlock.releaseKey(
+        profileId,
+        tr("biometric.reasonUnlock", { name: await activeProfileName() }),
+      );
+      try {
+        if (store !== vaultStore || lockEpoch !== unlockEpoch) {
+          throw new Error("Unlock was interrupted because the vault was locked.");
+        }
+        let status;
+        try {
+          status = await store.unlockWithDataKey(dataKey);
+        } catch (error) {
+          // A key that no longer opens the file (restored from another
+          // backup, for example) is removed so the button stops appearing.
+          if (/^Touch ID can no longer/.test(error.message)) {
+            await biometricUnlock.disable(profileId).catch(() => {});
+          }
+          throw error;
+        }
+        await profileManager.markOpened(profileId).catch(() => {});
+        return status;
+      } finally {
+        dataKey.fill(0);
+      }
+    });
+
     // The renderer gets entry metadata only. Passwords are decrypted in this
     // process on an explicit copy or reveal and are never returned over IPC.
     registerHandler("vault:list-entries", () => vaultStore.listEntries());
@@ -624,6 +694,7 @@ if (launchedWithRemoteDebugging) {
       activeProfileId = null;
       vaultStore = new VaultStore(profileManager.legacyVaultPath);
       await profileManager.deleteProfile(profileId);
+      await biometricUnlock.disable(profileId).catch(() => {});
       return { deleted: true };
     });
     registerHandler("vault:restore-backup", async (credentials) => {
@@ -661,6 +732,11 @@ if (launchedWithRemoteDebugging) {
 
       await store.restoreBackup(selection.filePaths[0], restoreCredentials);
       const recoveryKey = store.takeIssuedRecoveryKey();
+      // The restored file may use a different vault key than the one stored
+      // for Touch ID.
+      if (activeProfileId !== null) {
+        await biometricUnlock.disable(activeProfileId).catch(() => {});
+      }
       if (isStale()) {
         store.lock();
         throw new Error("Restore was interrupted because the vault was locked.");
