@@ -212,3 +212,221 @@ test("sealed passwords are bound to their entry ID", async (t) => {
   assert.equal(store.revealPassword(first.id), "first-secret");
   assert.throws(() => store.revealPassword(second.id), /Could not decrypt/);
 });
+
+test("recovery key opens the vault, resets the passphrase, and is replaced", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new VaultStore(path.join(directory, "recovery.vault"));
+  await store.create(PASSPHRASE);
+  const recoveryKey = store.takeIssuedRecoveryKey();
+  assert.match(recoveryKey, /^([0-9A-HJKMNP-TV-Z]{4}-){13}[0-9A-HJKMNP-TV-Z]{4}$/);
+  assert.equal(store.takeIssuedRecoveryKey(), null);
+  assert.equal(store.hasRecoveryKey(), true);
+  const { id } = await store.saveEntry(makeLogin());
+
+  const file = JSON.parse(await fs.readFile(store.filePath, "utf8"));
+  assert.equal(file.version, 2);
+  assert.equal(JSON.stringify(file).includes(recoveryKey.replaceAll("-", "")), false);
+  store.lock();
+
+  // Typos are caught by the checksum before any decryption.
+  const typo = recoveryKey.slice(0, -1) + (recoveryKey.endsWith("0") ? "1" : "0");
+  await assert.rejects(store.recoverWithKey(typo, "new passphrase 123"), /recovery key is not valid/);
+  await assert.rejects(store.recoverWithKey(recoveryKey, "short"), /at least 7 characters/);
+
+  // Lowercase, spaces, and look-alike letters are accepted.
+  const typed = recoveryKey.toLowerCase().replaceAll("-", " ").replaceAll("0", "o");
+  const recovered = await store.recoverWithKey(typed, "new passphrase 123");
+  assert.equal(recovered.status.unlocked, true);
+  assert.notEqual(recovered.recoveryKey, recoveryKey);
+  assert.equal(store.revealPassword(id), "test-password-value");
+  store.lock();
+
+  await assert.rejects(store.unlock(PASSPHRASE), /Could not open the vault/);
+  await assert.rejects(store.recoverWithKey(recoveryKey, "another passphrase"), /with this recovery key/);
+  await store.unlock("new passphrase 123");
+  assert.equal(store.revealPassword(id), "test-password-value");
+  store.lock();
+  await store.recoverWithKey(recovered.recoveryKey, "third passphrase 123");
+});
+
+test("a new recovery key needs the current passphrase and replaces the old one", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new VaultStore(path.join(directory, "rotate.vault"));
+  await store.create(PASSPHRASE);
+  const original = store.takeIssuedRecoveryKey();
+  await store.saveEntry(makeLogin());
+
+  await assert.rejects(store.createRecoveryKey("wrong passphrase"), /master passphrase is incorrect/);
+  const replacement = await store.createRecoveryKey(PASSPHRASE);
+  assert.notEqual(replacement, original);
+  store.lock();
+
+  await assert.rejects(store.recoverWithKey(original, "new passphrase 123"), /with this recovery key/);
+  await store.unlock(PASSPHRASE);
+  store.lock();
+  await store.recoverWithKey(replacement, "new passphrase 123");
+});
+
+test("format 1 vaults still open and gain a recovery key on request", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new VaultStore(path.join(directory, "legacy-format.vault"));
+  await store.create(PASSPHRASE);
+  const { id } = await store.saveEntry(makeLogin());
+  store.lock();
+
+  // Rebuild the file as format 1: same data key, no recovery wrap.
+  const crypto = require("node:crypto");
+  const v2 = JSON.parse(await fs.readFile(store.filePath, "utf8"));
+  const v2Header = { format: v2.format, version: 2, kdf: v2.kdf, recovery: v2.recovery };
+  const aad = (purpose, header) => Buffer.from(`local-vault:${purpose}:v${header.version}:${JSON.stringify(header)}`);
+  const unwrap = (record, key, data) => {
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(record.nonce, "base64"));
+    decipher.setAAD(data);
+    decipher.setAuthTag(Buffer.from(record.tag, "base64"));
+    return Buffer.concat([decipher.update(Buffer.from(record.ciphertext, "base64")), decipher.final()]);
+  };
+  const wrap = (plaintext, key, data) => {
+    const nonce = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv("aes-256-gcm", key, nonce);
+    cipher.setAAD(data);
+    const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+    return { name: "aes-256-gcm", nonce: nonce.toString("base64"), tag: cipher.getAuthTag().toString("base64"), ciphertext: ciphertext.toString("base64") };
+  };
+  const wrappingKey = crypto.scryptSync(PASSPHRASE, Buffer.from(v2.kdf.salt, "base64"), 32, { N: 2 ** 17, r: 8, p: 1, maxmem: 256 * 1024 * 1024 });
+  const dataKey = unwrap(v2.keyWrap, wrappingKey, aad("key-wrap", v2Header));
+  const vaultData = unwrap(v2.data, dataKey, aad("vault-data", v2Header));
+  const v1Header = { format: v2.format, version: 1, kdf: v2.kdf };
+  await fs.writeFile(store.filePath, JSON.stringify({
+    ...v1Header,
+    keyWrap: wrap(dataKey, wrappingKey, aad("key-wrap", v1Header)),
+    data: wrap(vaultData, dataKey, aad("vault-data", v1Header)),
+  }));
+
+  await store.unlock(PASSPHRASE);
+  assert.equal(store.hasRecoveryKey(), false);
+  assert.equal(store.revealPassword(id), "test-password-value");
+  store.lock();
+  await assert.rejects(store.recoverWithKey("0".repeat(56), "new passphrase 123"), /recovery key is not valid|no recovery key/);
+
+  await store.unlock(PASSPHRASE);
+  const recoveryKey = await store.createRecoveryKey(PASSPHRASE);
+  assert.equal(store.hasRecoveryKey(), true);
+  assert.equal(JSON.parse(await fs.readFile(store.filePath, "utf8")).version, 2);
+  store.lock();
+  await store.recoverWithKey(recoveryKey, "new passphrase 123");
+  assert.equal(store.revealPassword(id), "test-password-value");
+});
+
+test("tampering with the recovery wrap or header is detected", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new VaultStore(path.join(directory, "tamper.vault"));
+  await store.create(PASSPHRASE);
+  const recoveryKey = store.takeIssuedRecoveryKey();
+  store.lock();
+  const original = await fs.readFile(store.filePath, "utf8");
+
+  const stripped = JSON.parse(original);
+  delete stripped.recoveryWrap;
+  await fs.writeFile(store.filePath, JSON.stringify(stripped));
+  await assert.rejects(store.unlock(PASSPHRASE), /Could not open the vault/);
+
+  const resalted = JSON.parse(original);
+  resalted.recovery.salt = Buffer.alloc(16, 7).toString("base64");
+  await fs.writeFile(store.filePath, JSON.stringify(resalted));
+  await assert.rejects(store.unlock(PASSPHRASE), /Could not open the vault/);
+  await assert.rejects(store.recoverWithKey(recoveryKey, "new passphrase 123"), /with this recovery key/);
+
+  await fs.writeFile(store.filePath, original);
+  await store.unlock(PASSPHRASE);
+});
+
+test("a backup opens with its recovery key and gets a new passphrase and key", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const source = new VaultStore(path.join(directory, "source.vault"));
+  await source.create(PASSPHRASE);
+  const recoveryKey = source.takeIssuedRecoveryKey();
+  const { id } = await source.saveEntry(makeLogin());
+  const backupPath = path.join(directory, "backup.vault");
+  await source.exportBackup(backupPath);
+
+  const target = new VaultStore(path.join(directory, "target.vault"));
+  await assert.rejects(
+    target.restoreBackup(backupPath, { recoveryKey, newPassphrase: "short" }),
+    /at least 7 characters/,
+  );
+  await assert.rejects(
+    target.restoreBackup(backupPath, { recoveryKey, newPassphrase: "new passphrase 123", extra: 1 }),
+    /recovery key is not valid/,
+  );
+  const status = await target.restoreBackup(backupPath, {
+    recoveryKey,
+    newPassphrase: "new passphrase 123",
+  });
+  assert.equal(status.unlocked, true);
+  const newKey = target.takeIssuedRecoveryKey();
+  assert.ok(newKey && newKey !== recoveryKey);
+  assert.equal(target.revealPassword(id), "test-password-value");
+  target.lock();
+
+  await assert.rejects(target.unlock(PASSPHRASE), /Could not open the vault/);
+  await target.unlock("new passphrase 123");
+  target.lock();
+  await target.recoverWithKey(newKey, "third passphrase 123");
+
+  // Restoring with the passphrase keeps the file as-is and issues no key.
+  const plain = new VaultStore(path.join(directory, "plain.vault"));
+  await plain.restoreBackup(backupPath, PASSPHRASE);
+  assert.equal(plain.takeIssuedRecoveryKey(), null);
+});
+
+test("imported logins are sealed, deduplicated, and validated", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new VaultStore(path.join(directory, "import.vault"));
+  await store.create(PASSPHRASE);
+  await store.saveEntry(makeLogin({ name: "Existing", password: "same" }));
+
+  const result = await store.importLogins([
+    { name: "Existing", username: "user@example.com", password: "same", url: "example.com/login", notes: "" },
+    { name: "New", username: "n", password: "new-pw", url: "new.example", notes: "x" },
+    { name: "New", username: "n", password: "new-pw", url: "new.example", notes: "x" },
+    { name: "Bad", username: "", password: "pw", url: "javascript:alert(1)", notes: "" },
+    { name: "Long", username: "", password: "x".repeat(5000), url: "", notes: "" },
+  ]);
+  assert.deepEqual(result, { imported: 1, duplicates: 2, invalid: 2 });
+  const added = store.listEntries().find((entry) => entry.name === "New");
+  assert.equal(added.url, "https://new.example");
+  assert.equal(store.revealPassword(added.id), "new-pw");
+  assert.equal(JSON.stringify(store.vaultData).includes("new-pw"), false);
+
+  // A Mnemo backup can be read for import with its passphrase or recovery key.
+  const recoveryKey = store.takeIssuedRecoveryKey();
+  const backupPath = path.join(directory, "import-backup.vault");
+  await store.exportBackup(backupPath);
+  const byPassphrase = await VaultStore.readBackupLogins(backupPath, PASSPHRASE);
+  const byKey = await VaultStore.readBackupLogins(backupPath, { recoveryKey });
+  assert.deepEqual(byKey, byPassphrase);
+  assert.equal(byKey.find((login) => login.name === "New").password, "new-pw");
+  await assert.rejects(VaultStore.readBackupLogins(backupPath, "wrong passphrase"), /Could not open the vault/);
+});
+
+test("the vault opens with its data key, and a wrong key is refused", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new VaultStore(path.join(directory, "datakey.vault"));
+  await store.create(PASSPHRASE);
+  const { id } = await store.saveEntry(makeLogin());
+  const dataKey = store.exportDataKey();
+  assert.notEqual(dataKey, store.dataKey);
+  store.lock();
+  assert.throws(() => store.exportDataKey(), /Unlock the vault first/);
+
+  const status = await store.unlockWithDataKey(dataKey);
+  assert.equal(status.unlocked, true);
+  assert.equal(store.revealPassword(id), "test-password-value");
+  store.lock();
+
+  await assert.rejects(
+    store.unlockWithDataKey(Buffer.alloc(32, 1)),
+    /Touch ID can no longer unlock this vault/,
+  );
+  await assert.rejects(store.unlockWithDataKey(Buffer.alloc(16)), /Touch ID can no longer/);
+});

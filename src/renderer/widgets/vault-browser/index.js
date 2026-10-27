@@ -1,6 +1,7 @@
 (() => {
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
+  const { t } = ns.shared.i18n;
 
   function create(ctx) {
     const state = ctx.state.vault;
@@ -37,10 +38,10 @@
       const button = $("#fetch-site-icon-button");
       button.disabled = !entry?.url || state.fetchingFaviconForId !== null;
       button.textContent = state.fetchingFaviconForId === state.selectedEntryId
-        ? "Loading…"
+        ? t("detail.loadingIcon")
         : entry?.favicon
-          ? "Update icon"
-          : "Load site icon";
+          ? t("detail.updateIcon")
+          : t("detail.loadIcon");
     }
 
     async function loadSelectedNotes(id) {
@@ -121,6 +122,10 @@
       updateSiteIconButton,
     });
     $("#entry-search").addEventListener("input", renderEntryList);
+    ns.shared.i18n.onChange(() => {
+      renderEntryList();
+      updateSiteIconButton();
+    });
 
     return {
       clear,

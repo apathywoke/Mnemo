@@ -199,7 +199,9 @@ a:focus-visible {
   gap: 7px;
 }
 
-.settings-button {
+/* Doubled class so .quiet-button's padding, declared later, cannot push the
+   icon off center. */
+.settings-button.quiet-button {
   box-sizing: border-box;
   display: inline-grid;
   width: 34px;
@@ -242,7 +244,7 @@ a:focus-visible {
   white-space: nowrap;
 }
 
-.local-badge span {
+.local-badge > span:first-child {
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -253,7 +255,7 @@ a:focus-visible {
   position: relative;
   display: flex;
   flex: 1;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
   min-height: 0;
   padding: 20px 0 34px;
@@ -267,8 +269,15 @@ a:focus-visible {
   display: flex;
   width: min(100%, 620px);
   flex-direction: column;
-  align-self: center;
+  align-self: safe center;
   padding: 22px clamp(10px, 3.5vw, 42px);
+}
+
+/* Tall forms (restore, recovery) scroll inside the panel, so the header and
+   the version line below stay in place. */
+.vault-panel:not(.vault-dashboard) {
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 .vault-panel:not([hidden]) {
@@ -658,6 +667,7 @@ h2 {
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.07em;
+  overflow-wrap: anywhere;
   text-align: center;
   text-transform: uppercase;
 }
@@ -893,7 +903,7 @@ h2 {
   font-size: 9px;
 }
 
-.version span {
+.version #app-version {
   color: #9a9a9a;
 }
 
@@ -1067,7 +1077,7 @@ h2 {
   color: #000;
 }
 
-.new-entry-button span {
+.new-entry-button span[aria-hidden="true"] {
   margin-right: 3px;
   font-size: 15px;
   vertical-align: -1px;
@@ -1470,6 +1480,53 @@ h2 {
   margin-bottom: 0;
 }
 
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+/* Same treatment as the dialog's eyebrow above it. */
+.settings-field label {
+  color: #8b8b8b;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.settings-select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 38px 0 14px;
+  border: 1px solid #333;
+  border-radius: 9px;
+  appearance: none;
+  background: #0b0b0b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23aaa' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 12px;
+  color: var(--white);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.settings-select:hover {
+  border-color: #4b4b4b;
+}
+
+.settings-select:focus-visible {
+  border-color: var(--white);
+  outline: none;
+}
+
+.settings-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
 .app-dialog[open] {
   animation: dialog-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -1505,6 +1562,11 @@ h2 {
   font-size: 25px;
   font-weight: 450;
   letter-spacing: -0.04em;
+}
+
+.settings-button:focus-visible,
+.dialog-close:focus-visible {
+  outline-offset: 2px;
 }
 
 .dialog-close {
@@ -1954,4 +2016,412 @@ h2 {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* Recovery key */
+.unlock-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+}
+
+.recovery-key-input {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.recovery-key-input::placeholder {
+  text-transform: none;
+}
+
+#recovery-key-dialog {
+  width: min(92vw, 500px);
+}
+
+.recovery-key-content {
+  display: flex;
+  flex-direction: column;
+  padding: 25px 28px 24px;
+}
+
+.recovery-key-content h3 {
+  margin: 8px 0 0;
+  color: #f1f1f1;
+  font-size: 25px;
+  font-weight: 450;
+  letter-spacing: -0.04em;
+}
+
+.recovery-key-description {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.recovery-key-value {
+  outline: none;
+  margin: 18px 0 0;
+  padding: 16px 18px;
+  border: 1px solid #554721;
+  border-radius: 10px;
+  background: #17140d;
+  color: #f0e3b8;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  line-height: 1.7;
+  text-align: center;
+  user-select: all;
+  word-break: break-word;
+}
+
+.recovery-key-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.recovery-key-actions .secondary-button {
+  margin-top: 12px;
+}
+
+.recovery-key-tips {
+  margin: 18px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.recovery-key-tip-strong {
+  color: #d6c58f;
+}
+
+.recovery-key-content[hidden] {
+  display: none;
+}
+
+.recovery-key-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 18px;
+  color: #d2d2d2;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.recovery-key-confirm input {
+  margin: 2px 0 0;
+  accent-color: #eee;
+}
+
+.dialog-save-button:disabled {
+  border-color: #3a3a3a;
+  background: #2a2a2a;
+  color: #777;
+  cursor: not-allowed;
+}
+
+.settings-recovery {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-section-title {
+  margin: 0;
+  color: #8b8b8b;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.settings-recovery-button {
+  margin-top: 4px;
+}
+
+.settings-recovery-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.settings-recovery-form[hidden],
+.settings-recovery-button[hidden] {
+  display: none;
+}
+
+.settings-recovery-form label {
+  color: #bcbcbc;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.settings-recovery-form .secret-input-row > input {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--white);
+  font: inherit;
+  font-size: 14px;
+}
+
+.settings-recovery-form .dialog-actions {
+  margin-top: 8px;
+}
+
+/* Three fields plus a description: tighten the gaps so the submit button
+   fits in the default window height. */
+.restore-mode-fields {
+  display: contents;
+}
+
+.restore-mode-fields[hidden] {
+  display: none;
+}
+
+.restore-mode-button {
+  margin-top: 2px;
+}
+
+#recover-panel h2 {
+  margin-top: 6px;
+}
+
+#recover-panel .vault-form {
+  margin-top: 14px;
+}
+
+#recover-panel .primary-button {
+  margin-top: 18px;
+}
+
+.touchid-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 18px 0 4px;
+}
+
+.touchid-button[hidden] {
+  display: none;
+}
+
+.touchid-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+/* Settings: vault sections */
+.settings-vault[hidden],
+.settings-vault-locked[hidden],
+.settings-confirm-form[hidden],
+.settings-actions [hidden] {
+  display: none;
+}
+
+.settings-vault-locked {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-section {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-actions .secondary-button {
+  margin-top: 4px;
+}
+
+.settings-danger-button {
+  border-color: #6b3434;
+  color: #f0b4b4;
+}
+
+.settings-danger-button:hover:not(:disabled) {
+  border-color: #a14d4d;
+  background: #241414;
+}
+
+.settings-actions .secondary-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.settings-confirm-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #333;
+  border-radius: 10px;
+  background: #0d0d0d;
+}
+
+.settings-confirm-form label {
+  color: #bcbcbc;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.settings-confirm-form .secret-input-row > input,
+.import-mnemo-fields .secret-input-row > input,
+.import-text-input {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--white);
+  font-size: 14px;
+}
+
+.import-text-input {
+  border-bottom: 1px solid #4b4b4b;
+}
+
+.import-text-input:focus {
+  border-color: var(--white);
+}
+
+.settings-confirm-form .dialog-actions {
+  margin-top: 6px;
+}
+
+.danger-confirm-button.dialog-save-button {
+  border-color: #c45c5c;
+  background: #c45c5c;
+  color: #fff;
+}
+
+/* Import dialog */
+#import-dialog {
+  width: min(92vw, 520px);
+}
+
+.import-content {
+  padding: 25px 28px 24px;
+}
+
+.import-step[hidden] {
+  display: none;
+}
+
+.import-sources {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.import-sources legend {
+  margin-bottom: 10px;
+  padding: 0;
+}
+
+.import-source {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 12px;
+  padding: 12px 14px;
+  border: 1px solid #333;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.import-source:hover {
+  border-color: #4b4b4b;
+}
+
+.import-source:has(input:checked) {
+  border-color: #eee;
+  background: #161616;
+}
+
+.import-source input {
+  grid-row: span 2;
+  margin: 0;
+  accent-color: #eee;
+}
+
+.import-source-name {
+  color: #eee;
+  font-size: 14px;
+}
+
+.import-source-hint {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.import-instructions {
+  margin-top: 14px;
+}
+
+.import-mnemo-fields {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.import-mnemo-fields[hidden] {
+  display: none;
+}
+
+.import-mnemo-fields label {
+  color: #bcbcbc;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.import-file-name {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.import-summary {
+  margin: 10px 0 0;
+  color: #eee;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.import-skipped {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+#import-done-step .recovery-warning {
+  margin-top: 16px;
 }

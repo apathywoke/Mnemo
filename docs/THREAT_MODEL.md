@@ -11,7 +11,8 @@ again whenever a trigger at the end of this document applies.
 | Entry passwords | Vault file (encrypted, then sealed per entry); main-process memory while unlocked; clipboard for up to 30 s after a copy | Highest value. |
 | Other entry fields: name, username, website, notes, site icon | Vault file (encrypted); main-process memory while unlocked; renderer memory and DOM for the visible list or selected entry | Usernames and websites reveal which accounts exist. |
 | Master passphrase | Typed into the renderer, sent once over IPC, then dropped | Never stored. |
-| Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock | Unwraps everything. |
+| Recovery key (256-bit) | Shown once in the renderer; kept in main memory until the user confirms it is saved; optionally in a user-saved text file; on paper | Opens the vault and resets the passphrase. |
+| Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock; if Touch ID is on, also in `biometric/<profile>.key`, encrypted with a Keychain-held key | Unwraps everything. |
 | Encrypted backups (`.vault`) | Wherever the user saves them | Same envelope and passphrase as the local vault. |
 | Profile registry (`profiles.json`) | Application support folder, `0600` | Profile names in plain text, not secret by design. |
 | Integrity of the shipped app | Signed, notarized `Mnemo.app` | A modified app can steal everything the user types. |
@@ -76,6 +77,8 @@ again whenever a trigger at the end of this document applies.
 
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
+| Brute-force the recovery key | 256 random bits; the 24-bit checksum only detects typos and reveals nothing about the key | None known. |
+| Strip or replace the recovery wrap to plant a key the attacker knows | The recovery salt is in the AES-GCM associated data of the key wraps and the vault data; a missing or different recovery wrap cannot unwrap the real vault key, and the strict format check rejects the file | An attacker with write access can delete the recovery wrap together with the file (denial of service only). |
 | Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM | A weak passphrase still falls. The 7-character minimum is a usability floor, not a strength guarantee. |
 | Tamper with a vault or backup to plant data or downgrade parameters | AES-GCM with the header (format, version, KDF parameters, salt) as AAD; strict schema and size validation before and after decryption; fixed KDF parameters | None known. |
 | Swap sealed passwords between entries | Each password is sealed with the entry ID in its AAD; a swapped value fails authentication | None known. |
@@ -95,8 +98,10 @@ again whenever a trigger at the end of this document applies.
 | --- | --- | --- |
 | Read all passwords in bulk | **New in this change.** The renderer receives metadata only (`listEntries`); passwords never cross IPC. `copyEntryField` writes to the clipboard from the main process; `revealPassword` shows a native dialog. The renderer cannot read the clipboard back: permission requests and permission checks are both denied, so `navigator.clipboard.readText()` fails and `document.execCommand("paste")` returns `false` (verified in the running app). | An attacker can still read usernames, websites, and the selected entry's notes, and can call `getEntry` for every ID to read all notes. It can trigger copies or reveal dialogs, which the user sees. |
 | Write arbitrary clipboard contents (for example, a malicious command) | The old `copySecret(value)` API is removed; only an entry's username or password can be copied | None known. |
-| Modify or delete entries, or export a backup | Possible through the preload API while unlocked; export and restore always show a native file dialog | A compromised renderer can corrupt or delete data. Keep backups. |
+| Modify or delete entries, or export a backup | Entries can be changed through the preload API while unlocked. Exporting a backup and deleting the vault need the master passphrase again; deletion also needs a native confirmation; export, import, and restore always show a native file dialog | A compromised renderer can corrupt entries, and one that captured the passphrase at unlock can pass these checks. Keep backups. |
+| Read a third-party export through import | Import files are chosen in a native dialog and parsed in main; only counts return to the renderer | Main parses untrusted JSON, CSV, and ZIP; sizes are capped, but parser bugs would run in the privileged process. |
 | Read the master passphrase | Typed into the renderer by design | A compromised renderer during unlock sees the passphrase. |
+| Read or mint a recovery key | The key is shown in the renderer once, by design. Creating a new key requires the current master passphrase in main | A compromised renderer during vault creation, recovery, or key creation sees the recovery key, which is equivalent to the passphrase it can already see. |
 | Exfiltrate what it can read (metadata, notes, passphrase) | CSP `connect-src 'none'`; `webRequest` cancels HTTP(S) and WebSocket; WebRTC removed from the page, UDP restricted, and the session proxied to a closed port; DevTools disabled in packaged builds | DNS prefetch or other Chromium side channels not covered here. |
 | Escape to Node.js or the filesystem | `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`; narrow preload; no `webview`; window opening and navigation denied; strict CSP (`script-src 'self'`, `connect-src 'none'`); remote requests cancelled | Depends on Chromium's sandbox. |
 | Spoof IPC from another frame | Handlers accept only the main frame whose URL is the packaged `index.html` | None known. |
@@ -110,6 +115,7 @@ again whenever a trigger at the end of this document applies.
 | Launch with `--remote-debugging-port` or `--remote-debugging-pipe` and drive the renderer | Packaged builds exit at startup when either switch is present | Other Chromium switches (`--js-flags`, `--disable-web-security`, and so on) are not filtered. They cannot reach Node.js and do not change the main-process checks, but should be reviewed. |
 | Modify `app.asar` or plant `Resources/app/` to backdoor the app | `EnableEmbeddedAsarIntegrityValidation` and `OnlyLoadAppFromAsar` fuses on; the asar hash is inside the signed `Info.plist`; hardened runtime with library validation (no `disable-library-validation` entitlement) | An attacker who can rewrite the whole bundle and re-sign it ad hoc produces an app that Gatekeeper does not trust; a quarantined download fails assessment, but a local unquarantined copy may still launch. Install in `/Applications` and keep it owned by an admin. |
 | Replace the vault file or `profiles.json` | AES-GCM authentication; schema validation; registry validation | The attacker can delete or roll back vaults (old encrypted copy). Rollback is not detected. |
+| Read the Touch ID key file and ask the Keychain for its key | The Keychain item belongs to the signed app; another app gets a macOS Keychain prompt. The file is `0600` and bound to its profile ID | A user who clicks "Always Allow", or an attacker who knows the login password and has the disk, can decrypt the vault key without Touch ID or the master passphrase. Touch ID is checked by the app, not by the Keychain item. |
 | Read clipboard leftovers | Copied values are cleared after 30 s, and on lock, if unchanged | Clipboard managers and Universal Clipboard may keep copies. |
 
 ### A5, local process while unlocked
@@ -127,6 +133,7 @@ auto-lock limits how long secrets stay in memory.
 | --- | --- | --- |
 | Unattended unlocked app | Auto-lock after 5 minutes without input, on screen lock, sleep, window close, and quit | Up to 5 minutes of exposure. |
 | Shoulder surfing | Passwords masked; reveal is an explicit action in a separate dialog | The dialog shows the password until dismissed. |
+| Recovery key found on paper or in a saved file | The user is told to keep it offline and to move or delete the file; a new key can be issued from Settings, which invalidates the old one for the current file | Old backups still open with the key that was valid when they were made, including through the restore screen. Replacing a key does not protect backups made before the replacement. |
 
 ### A7, distribution
 
@@ -140,7 +147,8 @@ auto-lock limits how long secrets stay in memory.
 
 - Malware running as root, kernel compromise, or hardware attacks such as
   cold boot.
-- Recovering a forgotten master passphrase. There is no recovery by design.
+- Recovering a forgotten master passphrase without the recovery key. There is
+  no other way back in by design.
 - Sync, sharing, browser autofill, and multi-device use. These features do not
   exist yet.
 - Side channels in Node.js or Chromium crypto implementations.
@@ -158,11 +166,16 @@ auto-lock limits how long secrets stay in memory.
    zeroized.
 4. **Rollback.** Replacing a vault with an older encrypted copy is not
    detected.
-5. **Profile deletion** is confirmed only in the renderer; add a native
-   confirmation in the main process.
+5. **Profile deletion from the profile list** (vault locked) is confirmed
+   only in the renderer; add a native confirmation there too.
 6. **Favicon decoding** runs in the main process; move it to a sandboxed
    process.
-7. **Passphrase strength.** Consider a stronger minimum or an entropy-based
+7. **Touch ID binding.** Replace the `safeStorage` backend with a Secure
+   Enclave key whose access control requires biometry (current set), so the
+   Keychain itself refuses to release the key without a fingerprint and the
+   key is invalidated when fingerprints change. Needs a native module, the
+   data protection keychain, and a provisioning profile.
+8. **Passphrase strength.** Consider a stronger minimum or an entropy-based
    check, and consider raising scrypt cost or moving to Argon2id.
 
 ## 8. Internal review (2026-10-26)
@@ -177,7 +190,7 @@ found no Critical or High issues.
 | 1 | Medium | The reveal-password dialog stayed open after auto-lock, screen lock, or sleep | **Fixed.** Vault dialogs use an `AbortController`; `lockVault()` closes them. Covered by a test. |
 | 2 | Medium | A compromised renderer could exfiltrate metadata and the master passphrase through WebRTC (STUN/TURN), which bypasses `webRequest` and CSP `connect-src` | **Fixed.** The preload removes `RTCPeerConnection`, `webkitRTCPeerConnection`, and `RTCDataChannel` (verified in the running app); the IP handling policy is `disable_non_proxied_udp`; the session proxy points to a closed local port; CSP adds `webrtc 'block'`. |
 | 3 | Low | No permission check handler, so checks report "granted" | **Fixed.** Permission checks and device permissions are denied; clipboard reads verified to fail in the running app. |
-| 4 | Low | Restore read the global vault after awaiting dialogs and ignored the lock epoch; profile deletion is confirmed only in the renderer | **Partly fixed.** Restore binds to the vault and epoch at the start and aborts if either changes. Profile deletion still needs a native confirmation, ideally with the profile's passphrase. |
+| 4 | Low | Restore read the global vault after awaiting dialogs and ignored the lock epoch; profile deletion is confirmed only in the renderer | **Mostly fixed.** Restore binds to the vault and epoch at the start and aborts if either changes. Deleting the open vault from Settings needs its passphrase and a native confirmation. Deleting a locked profile from the profile list still relies on the renderer's type-the-name dialog. |
 | 5 | Low | DevTools available in packaged builds (self-XSS through the console) | **Fixed.** `devTools` is disabled when packaged. |
 | 6 | Low/Info | `file://` origin with `GrantFileProtocolExtraPrivileges` makes CSP `'self'` cover any local file | **Open.** See follow-up 1 in section 7. |
 | 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Open.** Move decoding to a sandboxed `utilityProcess` or to the renderer. |

@@ -27,6 +27,8 @@ passwords until the design has received independent security review.
 - Each profile has an independent encrypted vault file and master passphrase.
   Profile names and IDs are stored in a local, permission-restricted registry
   in plain text; profile names are not secret vault data.
+- The interface language is stored in `settings.json` in the same folder
+  (plain text, `0600`). It holds no vault data.
 - The renderer receives only entry metadata (name, username, website, icon,
   timestamps). Notes are fetched for the selected entry. Passwords never cross
   IPC: the main process decrypts one password when the user copies it, or
@@ -76,8 +78,48 @@ passwords until the design has received independent security review.
   are off; `OnlyLoadAppFromAsar` and embedded asar integrity validation are on.
   Packaged builds refuse to start with Chromium remote-debugging switches. See
   `docs/RELEASING.md`.
-- There is no independent backup passphrase or recovery mechanism for a
-  forgotten master passphrase.
+- Every new vault gets a recovery key: 256 random bits shown once as 14
+  groups of Crockford Base32 with a 24-bit checksum. The vault key is wrapped
+  a second time under a key derived from it with HKDF-SHA256 and a separate
+  salt (file format 2). The recovery salt is part of the authenticated header,
+  so removing or swapping the recovery wrap makes the file fail to open.
+  Recovering access requires the key and a new master passphrase; a new
+  recovery key is issued at the same time, and the old one stops opening the
+  current file. Older backups still open with the passphrase or recovery key
+  that was valid when they were made. Creating a new key from Settings needs
+  the current master passphrase. Vaults in format 1 keep working and get a
+  key when the user creates one.
+- The recovery key is shown in the app window once and can be copied (cleared
+  from the clipboard after 30 seconds) or saved as a text file with mode
+  `0600`. Anyone who holds it can open the vault; it is a second secret of the
+  same strength as the vault key, not a weaker one.
+- A backup can be restored with its master passphrase, or with the recovery
+  key that was valid when it was made. With the recovery key, the restored
+  vault is re-encrypted under a new master passphrase and gets a new recovery
+  key; the backup file itself is not changed.
+- Backups are exported from Settings after the master passphrase is entered
+  again, or right after a recovery key is issued (when the passphrase was
+  just entered). The new-key dialog offers that backup, because a recovery
+  key alone cannot restore a vault whose file was deleted.
+- Import from Bitwarden (unencrypted JSON or CSV), 1Password (1PUX or CSV),
+  and other Mnemo backups adds logins to the open vault. Import files are
+  opened and parsed only in the main process; the renderer receives counts,
+  never file contents. Parsing is size-limited, including the decompressed
+  size of 1PUX archives. Non-login items, archived items, and two-factor
+  secrets are skipped and reported. After importing a plain-text export, the
+  app offers to move it to the Trash; it cannot securely erase it.
+- Deleting the open vault from Settings requires the master passphrase and a
+  native confirmation dialog in the main process.
+- Touch ID unlock is opt-in per vault and needs the master passphrase plus a
+  successful Touch ID check to turn on. The vault key is then encrypted with
+  Electron `safeStorage`, whose key lives in the macOS login Keychain under
+  the app's signature, and stored in `biometric/<profile>.key` (`0600`). It
+  is released only in the main process after `promptTouchID` succeeds. This
+  is a convenience trade-off: Touch ID is enforced by the app rather than by
+  the Keychain item, and someone who can unlock your macOS login keychain
+  (for example, with your Mac login password) could recover the vault key
+  without the master passphrase. Restoring a backup into the vault or
+  deleting the vault removes the stored key.
 - Deleting a profile unlinks its encrypted vault file. It does not guarantee
   secure erasure from APFS snapshots, Time Machine backups, SSD remapping, or
   other copies of that file.

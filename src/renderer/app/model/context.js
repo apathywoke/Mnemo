@@ -37,6 +37,7 @@
           setup: $("#setup-panel"),
           unlock: $("#unlock-panel"),
           restore: $("#restore-panel"),
+          recover: $("#recover-panel"),
           open: $("#open-panel"),
           fatal: $("#fatal-panel"),
         };
@@ -49,6 +50,15 @@
           "confirm-passphrase",
           "unlock-passphrase",
           "restore-passphrase",
+          "recover-key",
+          "restore-recovery-key",
+          "restore-new-passphrase",
+          "restore-confirm-passphrase",
+          "recover-passphrase",
+          "recover-confirm-passphrase",
+          "settings-confirm-passphrase",
+          "import-passphrase",
+          "import-recovery-key",
           "profile-name",
           "restore-profile-name",
           "entry-password",
@@ -60,6 +70,9 @@
         ctx.pages.vault?.updatePasswordStrength();
       },
       clearVaultView() {
+        ctx.recoveryKey?.discard();
+        ctx.importer?.close();
+        ns.features.settings.showRecoveryLocked?.();
         ctx.pages.vault?.clear();
         $("#entry-search").value = "";
         $("#entry-count").textContent = "0";

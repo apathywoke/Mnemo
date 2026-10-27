@@ -2,15 +2,18 @@
   const ns = window.mnemoRenderer;
 
   function formatLastOpened(timestamp) {
+    const { t, language } = ns.shared.i18n;
     if (!Number.isSafeInteger(timestamp) || timestamp < 0) {
-      return "Last opened · Not recorded";
+      return t("profile.lastOpenedUnknown");
     }
     const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return "Last opened · Not recorded";
-    return `Last opened · ${new Intl.DateTimeFormat("en-US", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(date)}`;
+    if (Number.isNaN(date.getTime())) return t("profile.lastOpenedUnknown");
+    return t("profile.lastOpened", {
+      date: new Intl.DateTimeFormat(language, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(date),
+    });
   }
 
   ns.entities.vaultProfile = { formatLastOpened };

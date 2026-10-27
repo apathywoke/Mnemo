@@ -4,14 +4,28 @@ const { promisify } = require("node:util");
 const {
   createCipheriv,
   createDecipheriv,
+  createHash,
+  hkdfSync,
   randomUUID,
   randomBytes,
   scrypt,
+  timingSafeEqual,
 } = require("node:crypto");
 
 const scryptAsync = promisify(scrypt);
 const FORMAT = "local-vault";
-const FORMAT_VERSION = 1;
+// Format 2 adds a recovery key: the data key is wrapped a second time under a
+// key derived from a random recovery key, and the recovery salt is part of the
+// authenticated header. Format 1 files (no recovery key) remain readable.
+const FORMAT_VERSION = 2;
+const LEGACY_FORMAT_VERSION = 1;
+const RECOVERY_KDF = "hkdf-sha256";
+const RECOVERY_KEY_BYTES = 32;
+const RECOVERY_CHECKSUM_BYTES = 3;
+// Crockford Base32: no I, L, O, or U, so the key is easy to read and type.
+const RECOVERY_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const RECOVERY_KEY_CHARACTERS = ((RECOVERY_KEY_BYTES + RECOVERY_CHECKSUM_BYTES) * 8) / 5;
+const RECOVERY_GROUP_SIZE = 4;
 // Schema 1 stored passwords as plain strings inside the encrypted vault data.
 // Schema 2 additionally seals each password under the vault key, bound to its
 // entry ID, so unlocking does not decrypt every password at once.
@@ -68,14 +82,87 @@ function decodeBase64(value, expectedLength, maxLength = expectedLength) {
   return decoded;
 }
 
-function getHeader(kdf) {
-  return { format: FORMAT, version: FORMAT_VERSION, kdf };
+function getHeader(kdf, recovery = null) {
+  return recovery
+    ? { format: FORMAT, version: FORMAT_VERSION, kdf, recovery }
+    : { format: FORMAT, version: LEGACY_FORMAT_VERSION, kdf };
+}
+
+function headerOf(envelope) {
+  return getHeader(envelope.kdf, envelope.recovery ?? null);
 }
 
 function getAad(purpose, header) {
   return Buffer.from(
-    `local-vault:${purpose}:v${FORMAT_VERSION}:${JSON.stringify(header)}`,
+    `local-vault:${purpose}:v${header.version}:${JSON.stringify(header)}`,
     "utf8",
+  );
+}
+
+function recoveryChecksum(keyBytes) {
+  return createHash("sha256").update(keyBytes).digest().subarray(0, RECOVERY_CHECKSUM_BYTES);
+}
+
+function encodeRecoveryKey(keyBytes) {
+  const bytes = Buffer.concat([keyBytes, recoveryChecksum(keyBytes)]);
+  let bits = 0;
+  let value = 0;
+  let text = "";
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      text += RECOVERY_ALPHABET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  bytes.fill(0);
+  return text.match(new RegExp(`.{1,${RECOVERY_GROUP_SIZE}}`, "g")).join("-");
+}
+
+// Accepts any case, spaces, and dashes, and the usual look-alikes (O→0,
+// I/L→1). The checksum catches typos before any decryption is attempted.
+function decodeRecoveryKey(input) {
+  const invalid = () => new Error("The recovery key is not valid. Check it and try again.");
+  if (typeof input !== "string" || input.length > 200) throw invalid();
+  const text = input
+    .toUpperCase()
+    .replace(/[\s-]/g, "")
+    .replace(/O/g, "0")
+    .replace(/[IL]/g, "1");
+  if (text.length !== RECOVERY_KEY_CHARACTERS) throw invalid();
+
+  const bytes = Buffer.alloc(RECOVERY_KEY_BYTES + RECOVERY_CHECKSUM_BYTES);
+  let bits = 0;
+  let value = 0;
+  let index = 0;
+  for (const character of text) {
+    const digit = RECOVERY_ALPHABET.indexOf(character);
+    if (digit === -1) throw invalid();
+    value = ((value << 5) | digit) & 0xffff;
+    bits += 5;
+    if (bits >= 8) {
+      bytes[index] = (value >>> (bits - 8)) & 0xff;
+      index += 1;
+      bits -= 8;
+    }
+  }
+
+  const keyBytes = Buffer.from(bytes.subarray(0, RECOVERY_KEY_BYTES));
+  const checksum = bytes.subarray(RECOVERY_KEY_BYTES);
+  const valid = timingSafeEqual(checksum, recoveryChecksum(keyBytes));
+  bytes.fill(0);
+  if (!valid) {
+    keyBytes.fill(0);
+    throw invalid();
+  }
+  return keyBytes;
+}
+
+// The recovery key already has 256 bits of entropy, so a fast KDF is enough.
+function deriveRecoveryWrappingKey(recoveryKeyBytes, salt) {
+  return Buffer.from(
+    hkdfSync("sha256", recoveryKeyBytes, salt, "local-vault:recovery-wrap", KEY_BYTES),
   );
 }
 
@@ -192,39 +279,58 @@ async function deriveWrappingKey(passphrase, salt) {
   }
 }
 
-function makeEnvelope(vaultData, wrappingKey, dataKey, salt) {
-  const kdf = {
-    name: KDF.name,
-    N: KDF.N,
-    r: KDF.r,
-    p: KDF.p,
-    salt: salt.toString("base64"),
-  };
-  const header = getHeader(kdf);
-  const wrappedKey = encryptGcm(
-    dataKey,
-    wrappingKey,
-    getAad("key-wrap", header),
-  );
+// Builds a format 2 envelope with fresh salts and a new recovery key. Returns
+// the envelope and the recovery key text, which is shown to the user once.
+async function makeEnvelope(vaultData, passphrase, dataKey) {
+  const salt = randomBytes(SALT_BYTES);
+  const recoverySalt = randomBytes(SALT_BYTES);
+  const recoveryKeyBytes = randomBytes(RECOVERY_KEY_BYTES);
+  let wrappingKey = null;
+  let recoveryWrappingKey = null;
   const serializedVault = Buffer.from(JSON.stringify(vaultData), "utf8");
 
   try {
-    const data = encryptGcm(
-      serializedVault,
-      dataKey,
-      getAad("vault-data", header),
+    wrappingKey = await deriveWrappingKey(passphrase, salt);
+    recoveryWrappingKey = deriveRecoveryWrappingKey(recoveryKeyBytes, recoverySalt);
+    const header = getHeader(
+      { name: KDF.name, N: KDF.N, r: KDF.r, p: KDF.p, salt: salt.toString("base64") },
+      { name: RECOVERY_KDF, salt: recoverySalt.toString("base64") },
     );
-    return { ...header, keyWrap: wrappedKey, data };
+    const envelope = {
+      ...header,
+      keyWrap: encryptGcm(dataKey, wrappingKey, getAad("key-wrap", header)),
+      recoveryWrap: encryptGcm(dataKey, recoveryWrappingKey, getAad("recovery-wrap", header)),
+      data: encryptGcm(serializedVault, dataKey, getAad("vault-data", header)),
+    };
+    return { envelope, recoveryKey: encodeRecoveryKey(recoveryKeyBytes) };
   } finally {
     serializedVault.fill(0);
+    wrappingKey?.fill(0);
+    recoveryWrappingKey?.fill(0);
+    recoveryKeyBytes.fill(0);
+    salt.fill(0);
+    recoverySalt.fill(0);
   }
 }
 
+function isGcmRecord(value) {
+  return hasExactKeys(value, ["name", "nonce", "tag", "ciphertext"]) &&
+    value.name === "aes-256-gcm";
+}
+
 function parseEnvelope(envelope) {
+  const hasRecovery = envelope?.version === FORMAT_VERSION;
+  const expectedKeys = hasRecovery
+    ? ["format", "version", "kdf", "recovery", "keyWrap", "recoveryWrap", "data"]
+    : ["format", "version", "kdf", "keyWrap", "data"];
   if (
-    !hasExactKeys(envelope, ["format", "version", "kdf", "keyWrap", "data"]) ||
+    !hasExactKeys(envelope, expectedKeys) ||
     envelope.format !== FORMAT ||
-    envelope.version !== FORMAT_VERSION ||
+    (envelope.version !== FORMAT_VERSION && envelope.version !== LEGACY_FORMAT_VERSION) ||
+    (hasRecovery &&
+      (!hasExactKeys(envelope.recovery, ["name", "salt"]) ||
+        envelope.recovery.name !== RECOVERY_KDF ||
+        !isGcmRecord(envelope.recoveryWrap))) ||
     !hasExactKeys(envelope.kdf, ["name", "N", "r", "p", "salt"]) ||
     envelope.kdf.name !== KDF.name ||
     envelope.kdf.N !== KDF.N ||
@@ -246,8 +352,15 @@ function parseEnvelope(envelope) {
   decodeBase64(envelope.data.nonce, NONCE_BYTES, NONCE_BYTES);
   decodeBase64(envelope.data.tag, TAG_BYTES, TAG_BYTES);
   decodeBase64(envelope.data.ciphertext, 1, MAX_FILE_BYTES);
+  let recoverySalt = null;
+  if (hasRecovery) {
+    recoverySalt = decodeBase64(envelope.recovery.salt, SALT_BYTES, SALT_BYTES);
+    decodeBase64(envelope.recoveryWrap.nonce, NONCE_BYTES, NONCE_BYTES);
+    decodeBase64(envelope.recoveryWrap.tag, TAG_BYTES, TAG_BYTES);
+    decodeBase64(envelope.recoveryWrap.ciphertext, KEY_BYTES, KEY_BYTES);
+  }
 
-  return { salt, header: getHeader(envelope.kdf) };
+  return { salt, recoverySalt, header: headerOf(envelope) };
 }
 
 function validateVaultData(value) {
@@ -433,6 +546,7 @@ class VaultStore {
     this.envelope = null;
     this.sessionEpoch = 0;
     this.mutationQueue = Promise.resolve();
+    this.issuedRecoveryKey = null;
   }
 
   enqueueMutation(operation) {
@@ -471,17 +585,14 @@ class VaultStore {
       throw new Error("A vault already exists on this Mac.");
     }
 
-    const salt = randomBytes(SALT_BYTES);
-    let wrappingKey = null;
     let dataKey = randomBytes(KEY_BYTES);
 
     try {
-      wrappingKey = await deriveWrappingKey(passphrase, salt);
+      const vaultData = { schemaVersion: VAULT_SCHEMA_VERSION, entries: [] };
+      const { envelope, recoveryKey } = await makeEnvelope(vaultData, passphrase, dataKey);
       if (this.sessionEpoch !== sessionEpoch) {
         throw new Error("Creation was interrupted because the vault was locked.");
       }
-      const vaultData = { schemaVersion: VAULT_SCHEMA_VERSION, entries: [] };
-      const envelope = makeEnvelope(vaultData, wrappingKey, dataKey, salt);
       await this.writeEnvelope(envelope);
       if (this.sessionEpoch !== sessionEpoch) {
         throw new Error("Creation was interrupted because the vault was locked.");
@@ -491,6 +602,7 @@ class VaultStore {
       this.dataKey = dataKey;
       this.vaultData = vaultData;
       this.envelope = envelope;
+      this.issuedRecoveryKey = recoveryKey;
       dataKey = null;
       return this.getStatus();
     } catch (error) {
@@ -500,10 +612,123 @@ class VaultStore {
       }
       throw new Error("Could not create the encrypted vault.");
     } finally {
-      wrappingKey?.fill(0);
       dataKey?.fill(0);
-      salt.fill(0);
     }
+  }
+
+  // Unlocks with the vault key itself, as released from the Keychain after
+  // Touch ID. The key is copied; the caller should wipe its own buffer.
+  async unlockWithDataKey(dataKey) {
+    const sessionEpoch = this.sessionEpoch;
+    await this.mutationQueue;
+    const opened = await this.decryptVaultFile(this.filePath, { dataKey });
+    if (this.sessionEpoch !== sessionEpoch) {
+      opened.dataKey.fill(0);
+      throw new Error("Unlock was interrupted because the vault was locked.");
+    }
+    this.lock();
+    this.dataKey = opened.dataKey;
+    this.vaultData = opened.vaultData;
+    this.envelope = opened.envelope;
+    return this.getStatus();
+  }
+
+  // A copy of the vault key for Touch ID enrollment.
+  exportDataKey() {
+    this.requireUnlocked();
+    return Buffer.from(this.dataKey);
+  }
+
+  // The recovery key created with the vault, handed out once.
+  takeIssuedRecoveryKey() {
+    const recoveryKey = this.issuedRecoveryKey;
+    this.issuedRecoveryKey = null;
+    return recoveryKey;
+  }
+
+  hasRecoveryKey() {
+    this.requireUnlocked();
+    return this.envelope.version === FORMAT_VERSION;
+  }
+
+  // Creates a new recovery key for the open vault; the previous one stops
+  // working for this file. The passphrase is required again so that an
+  // unattended unlocked app cannot be used to mint a key.
+  async createRecoveryKey(passphrase) {
+    return this.enqueueMutation(async () => {
+      this.requireUnlocked();
+      validatePassphrase(passphrase);
+      const sessionEpoch = this.sessionEpoch;
+      const dataKey = this.dataKey;
+      await this.verifyPassphrase(passphrase);
+      const { envelope, recoveryKey } = await makeEnvelope(this.vaultData, passphrase, dataKey);
+      if (this.sessionEpoch !== sessionEpoch || this.dataKey !== dataKey) {
+        throw new Error("The vault was locked while saving. Unlock it again.");
+      }
+      await this.writeEnvelope(envelope);
+      if (this.sessionEpoch !== sessionEpoch || this.dataKey !== dataKey) {
+        throw new Error("The vault was locked while saving. Unlock it again.");
+      }
+      this.envelope = envelope;
+      return recoveryKey;
+    });
+  }
+
+  async verifyPassphrase(passphrase) {
+    const header = headerOf(this.envelope);
+    const salt = decodeBase64(this.envelope.kdf.salt, SALT_BYTES, SALT_BYTES);
+    let wrappingKey = null;
+    let unwrapped = null;
+    try {
+      wrappingKey = await deriveWrappingKey(passphrase, salt);
+      unwrapped = decryptGcm(this.envelope.keyWrap, wrappingKey, getAad("key-wrap", header), KEY_BYTES);
+      if (!timingSafeEqual(unwrapped, this.dataKey)) throw new Error("mismatch");
+    } catch {
+      throw new Error("The master passphrase is incorrect.");
+    } finally {
+      salt.fill(0);
+      wrappingKey?.fill(0);
+      unwrapped?.fill(0);
+    }
+  }
+
+  // Opens the vault with its recovery key, sets a new master passphrase, and
+  // replaces the recovery key, since the old one has now been typed in.
+  async recoverWithKey(recoveryKeyText, newPassphrase) {
+    return this.enqueueMutation(async () => {
+      const sessionEpoch = this.sessionEpoch;
+      validatePassphrase(newPassphrase);
+      const recoveryKeyBytes = decodeRecoveryKey(recoveryKeyText);
+      let opened = null;
+      try {
+        opened = await this.decryptVaultFile(this.filePath, { recoveryKeyBytes });
+      } finally {
+        recoveryKeyBytes.fill(0);
+      }
+
+      try {
+        const { envelope, recoveryKey } = await makeEnvelope(
+          opened.vaultData,
+          newPassphrase,
+          opened.dataKey,
+        );
+        if (this.sessionEpoch !== sessionEpoch) {
+          throw new Error("Recovery was interrupted because the vault was locked.");
+        }
+        await this.writeEnvelope(envelope);
+        if (this.sessionEpoch !== sessionEpoch) {
+          throw new Error("Recovery was interrupted because the vault was locked.");
+        }
+        this.lock();
+        this.dataKey = opened.dataKey;
+        this.vaultData = opened.vaultData;
+        this.envelope = envelope;
+        opened.dataKey = null;
+        return { status: await this.getStatus(), recoveryKey };
+      } finally {
+        opened.dataKey?.fill(0);
+      }
+    });
   }
 
   async unlock(passphrase) {
@@ -604,6 +829,103 @@ class VaultStore {
     });
   }
 
+  // Adds logins from an import ({ name, username, password, url, notes }) in
+  // one save. Entries that fail validation or already exist with the same
+  // name, username, website, and password are skipped and counted.
+  async importLogins(logins) {
+    return this.enqueueMutation(async () => {
+      this.requireUnlocked();
+      if (!Array.isArray(logins)) throw new Error("Invalid login entry.");
+      const entries = this.vaultData.entries.slice();
+      const existingKeys = new Map();
+      for (const entry of entries) {
+        const key = JSON.stringify([entry.name, entry.username, entry.url]);
+        if (!existingKeys.has(key)) existingKeys.set(key, []);
+        existingKeys.get(key).push(entry);
+      }
+
+      let imported = 0;
+      let duplicates = 0;
+      let invalid = 0;
+      const timestamp = Date.now();
+      for (const login of logins) {
+        let normalized;
+        try {
+          normalized = normalizeLoginInput({ id: "", ...login });
+          if (!normalized.password) throw new Error("missing password");
+        } catch {
+          invalid += 1;
+          continue;
+        }
+        const key = JSON.stringify([normalized.name, normalized.username, normalized.url]);
+        const sameLabel = existingKeys.get(key) ?? [];
+        if (sameLabel.some((entry) => openPassword(entry.password, this.dataKey, entry.id) === normalized.password)) {
+          duplicates += 1;
+          continue;
+        }
+        if (entries.length >= MAX_ENTRIES) {
+          throw new Error("The vault has reached its entry limit.");
+        }
+        const id = randomUUID();
+        const entry = {
+          id,
+          type: "login",
+          name: normalized.name,
+          username: normalized.username,
+          password: sealPassword(normalized.password, this.dataKey, id),
+          url: normalized.url,
+          notes: normalized.notes,
+          favicon: "",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+        entries.push(entry);
+        if (!existingKeys.has(key)) existingKeys.set(key, []);
+        existingKeys.get(key).push(entry);
+        imported += 1;
+      }
+
+      if (imported > 0) {
+        await this.persistVaultData({ schemaVersion: VAULT_SCHEMA_VERSION, entries });
+      }
+      return { imported, duplicates, invalid };
+    });
+  }
+
+  // Reads the logins of a Mnemo backup for import, using its passphrase or
+  // { recoveryKey }. Returns plain values; the caller must not keep them.
+  static async readBackupLogins(filePath, credentials) {
+    const reader = new VaultStore(filePath);
+    let secret = credentials;
+    let recoveryKeyBytes = null;
+    if (typeof credentials === "string") {
+      validatePassphrase(credentials);
+    } else {
+      if (!hasExactKeys(credentials, ["recoveryKey"])) {
+        throw new Error("The recovery key is not valid. Check it and try again.");
+      }
+      recoveryKeyBytes = decodeRecoveryKey(credentials.recoveryKey);
+      secret = { recoveryKeyBytes };
+    }
+    let opened;
+    try {
+      opened = await reader.decryptVaultFile(filePath, secret);
+    } finally {
+      recoveryKeyBytes?.fill(0);
+    }
+    try {
+      return opened.vaultData.entries.map((entry) => ({
+        name: entry.name,
+        username: entry.username,
+        password: openPassword(entry.password, opened.dataKey, entry.id),
+        url: entry.url,
+        notes: entry.notes,
+      }));
+    } finally {
+      opened.dataKey.fill(0);
+    }
+  }
+
   async saveFavicon(id, favicon) {
     return this.enqueueMutation(async () => {
       this.requireUnlocked();
@@ -665,7 +987,7 @@ class VaultStore {
         throw new Error("The vault is too large to save.");
       }
 
-      const header = getHeader(this.envelope.kdf);
+      const header = headerOf(this.envelope);
       const nextEnvelope = {
         ...this.envelope,
         data: encryptGcm(
@@ -714,24 +1036,56 @@ class VaultStore {
     }
   }
 
-  async restoreBackup(sourcePath, passphrase) {
+  // `credentials` is the backup's master passphrase, or
+  // { recoveryKey, newPassphrase } when that passphrase is forgotten. With a
+  // recovery key the backup is re-encrypted under the new passphrase and a new
+  // recovery key, available afterwards from takeIssuedRecoveryKey().
+  async restoreBackup(sourcePath, credentials) {
     return this.enqueueMutation(async () => {
       const sessionEpoch = this.sessionEpoch;
-      validatePassphrase(passphrase);
-      const opened = await this.decryptVaultFile(sourcePath, passphrase);
+      let opened;
+      let envelope;
+      let recoveryKey = null;
+      if (typeof credentials === "string") {
+        validatePassphrase(credentials);
+        opened = await this.decryptVaultFile(sourcePath, credentials);
+        envelope = opened.envelope;
+      } else {
+        if (!hasExactKeys(credentials, ["recoveryKey", "newPassphrase"])) {
+          throw new Error("The recovery key is not valid. Check it and try again.");
+        }
+        validatePassphrase(credentials.newPassphrase);
+        const recoveryKeyBytes = decodeRecoveryKey(credentials.recoveryKey);
+        try {
+          opened = await this.decryptVaultFile(sourcePath, { recoveryKeyBytes });
+        } finally {
+          recoveryKeyBytes.fill(0);
+        }
+        try {
+          ({ envelope, recoveryKey } = await makeEnvelope(
+            opened.vaultData,
+            credentials.newPassphrase,
+            opened.dataKey,
+          ));
+        } catch (error) {
+          opened.dataKey.fill(0);
+          throw error;
+        }
+      }
 
       try {
         if (this.sessionEpoch !== sessionEpoch) {
           throw new Error("Restore was interrupted because the vault was locked.");
         }
-        await this.writeEnvelope(opened.envelope);
+        await this.writeEnvelope(envelope);
         if (this.sessionEpoch !== sessionEpoch) {
           throw new Error("Restore was interrupted because the vault was locked.");
         }
         this.lock();
         this.dataKey = opened.dataKey;
         this.vaultData = opened.vaultData;
-        this.envelope = opened.envelope;
+        this.envelope = envelope;
+        this.issuedRecoveryKey = recoveryKey;
         opened.dataKey = null;
         return this.getStatus();
       } finally {
@@ -740,7 +1094,11 @@ class VaultStore {
     });
   }
 
-  async decryptVaultFile(filePath, passphrase) {
+  // `secret` is the master passphrase (string), { recoveryKeyBytes }, or
+  // { dataKey } for a key released by Touch ID.
+  async decryptVaultFile(filePath, secret) {
+    const usingRecoveryKey = Boolean(secret?.recoveryKeyBytes);
+    const usingDataKey = Boolean(secret?.dataKey);
     let wrappingKey = null;
     let dataKey = null;
     let plaintext = null;
@@ -755,14 +1113,36 @@ class VaultStore {
       rawFile = await fs.readFile(filePath);
       const envelope = JSON.parse(rawFile.toString("utf8"));
       const parsed = parseEnvelope(envelope);
-      salt = parsed.salt;
-      wrappingKey = await deriveWrappingKey(passphrase, salt);
-      dataKey = decryptGcm(
-        envelope.keyWrap,
-        wrappingKey,
-        getAad("key-wrap", parsed.header),
-        KEY_BYTES,
-      );
+      if (usingDataKey) {
+        parsed.salt.fill(0);
+        parsed.recoverySalt?.fill(0);
+        if (secret.dataKey.length !== KEY_BYTES) throw new Error("Invalid key");
+        dataKey = Buffer.from(secret.dataKey);
+      } else if (usingRecoveryKey) {
+        if (!parsed.recoverySalt) {
+          parsed.salt.fill(0);
+          throw Object.assign(new Error("This vault has no recovery key."), { userFacing: true });
+        }
+        salt = parsed.recoverySalt;
+        parsed.salt.fill(0);
+        wrappingKey = deriveRecoveryWrappingKey(secret.recoveryKeyBytes, salt);
+        dataKey = decryptGcm(
+          envelope.recoveryWrap,
+          wrappingKey,
+          getAad("recovery-wrap", parsed.header),
+          KEY_BYTES,
+        );
+      } else {
+        salt = parsed.salt;
+        parsed.recoverySalt?.fill(0);
+        wrappingKey = await deriveWrappingKey(secret, salt);
+        dataKey = decryptGcm(
+          envelope.keyWrap,
+          wrappingKey,
+          getAad("key-wrap", parsed.header),
+          KEY_BYTES,
+        );
+      }
       plaintext = decryptGcm(
         envelope.data,
         dataKey,
@@ -778,9 +1158,15 @@ class VaultStore {
       };
       dataKey = null;
       return opened;
-    } catch {
+    } catch (error) {
+      if (error?.userFacing) throw new Error(error.message);
+      if (usingDataKey) {
+        throw new Error("Touch ID can no longer unlock this vault. Unlock it with your master passphrase and turn Touch ID on again.");
+      }
       throw new Error(
-        "Could not open the vault. Check the master passphrase and make sure the vault or backup file is intact.",
+        usingRecoveryKey
+          ? "Could not open the vault with this recovery key. Check the key and make sure the vault file is intact."
+          : "Could not open the vault. Check the master passphrase and make sure the vault or backup file is intact.",
       );
     } finally {
       salt?.fill(0);
@@ -793,6 +1179,7 @@ class VaultStore {
 
   lock() {
     this.sessionEpoch += 1;
+    this.issuedRecoveryKey = null;
     this.dataKey?.fill(0);
     this.dataKey = null;
     this.vaultData = null;

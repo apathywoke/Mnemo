@@ -1,8 +1,12 @@
-(() => {
+(async () => {
   const ns = window.mnemoRenderer;
   const ctx = ns.app.createContext();
 
-  ns.features.settings.bind();
+  await ns.features.settings.loadSettings(ctx);
+  ctx.recoveryKey = ns.features.recoveryKey.init(ctx);
+  ctx.importer = ns.features.importer.init(ctx);
+  ctx.touchId = ns.features.touchId.init(ctx);
+  ns.features.settings.bind(ctx);
 
   // Page composition follows FSD direction: pages compose widgets and features;
   // the app layer wires pages together and owns application-wide navigation.
@@ -13,7 +17,7 @@
 
   ctx.api.getVersion()
     .then((version) => { ns.shared.dom.$("#app-version").textContent = version; })
-    .catch(() => { ns.shared.dom.$("#app-version").textContent = "unavailable"; });
+    .catch(() => { ns.shared.dom.$("#app-version").textContent = ns.shared.i18n.t("common.unavailable"); });
 
   void ctx.pages.access.refreshProfiles();
 })();

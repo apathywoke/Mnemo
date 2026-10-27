@@ -14,7 +14,7 @@
         return entry.url;
       }
     }
-    return "Login";
+    return ns.shared.i18n.t("login.fallbackLabel");
   }
 
   function filter(entries, query) {

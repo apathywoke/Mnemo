@@ -27,11 +27,12 @@ test("every password input has an accessible visibility toggle", async () => {
   assert.match(html, /id="toggle-password-button"[^>]*class="[^"]*password-visibility-toggle/);
 });
 
-test("vault creation, backup, and restore explain that the master passphrase cannot be recovered", async () => {
+test("vault creation, backup, and restore explain how access can be recovered", async () => {
   const html = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
 
-  assert.match(html, /Your master passphrase cannot be recovered/);
-  assert.match(html, /Backups need the original master passphrase/);
+  assert.match(html, /Mnemo cannot recover your master passphrase/);
+  assert.match(html, /recovery key\. It is the only way back in/);
+  assert.match(html, /Backups open with their master passphrase or recovery key/);
   assert.match(html, /Every backup requires this same passphrase/);
 });
 

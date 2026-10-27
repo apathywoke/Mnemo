@@ -35,8 +35,8 @@
     const close = document.createElement("button");
     close.className = "toast-dismiss";
     close.type = "button";
-    close.setAttribute("aria-label", "Dismiss notification");
-    close.title = "Dismiss notification";
+    close.setAttribute("aria-label", ns.shared.i18n.t("toast.dismiss"));
+    close.title = ns.shared.i18n.t("toast.dismiss");
     close.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
     close.addEventListener("click", () => dismiss(notification));
 

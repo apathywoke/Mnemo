@@ -1,6 +1,7 @@
 (() => {
   const ns = window.mnemoRenderer;
   const { formatLastOpened } = ns.entities.vaultProfile;
+  const { t } = ns.shared.i18n;
 
   function renderProfileList(container, profiles, { onSelect, onDelete }) {
     container.replaceChildren();
@@ -16,7 +17,7 @@
       name.textContent = profile.name;
       const meta = document.createElement("span");
       meta.className = "profile-choice-meta";
-      meta.textContent = `Encrypted vault · ${formatLastOpened(profile.lastOpenedAt)}`;
+      meta.textContent = `${t("profile.encryptedVault")} · ${formatLastOpened(profile.lastOpenedAt)}`;
       const arrow = document.createElement("span");
       arrow.className = "profile-choice-arrow";
       arrow.setAttribute("aria-hidden", "true");
@@ -27,8 +28,8 @@
       const deleteButton = document.createElement("button");
       deleteButton.type = "button";
       deleteButton.className = "profile-delete-button";
-      deleteButton.setAttribute("aria-label", `Delete ${profile.name}`);
-      deleteButton.title = "Delete vault";
+      deleteButton.setAttribute("aria-label", t("profile.deleteAria", { name: profile.name }));
+      deleteButton.title = t("profile.deleteTitle");
       deleteButton.innerHTML =
         '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6m4-6v6"/><path d="M5 7l1 13h12l1-13"/><path d="M9 7V4h6v3"/></svg>';
       deleteButton.addEventListener("click", () => onDelete(profile));

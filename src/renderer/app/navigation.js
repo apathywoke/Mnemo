@@ -7,6 +7,11 @@
       if (ctx.state.ui.backNavigationInProgress) return;
       ctx.state.ui.backNavigationInProgress = true;
       try {
+        if (ctx.recoveryKey.isOpen) return;
+        if (ctx.importer.isOpen) {
+          ctx.importer.close();
+          return;
+        }
         if ($("#settings-dialog").open) {
           $("#settings-dialog").close();
           return;
@@ -25,6 +30,10 @@
         }
         if (!$("#restore-panel").hidden) {
           await ctx.pages.access.cancelRestore();
+          return;
+        }
+        if (!$("#recover-panel").hidden) {
+          await ctx.pages.access.cancelRecover();
           return;
         }
         if (!$("#unlock-panel").hidden) {
@@ -68,12 +77,15 @@
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
+        if (ctx.recoveryKey.isOpen) return;
         const canGoBack =
+          ctx.importer.isOpen ||
           $("#settings-dialog").open ||
           $("#entry-dialog").open ||
           $("#delete-dialog").open ||
           ctx.pages.access.isProfileDeleteDialogOpen() ||
           !$("#restore-panel").hidden ||
+          !$("#recover-panel").hidden ||
           !$("#unlock-panel").hidden ||
           (!$("#setup-panel").hidden && ctx.state.access.availableProfiles.length > 0) ||
           !$("#open-panel").hidden ||
@@ -95,7 +107,7 @@
     ctx.api.onAutoLocked(() => {
       ctx.clearVaultView();
       ctx.clearSensitiveFields();
-      $("#unlock-error").textContent = "Vault locked after your Mac was locked or the app was idle.";
+      $("#unlock-error").textContent = ns.shared.i18n.t("unlock.autoLocked");
       $("#unlock-error").hidden = false;
       ctx.showPanel("unlock");
     });
