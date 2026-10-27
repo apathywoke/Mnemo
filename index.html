@@ -63,6 +63,22 @@
             <div class="local-badge"><span></span> <span data-i18n="header.localBadge">Stored on this Mac</span></div>
           </div>
         </header>
+        <div id="update-banner" class="update-banner" role="status" aria-live="polite" hidden>
+          <div class="update-banner-row">
+            <span class="update-banner-mark" aria-hidden="true">↑</span>
+            <div class="update-banner-text">
+              <strong id="update-banner-title"></strong>
+              <span id="update-banner-detail"></span>
+            </div>
+            <div class="update-banner-actions">
+              <button id="update-notes-button" type="button" class="quiet-button" aria-expanded="false" aria-controls="update-notes" data-i18n="updates.whatsNew">What's new</button>
+              <button id="update-later-button" type="button" class="quiet-button" data-i18n="updates.later">Later</button>
+              <button id="update-action-button" type="button" class="update-action-button"></button>
+            </div>
+          </div>
+          <div id="update-progress" class="update-progress" hidden><span id="update-progress-bar"></span></div>
+          <p id="update-notes" class="update-notes" hidden></p>
+        </div>
 
         <section class="content" aria-live="polite">
         <section id="profiles-panel" class="vault-panel profiles-panel" hidden>
@@ -721,6 +737,18 @@
                 </div>
                 <p id="settings-theme-error" class="form-error" role="alert" hidden></p>
               </div>
+              <div class="settings-field settings-section">
+                <span class="settings-field-label" data-i18n="updates.title">Updates</span>
+                <p id="settings-update-status" class="settings-hint"></p>
+                <label class="settings-checkbox">
+                  <input id="settings-auto-update" type="checkbox" />
+                  <span data-i18n="updates.auto">Check for updates automatically</span>
+                </label>
+                <p class="settings-hint" data-i18n="updates.privacy">Once a day Mnemo asks GitHub whether a new version exists. GitHub sees your IP address; nothing from your vault is sent. Each update is verified against Mnemo's signing key before it is installed.</p>
+                <div class="settings-actions">
+                  <button id="settings-check-updates" type="button" class="secondary-button" data-i18n="updates.checkNow">Check now</button>
+                </div>
+              </div>
             </section>
 
             <section id="settings-pane-security" class="settings-pane" role="tabpanel" aria-labelledby="settings-tab-security" hidden>
@@ -940,6 +968,7 @@
     <script src="./src/renderer/features/recovery-key/index.js"></script>
     <script src="./src/renderer/features/import/index.js"></script>
     <script src="./src/renderer/features/touch-id/index.js"></script>
+    <script src="./src/renderer/features/updates/index.js"></script>
     <script src="./src/renderer/features/settings/index.js"></script>
     <script src="./src/renderer/widgets/vault-browser/index.js"></script>
     <script src="./src/renderer/pages/access/index.js"></script>

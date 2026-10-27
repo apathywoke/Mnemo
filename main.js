@@ -17,6 +17,7 @@ const {
 const ProfileManager = require("./profile-manager");
 const SettingsStore = require("./settings-store");
 const BiometricUnlock = require("./biometric-unlock");
+const { Updater } = require("./updater");
 const { parseImportFile } = require("./importers");
 const { ITEM_TYPES } = require("./src/renderer/shared/item-types");
 const cardTools = require("./src/renderer/shared/lib/card-tools");
@@ -44,6 +45,14 @@ const translator = createTranslator(i18nCatalog);
 let language = translator.defaultLanguage;
 let settingsStore = null;
 let biometricUnlock = null;
+let updater = null;
+const UPDATE_FIRST_CHECK_MS = 20_000;
+const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+// What the renderer shows about updates. `available` holds the verified
+// manifest data for the newest release while one is pending.
+let updateState = { status: "idle", checkedAt: null, version: null, notes: "", progress: 0, error: null };
+let availableUpdate = null;
+let updateTask = null;
 let settingsLoaded = Promise.resolve();
 let mainWindow = null;
 let vaultStore = null;
@@ -129,6 +138,69 @@ async function activeProfileName() {
   } catch {
     return "Mnemo";
   }
+}
+
+function publicUpdateState() {
+  const blocker = updater?.installBlocker() ?? "notPackaged";
+  return {
+    ...updateState,
+    currentVersion: app.getVersion(),
+    canInstall: blocker === null,
+    blocker,
+    autoUpdate: settingsStore?.get().autoUpdate ?? true,
+  };
+}
+
+function setUpdateState(patch) {
+  updateState = { ...updateState, ...patch };
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+    mainWindow.webContents.send("updates:state", publicUpdateState());
+  }
+}
+
+// One check or download at a time; a second request joins the first.
+function runUpdateTask(task) {
+  if (!updateTask) {
+    updateTask = task().finally(() => {
+      updateTask = null;
+    });
+  }
+  return updateTask;
+}
+
+function checkForUpdates() {
+  return runUpdateTask(async () => {
+    if (updateState.status === "ready") return publicUpdateState();
+    setUpdateState({ status: "checking", error: null });
+    try {
+      const update = await updater.check();
+      availableUpdate = update;
+      setUpdateState(update
+        ? { status: "available", version: update.version, notes: update.notes, checkedAt: Date.now() }
+        : { status: "upToDate", version: null, notes: "", checkedAt: Date.now() });
+    } catch (error) {
+      setUpdateState({ status: "error", error: toIpcError(error).message, checkedAt: Date.now() });
+    }
+    return publicUpdateState();
+  });
+}
+
+function downloadUpdate() {
+  return runUpdateTask(async () => {
+    if (!availableUpdate) throw new Error("No update is available for this Mac.");
+    setUpdateState({ status: "downloading", progress: 0, error: null });
+    try {
+      await updater.download(availableUpdate, (received, total) => {
+        const progress = total ? Math.floor((received / total) * 100) : 0;
+        if (progress !== updateState.progress) setUpdateState({ progress });
+      });
+      setUpdateState({ status: "ready", progress: 100 });
+    } catch (error) {
+      setUpdateState({ status: "available", error: toIpcError(error).message });
+      throw error;
+    }
+    return publicUpdateState();
+  });
 }
 
 function enqueueClipboardOperation(operation) {
@@ -326,6 +398,47 @@ if (launchedWithRemoteDebugging) {
     settingsLoaded = settingsStore.load().then((settings) => {
       language = settings.language;
       if (nativeTheme) nativeTheme.themeSource = settings.theme;
+    });
+
+    updater = new Updater({
+      currentVersion: app.getVersion(),
+      keysDirectory: path.join(__dirname, "build", "update-keys"),
+      isPackaged: app.isPackaged,
+      tempDirectory: app.getPath("temp"),
+    });
+    void updater.cleanUpLeftovers();
+    void settingsLoaded.then(() => {
+      if (!settingsStore.get().autoUpdate) return;
+      setTimeout(() => void checkForUpdates(), UPDATE_FIRST_CHECK_MS).unref?.();
+    });
+    setInterval(() => {
+      if (settingsStore.get().autoUpdate) void checkForUpdates();
+    }, UPDATE_CHECK_INTERVAL_MS).unref?.();
+
+    // Update state changes do not count as user activity.
+    registerHandler("updates:get-state", () => publicUpdateState(), { countsAsActivity: false });
+    registerHandler("updates:check", () => checkForUpdates());
+    registerHandler("updates:download", () => downloadUpdate());
+    registerHandler("updates:install", async () => {
+      // Lock first so no key material outlives the swap.
+      lockVault(false);
+      await updater.install();
+      setImmediate(() => app.exit(0));
+      return { relaunching: true };
+    });
+    registerHandler("updates:open-release", async () => {
+      const url = availableUpdate?.releaseUrl ?? "https://github.com/apathywoke/Mnemo/releases/latest";
+      if (!url.startsWith("https://github.com/apathywoke/Mnemo/releases/")) {
+        throw new Error("The update server address is not allowed.");
+      }
+      await shell.openExternal(url);
+      return { opened: true };
+    });
+    registerHandler("settings:set-auto-update", async (enabled) => {
+      await settingsLoaded;
+      const settings = await settingsStore.setAutoUpdate(enabled);
+      setUpdateState({});
+      return settings;
     });
 
     registerHandler("app:get-version", () => app.getVersion());

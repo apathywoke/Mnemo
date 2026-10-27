@@ -24,6 +24,11 @@ hardened Electron fuses and asar integrity checks. It needs a Developer ID
 certificate and App Store Connect API key; see `docs/RELEASING.md`.
 `npm run pack:mac:local` makes an ad-hoc-signed local test build.
 
+Pushing a version tag (`v0.2.0`) runs `.github/workflows/release.yml`, which
+tests, builds ad-hoc-signed `.dmg` and `.zip` files, signs an update manifest
+with the project's Ed25519 key, and publishes a GitHub release. Installed
+copies find it through the in-app updater; see `docs/RELEASING.md`.
+
 ## Renderer architecture
 
 The renderer is organized by Feature-Sliced Design layers under
@@ -56,8 +61,10 @@ separate Electron processes.
   arbitrary IPC or filesystem access to the renderer.
 - IPC requests are accepted only from the app's main frame.
 - Renderer-originated remote HTTP(S) and WebSocket requests are blocked;
-  renderer `connect-src` is also set to `none`. The only network action is the
-  explicit site-icon request described below.
+  renderer `connect-src` is also set to `none`. The main process makes two
+  kinds of requests: the explicit site-icon request described below, and the
+  update check against this project's GitHub releases (daily and on demand;
+  it can be turned off in Settings → General).
 - Each profile has its own vault under Electron's per-user application data
   directory. The existing `vault.json` is retained as the “Local Vault” profile.
 - Profile names are stored locally in `profiles.json` in plain text; vault

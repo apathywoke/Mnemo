@@ -69,8 +69,8 @@ test("main-process errors are recognized and survive the IPC wrapper", () => {
 });
 
 test("every English error thrown by the main process has a translation", async () => {
-  const sources = ["main.js", "vault-store.js", "profile-manager.js", "favicon-fetcher.js", "settings-store.js", "importers.js", "biometric-unlock.js", "totp.js", "ssh-keys.js"];
-  const internalOnly = new Set(["Invalid vault file", "Invalid vault data", "Invalid profile registry", "mismatch", "missing password", "invalid csv", "invalid", "Invalid key", "truncated"]);
+  const sources = ["main.js", "vault-store.js", "profile-manager.js", "favicon-fetcher.js", "settings-store.js", "importers.js", "biometric-unlock.js", "totp.js", "ssh-keys.js", "updater.js"];
+  const internalOnly = new Set(["Invalid vault file", "Invalid vault data", "Invalid profile registry", "mismatch", "missing password", "invalid csv", "invalid", "Invalid key", "truncated", "Invalid version", "Update key ${name} is not an Ed25519 public key"]);
   let checked = 0;
   for (const file of sources) {
     const source = await fs.readFile(path.join(root, file), "utf8");
@@ -97,7 +97,7 @@ test("every translation key used by the UI exists", async () => {
   for (const file of [...rendererFiles, path.join(root, "main.js")]) {
     const source = await fs.readFile(file, "utf8");
     for (const [, key] of source.matchAll(/["']((?:[a-z]+[A-Za-z]*)\.[a-zA-Z]+)["']/g)) {
-      if (/^(common|profiles?|setup|unlock|restore|vault|login|detail|editor|strength|generator|deleteLogin|fatal|deleteProfile|footer|settings|toast|dialog|errors|header|brand|import|backupOffer|recoveryKey|recover|touchId|biometric|item|card)\./.test(key)) {
+      if (/^(common|profiles?|setup|unlock|restore|vault|login|detail|editor|strength|generator|deleteLogin|fatal|deleteProfile|footer|settings|toast|dialog|errors|header|brand|import|backupOffer|recoveryKey|recover|touchId|biometric|item|card|updates)\./.test(key)) {
         keys.add(key);
       }
     }

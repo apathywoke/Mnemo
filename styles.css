@@ -3335,3 +3335,145 @@ h2 {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
 }
+
+/* Update banner across the workspace */
+.update-banner {
+  margin: 0 clamp(10px, 3.5vw, 42px) 6px;
+  padding: 12px 14px;
+  border: 1px solid #2f4a38;
+  border-radius: 12px;
+  background: #121a14;
+}
+
+.update-banner[hidden] {
+  display: none;
+}
+
+.update-banner-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.update-banner-mark {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--c-70c58b);
+  border-radius: 50%;
+  color: var(--c-70c58b);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.update-banner-text {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.update-banner-text strong {
+  color: var(--c-f2f2f2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.update-banner-text span {
+  color: var(--c-9a9a9a);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.update-banner.has-error .update-banner-text span {
+  color: var(--c-f0b4b4);
+}
+
+.update-banner-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.update-banner-actions [hidden] {
+  display: none;
+}
+
+.update-action-button {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--c-eeeeee);
+  border-radius: 999px;
+  background: var(--c-eeeeee);
+  color: var(--c-090909);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.update-action-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.update-progress {
+  overflow: hidden;
+  height: 3px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--c-2a2a2a);
+}
+
+.update-progress[hidden] {
+  display: none;
+}
+
+.update-progress span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--c-70c58b);
+  transition: width 240ms ease;
+}
+
+.update-notes {
+  margin: 10px 0 0 36px;
+  color: var(--c-c9c9c9);
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.update-notes[hidden] {
+  display: none;
+}
+
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 6px;
+  color: var(--c-dedede);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-field .settings-checkbox {
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.settings-checkbox input {
+  margin: 0;
+  accent-color: var(--c-eeeeee);
+}
+
+:root[data-theme="light"] .update-banner {
+  border-color: #b9dcc4;
+  background: #eef7f1;
+}

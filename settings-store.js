@@ -13,7 +13,9 @@ class SettingsStore {
   constructor(directory, { isSupportedLanguage, defaultLanguage }) {
     this.filePath = path.join(directory, "settings.json");
     this.isSupportedLanguage = isSupportedLanguage;
-    this.settings = { language: defaultLanguage, theme: DEFAULT_THEME };
+    // Update checks contact GitHub; on by default because they deliver
+    // security fixes, and switchable in Settings.
+    this.settings = { language: defaultLanguage, theme: DEFAULT_THEME, autoUpdate: true };
     this.writeQueue = Promise.resolve();
   }
 
@@ -29,6 +31,7 @@ class SettingsStore {
             ? parsed.language
             : this.settings.language,
           theme: THEMES.includes(parsed.theme) ? parsed.theme : DEFAULT_THEME,
+          autoUpdate: typeof parsed.autoUpdate === "boolean" ? parsed.autoUpdate : true,
         };
       }
     } catch {
@@ -53,6 +56,13 @@ class SettingsStore {
       return Promise.reject(new Error("Could not save the settings."));
     }
     return this.update({ theme });
+  }
+
+  setAutoUpdate(enabled) {
+    if (typeof enabled !== "boolean") {
+      return Promise.reject(new Error("Could not save the settings."));
+    }
+    return this.update({ autoUpdate: enabled });
   }
 
   // Queued so that quick successive changes each build on the last one.

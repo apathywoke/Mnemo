@@ -42,6 +42,8 @@ module.exports = {
     "biometric-unlock.js",
     "totp.js",
     "ssh-keys.js",
+    "updater.js",
+    "build/update-keys/*.pem",
     "favicon-fetcher.js",
     "index.html",
     "styles.css",
@@ -52,6 +54,8 @@ module.exports = {
   forceCodeSigning: true,
   mac: {
     category: "public.app-category.productivity",
+    // Fixed names: the update manifest refers to the zips by name.
+    artifactName: "${productName}-${version}-mac-${arch}.${ext}",
     target: [
       { target: "dmg", arch: ["arm64", "x64"] },
       { target: "zip", arch: ["arm64", "x64"] },
