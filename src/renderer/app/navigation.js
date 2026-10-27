@@ -20,6 +20,10 @@
           $("#entry-dialog").close();
           return;
         }
+        if ($("#item-dialog").open) {
+          $("#item-dialog").close();
+          return;
+        }
         if ($("#delete-dialog").open) {
           $("#delete-dialog").close();
           return;
@@ -78,10 +82,19 @@
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         if (ctx.recoveryKey.isOpen) return;
+        const menu = $("#new-item-menu");
+        if (!menu.hidden) {
+          event.preventDefault();
+          menu.hidden = true;
+          $("#create-entry-button").setAttribute("aria-expanded", "false");
+          $("#create-entry-button").focus();
+          return;
+        }
         const canGoBack =
           ctx.importer.isOpen ||
           $("#settings-dialog").open ||
           $("#entry-dialog").open ||
+          $("#item-dialog").open ||
           $("#delete-dialog").open ||
           ctx.pages.access.isProfileDeleteDialogOpen() ||
           !$("#restore-panel").hidden ||

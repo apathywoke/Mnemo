@@ -11,6 +11,7 @@
     mnemo: "import.instructionsMnemo",
   });
   const SKIPPED_KEYS = Object.freeze({
+    withTotp: "import.withTotp",
     nonLogin: "import.skippedNonLogin",
     noPassword: "import.skippedNoPassword",
     archived: "import.skippedArchived",
@@ -147,6 +148,7 @@
           t("import.imported", { count: result.imported }),
           result.duplicates ? t("import.duplicates", { count: result.duplicates }) : "",
           result.invalid ? t("import.invalid", { count: result.invalid }) : "",
+          result.totpSkipped ? t("import.totpSkipped", { count: result.totpSkipped }) : "",
         ].filter(Boolean).join(" ");
         $("#import-trash").hidden = !result.canTrashFile;
         $("#import-trash-note").hidden = !result.canTrashFile;

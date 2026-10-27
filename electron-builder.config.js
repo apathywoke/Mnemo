@@ -40,6 +40,8 @@ module.exports = {
     "settings-store.js",
     "importers.js",
     "biometric-unlock.js",
+    "totp.js",
+    "ssh-keys.js",
     "favicon-fetcher.js",
     "index.html",
     "styles.css",

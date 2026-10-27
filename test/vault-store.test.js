@@ -42,7 +42,7 @@ test("vault lifecycle, encrypted entries, validation, icon storage, and locking"
   copiedEntry.name = "mutated copy";
   assert.equal(store.listEntries()[0].name, "Example account");
   assert.deepEqual(Object.keys(copiedEntry).sort(), [
-    "createdAt", "favicon", "id", "name", "type", "updatedAt", "url", "username",
+    "createdAt", "favicon", "hasTotp", "id", "name", "type", "updatedAt", "url", "username",
   ]);
   assert.equal(store.getEntry(login.id).notes, "local test data");
   assert.equal(Object.hasOwn(store.getEntry(login.id), "password"), false);
@@ -392,7 +392,7 @@ test("imported logins are sealed, deduplicated, and validated", async (t) => {
     { name: "Bad", username: "", password: "pw", url: "javascript:alert(1)", notes: "" },
     { name: "Long", username: "", password: "x".repeat(5000), url: "", notes: "" },
   ]);
-  assert.deepEqual(result, { imported: 1, duplicates: 2, invalid: 2 });
+  assert.deepEqual(result, { imported: 1, duplicates: 2, invalid: 2, totpSkipped: 0 });
   const added = store.listEntries().find((entry) => entry.name === "New");
   assert.equal(added.url, "https://new.example");
   assert.equal(store.revealPassword(added.id), "new-pw");
@@ -429,4 +429,147 @@ test("the vault opens with its data key, and a wrong key is refused", async (t) 
     /Touch ID can no longer unlock this vault/,
   );
   await assert.rejects(store.unlockWithDataKey(Buffer.alloc(16)), /Touch ID can no longer/);
+});
+
+test("one-time code settings are sealed per entry and produce RFC 6238 codes", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new VaultStore(path.join(directory, "totp.vault"));
+  await store.create(PASSPHRASE);
+  const uri = "otpauth://totp/Example:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&digits=8&issuer=Example";
+  const saved = await store.saveEntry({ ...makeLogin(), totp: uri, removeTotp: false });
+  assert.equal(saved.hasTotp, true);
+  assert.equal(Object.hasOwn(saved, "totp"), false);
+  assert.equal(JSON.stringify(store.vaultData).includes("GEZDGNBVGY3TQOJQ"), false);
+  // RFC 6238 appendix B, SHA-1, T = 59 s.
+  assert.deepEqual(store.getTotpCode(saved.id, 59_000), { code: "94287082", period: 30, expiresAt: 60_000 });
+
+  // Editing without a new value keeps the secret; removeTotp drops it.
+  await store.saveEntry({ ...makeLogin({ id: saved.id, password: "" }), totp: "", removeTotp: false });
+  assert.equal(store.getTotpCode(saved.id, 59_000).code, "94287082");
+  await assert.rejects(
+    store.saveEntry({ ...makeLogin({ id: saved.id, password: "" }), totp: "not base32!", removeTotp: false }),
+    /valid one-time code secret/,
+  );
+  await assert.rejects(
+    store.saveEntry({ ...makeLogin({ id: saved.id, password: "" }), totp: "otpauth://hotp/x?secret=GEZDGNBVGY3TQOJQ", removeTotp: false }),
+    /Only time-based/,
+  );
+
+  // Survives lock and unlock; a sealed secret moved to another entry fails.
+  store.lock();
+  await store.unlock(PASSPHRASE);
+  assert.equal(store.getTotpCode(saved.id, 59_000).code, "94287082");
+  const other = await store.saveEntry(makeLogin({ name: "Other" }));
+  const entries = store.vaultData.entries;
+  entries.find((entry) => entry.id === other.id).totp = entries.find((entry) => entry.id === saved.id).totp;
+  assert.throws(() => store.getTotpCode(other.id), /Could not read the one-time code/);
+  delete entries.find((entry) => entry.id === other.id).totp;
+
+  // Backups carry the code settings into imports.
+  const backupPath = path.join(directory, "totp-backup.vault");
+  await store.exportBackup(backupPath);
+  const logins = await VaultStore.readBackupLogins(backupPath, PASSPHRASE);
+  assert.match(logins.find((login) => login.name === "Example account").totp, /^otpauth:\/\/totp\/.*secret=GEZDGNBVGY3TQOJQ/);
+
+  await store.saveEntry({ ...makeLogin({ id: saved.id, password: "" }), totp: "", removeTotp: true });
+  assert.equal(store.listEntries().find((entry) => entry.id === saved.id).hasTotp, false);
+  assert.throws(() => store.getTotpCode(saved.id), /has no one-time code/);
+
+  const imported = await store.importLogins([
+    { name: "With code", username: "", password: "pw", url: "", notes: "", totp: "JBSWY3DPEHPK3PXP" },
+    { name: "Steam", username: "", password: "pw", url: "", notes: "", totp: "steam://ABCDEF" },
+  ]);
+  assert.deepEqual(imported, { imported: 2, duplicates: 0, invalid: 0, totpSkipped: 1 });
+  assert.equal(store.listEntries().find((entry) => entry.name === "With code").hasTotp, true);
+  assert.equal(store.listEntries().find((entry) => entry.name === "Steam").hasTotp, false);
+});
+
+test("cards, notes, identities, and SSH keys store secrets sealed per field", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new VaultStore(path.join(directory, "items.vault"));
+  await store.create(PASSPHRASE);
+  const item = (type, name, fields, id = "") => ({ id, type, name, notes: "", fields });
+
+  const card = await store.saveItem(item("card", "Visa", {
+    cardholder: "Alice Example", number: "4242 4242 4242 4242", expiry: "7/28".replace("7", "07"), cvv: "123", pin: "",
+  }));
+  assert.deepEqual(card.fields, { cardholder: "Alice Example", expiry: "07/28", last4: "4242" });
+  assert.deepEqual(card.secretFields.sort(), ["cvv", "number"]);
+  assert.equal(card.subtitle, "•••• 4242");
+  assert.equal(JSON.stringify(store.vaultData).includes("4242424242424242"), false);
+  assert.equal(store.revealItemSecret(card.id, "number"), "4242424242424242");
+  assert.equal(store.revealItemSecret(card.id, "cvv"), "123");
+  assert.throws(() => store.revealItemSecret(card.id, "pin"), /Could not copy/);
+  assert.throws(() => store.revealPassword(card.id), /Invalid login entry/);
+
+  // Blank secrets keep their stored values on edit.
+  await store.saveItem(item("card", "Visa", { cardholder: "Alice", number: "", expiry: "", cvv: "", pin: "1234" }, card.id));
+  assert.equal(store.revealItemSecret(card.id, "number"), "4242424242424242");
+  assert.equal(store.revealItemSecret(card.id, "pin"), "1234");
+  assert.equal(store.getEntry(card.id).fields.last4, "4242");
+
+  for (const [fields, message] of [
+    [{ number: "4242 abc" }, /valid card number/],
+    [{ number: "4242 4242 4242 4241" }, /valid card number/],
+    [{ number: "4242 4242" }, /valid card number/],
+    [{ expiry: "13/30" }, /MM\/YY/],
+    [{ cvv: "12" }, /3 or 4 digits/],
+    [{ pin: "12" }, /4 to 12 digits/],
+  ]) {
+    await assert.rejects(store.saveItem(item("card", "Bad", fields)), message);
+  }
+  await assert.rejects(store.saveItem(item("card", "Bad", { unknown: "x" })), /Invalid login entry/);
+  await assert.rejects(store.saveItem(item("spaceship", "Bad", {})), /Invalid login entry/);
+  await assert.rejects(store.saveItem(item("card", "  ", {})), /Enter a name for this item/);
+
+  const note = await store.saveItem(item("note", "Wi-Fi", { body: "Network: home\nPassword: hunter2" }));
+  assert.equal(store.getEntry(note.id).fields.body, "Network: home\nPassword: hunter2");
+
+  const identity = await store.saveItem(item("identity", "Me", {
+    firstName: "Alice", lastName: "Example", email: "alice@example.com", documentNumber: "P1234567",
+  }));
+  assert.equal(identity.subtitle, "Alice Example");
+  assert.equal(JSON.stringify(store.vaultData).includes("P1234567"), false);
+  assert.equal(store.revealItemSecret(identity.id, "documentNumber"), "P1234567");
+
+  const { generateKeyPairSync } = require("node:crypto");
+  const privateKey = generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" });
+  const ssh = await store.saveItem(item("ssh", "Server", { privateKey, publicKey: "", passphrase: "" }));
+  assert.equal(ssh.fields.keyType, "ssh-ed25519");
+  assert.match(ssh.fields.publicKey, /^ssh-ed25519 AAAA/);
+  assert.match(ssh.subtitle, /^SHA256:/);
+  assert.equal(store.revealItemSecret(ssh.id, "privateKey").trim(), privateKey.trim());
+  await assert.rejects(store.saveItem(item("ssh", "Empty", {})), /private or public key/);
+  await assert.rejects(store.saveItem(item("ssh", "Bad", { privateKey: "not a key" })), /OpenSSH or PEM/);
+  await assert.rejects(store.saveItem(item("ssh", "Bad", { publicKey: "ssh-rsa !!" })), /valid OpenSSH public key/);
+
+  // A secret sealed for one field does not open as another.
+  const stored = store.vaultData.entries.find((entry) => entry.id === card.id);
+  stored.secrets.cvv = stored.secrets.number;
+  assert.throws(() => store.revealItemSecret(card.id, "cvv"), /Could not decrypt/);
+  stored.secrets.cvv = stored.secrets.pin;
+  assert.throws(() => store.revealItemSecret(card.id, "cvv"), /Could not decrypt/);
+  await store.saveItem(item("card", "Visa", { cvv: "123" }, card.id));
+
+  // Login APIs refuse items, and items survive lock, backup, and import.
+  await assert.rejects(store.saveEntry(makeLogin({ id: card.id })), /Invalid login entry/);
+  await assert.rejects(store.saveFavicon(card.id, `data:image/png;base64,${makePngHeader(16, 16).toString("base64")}`), /no longer exists/);
+  store.lock();
+  await store.unlock(PASSPHRASE);
+  assert.deepEqual(
+    store.listEntries().map((entry) => entry.type).sort(),
+    ["card", "identity", "note", "ssh"],
+  );
+  const backupPath = path.join(directory, "items-backup.vault");
+  await store.exportBackup(backupPath);
+  const target = new VaultStore(path.join(directory, "items-target.vault"));
+  await target.create(PASSPHRASE);
+  const result = await target.importLogins(await VaultStore.readBackupLogins(backupPath, PASSPHRASE));
+  assert.deepEqual(result, { imported: 4, duplicates: 0, invalid: 0, totpSkipped: 0 });
+  const importedCard = target.listEntries().find((entry) => entry.type === "card");
+  assert.equal(target.revealItemSecret(importedCard.id, "number"), "4242424242424242");
+  assert.deepEqual(
+    await target.importLogins(await VaultStore.readBackupLogins(backupPath, PASSPHRASE)),
+    { imported: 0, duplicates: 4, invalid: 0, totpSkipped: 0 },
+  );
 });

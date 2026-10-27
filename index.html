@@ -7,9 +7,11 @@
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; webrtc 'block'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <title>Mnemo</title>
     <link rel="stylesheet" href="./styles.css" />
+    <!-- Loaded in <head> so the first paint already uses the right theme. -->
+    <script src="./src/renderer/shared/lib/theme.js"></script>
   </head>
   <body>
     <main class="app-shell">
@@ -54,8 +56,8 @@
                   <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(270 12 12)"/>
                   <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(315 12 12)"/>
                 </g>
-                <circle cx="12" cy="12" r="6.2" fill="#101010" stroke="currentColor" stroke-width="1.8"/>
-                <circle cx="12" cy="12" r="2.4" fill="#101010" stroke="currentColor" stroke-width="1.8"/>
+                <circle cx="12" cy="12" r="6.2" class="settings-gear-hole" stroke="currentColor" stroke-width="1.8"/>
+                <circle cx="12" cy="12" r="2.4" class="settings-gear-hole" stroke="currentColor" stroke-width="1.8"/>
               </svg>
             </button>
             <div class="local-badge"><span></span> <span data-i18n="header.localBadge">Stored on this Mac</span></div>
@@ -340,7 +342,7 @@
               <p class="eyebrow section-label">
                 <span data-i18n="vault.eyebrow">YOUR VAULT</span> · <span id="active-profile-name"></span>
               </p>
-              <h2 data-i18n="vault.title">Logins</h2>
+              <h2 data-i18n="vault.title">Items</h2>
             </div>
             <div class="dashboard-actions">
               <button id="switch-profile-button" type="button" class="quiet-button" data-i18n="vault.switch">
@@ -349,9 +351,6 @@
               <button id="lock-button" type="button" class="quiet-button" data-i18n="vault.lock">
                 Lock
               </button>
-              <button id="create-entry-button" type="button" class="new-entry-button">
-                <span aria-hidden="true">+</span> <span data-i18n="vault.newLogin" data-i18n="editor.titleNew">New login</span>
-              </button>
             </div>
           </header>
 
@@ -359,7 +358,7 @@
             <span class="recovery-warning-mark" aria-hidden="true">!</span>
             <div>
               <strong data-i18n="vault.backupWarningTitle">Keep your master passphrase safe</strong>
-              <p data-i18n="vault.backupWarningBody">Every backup requires this same passphrase. Mnemo cannot recover it if lost.</p>
+              <p data-i18n="vault.backupWarningBody">Every backup opens with the master passphrase or the recovery key that was valid when it was made. Keep both somewhere safe.</p>
             </div>
             <button id="dismiss-backup-warning" class="backup-warning-dismiss" type="button" aria-label="Dismiss this warning" data-i18n-aria-label="vault.dismissWarning" title="Dismiss this warning" data-i18n-title="vault.dismissWarning">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
@@ -373,8 +372,16 @@
                 <input id="entry-search" type="search" placeholder="Search vault" data-i18n-placeholder="vault.searchPlaceholder" />
                 <kbd>⌘ K</kbd>
               </div>
+              <div id="type-filter" class="type-filter" role="radiogroup" aria-label="Item types" data-i18n-aria-label="vault.typeFilter">
+                <button type="button" role="radio" aria-checked="true" class="type-filter-option" data-type-filter="all" data-i18n="vault.filterAll">All</button>
+                <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="login" data-i18n="vault.filterLogin">Logins</button>
+                <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="card" data-i18n="vault.filterCard">Cards</button>
+                <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="note" data-i18n="vault.filterNote">Notes</button>
+                <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="identity" data-i18n="vault.filterIdentity">Identities</button>
+                <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="ssh" data-i18n="vault.filterSsh">SSH keys</button>
+              </div>
               <div class="entry-list-heading">
-                <span data-i18n="vault.allLogins">ALL LOGINS</span>
+                <span id="entry-list-title" data-i18n="vault.allLogins">ALL LOGINS</span>
                 <span id="entry-count">0</span>
               </div>
               <div id="entry-list" class="entry-list" role="list"></div>
@@ -387,6 +394,18 @@
               <p id="no-search-results" class="no-results" hidden data-i18n="vault.noResults">
                 No logins match your search.
               </p>
+              <div class="new-item new-item-dock">
+                <button id="create-entry-button" type="button" class="new-entry-button" aria-haspopup="menu" aria-expanded="false" aria-controls="new-item-menu">
+                  <span aria-hidden="true">+</span> <span data-i18n="vault.newItem">New item</span>
+                </button>
+                <div id="new-item-menu" class="new-item-menu" role="menu" hidden>
+                  <button type="button" role="menuitem" class="new-item-option" data-new-item="login"><span class="item-type-glyph" data-type="login" aria-hidden="true"></span><span data-i18n="item.type.login">Login</span></button>
+                  <button type="button" role="menuitem" class="new-item-option" data-new-item="card"><span class="item-type-glyph" data-type="card" aria-hidden="true"></span><span data-i18n="item.type.card">Card</span></button>
+                  <button type="button" role="menuitem" class="new-item-option" data-new-item="note"><span class="item-type-glyph" data-type="note" aria-hidden="true"></span><span data-i18n="item.type.note">Secure note</span></button>
+                  <button type="button" role="menuitem" class="new-item-option" data-new-item="identity"><span class="item-type-glyph" data-type="identity" aria-hidden="true"></span><span data-i18n="item.type.identity">Identity</span></button>
+                  <button type="button" role="menuitem" class="new-item-option" data-new-item="ssh"><span class="item-type-glyph" data-type="ssh" aria-hidden="true"></span><span data-i18n="item.type.ssh">SSH key</span></button>
+                </div>
+              </div>
             </aside>
 
             <div class="entry-detail-area">
@@ -432,11 +451,39 @@
                       </button>
                     </div>
                   </div>
+                  <div id="detail-totp-field" class="detail-field" hidden>
+                    <label data-i18n="detail.totp">ONE-TIME CODE</label>
+                    <div class="detail-value-row">
+                      <span id="detail-totp" class="detail-value totp-code" aria-live="off">——— ———</span>
+                      <span class="totp-timer" role="timer" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><circle class="totp-timer-track" cx="12" cy="12" r="9"/><circle id="detail-totp-ring" class="totp-timer-ring" cx="12" cy="12" r="9"/></svg>
+                        <span id="detail-totp-seconds" class="totp-timer-seconds"></span>
+                      </span>
+                      <button id="copy-totp-button" type="button" class="copy-button password-copy-toggle" aria-label="Copy one-time code" data-i18n-aria-label="detail.copyTotp" title="Copy one-time code" data-i18n-title="detail.copyTotp">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+                      </button>
+                    </div>
+                  </div>
                   <div id="detail-notes-field" class="detail-field" hidden>
                     <label data-i18n="detail.notes">NOTES</label>
                     <p id="detail-notes" class="detail-notes"></p>
                   </div>
                 </div>
+              </section>
+              <section id="item-detail" class="entry-detail item-detail" hidden>
+                <div class="detail-toolbar">
+                  <span id="item-detail-kind" class="detail-kind"></span>
+                  <div>
+                    <button id="edit-item-button" type="button" class="detail-action" data-i18n="detail.edit">Edit</button>
+                    <button id="delete-item-button" type="button" class="detail-action danger-action" data-i18n="common.delete">Delete</button>
+                  </div>
+                </div>
+                <div class="detail-title-block">
+                  <div id="item-detail-icon" class="detail-icon item-detail-icon" aria-hidden="true"></div>
+                  <h3 id="item-detail-name"></h3>
+                  <p id="item-detail-subtitle" class="detail-url"></p>
+                </div>
+                <div id="item-detail-fields" class="detail-fields"></div>
               </section>
               <section id="detail-empty" class="detail-empty">
                 <div class="detail-empty-mark" aria-hidden="true">＋</div>
@@ -526,12 +573,41 @@
                 </div>
                 <p class="password-tools-note" data-i18n="generator.note">Estimate uses the selected length and character types. Nothing is sent anywhere.</p>
               </section>
+              <label for="entry-totp" data-i18n="editor.totp">One-time codes (TOTP)</label>
+              <input id="entry-totp" class="totp-input" type="text" maxlength="2048" autocomplete="off" spellcheck="false" placeholder="otpauth://… or secret key" data-i18n-placeholder="editor.totpPlaceholder" aria-describedby="entry-totp-hint" />
+              <p id="entry-totp-hint" class="field-hint" data-i18n="editor.totpHint">Paste the setup key or otpauth:// link a site shows when you turn on two-factor authentication.</p>
+              <label id="entry-remove-totp-field" class="entry-remove-totp" hidden>
+                <input id="entry-remove-totp" type="checkbox" />
+                <span data-i18n="editor.removeTotp">Remove one-time codes from this login</span>
+              </label>
               <label for="entry-notes" data-i18n="editor.notes">Notes</label>
               <textarea id="entry-notes" maxlength="16384" rows="3"></textarea>
               <p id="entry-form-error" class="form-error" role="alert" hidden></p>
               <div class="dialog-actions">
                 <button id="cancel-entry-button" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
                 <button type="submit" class="dialog-save-button" data-i18n="editor.save">Save login</button>
+              </div>
+            </form>
+          </dialog>
+
+          <dialog id="item-dialog" class="app-dialog">
+            <form id="item-form" class="entry-form">
+              <div class="dialog-heading">
+                <div>
+                  <p id="item-dialog-eyebrow" class="eyebrow section-label"></p>
+                  <h3 id="item-dialog-title"></h3>
+                </div>
+                <button id="close-item-dialog" type="button" class="dialog-close" aria-label="Close dialog" data-i18n-aria-label="common.closeDialog">×</button>
+              </div>
+              <label for="item-name" data-i18n="editor.name">Name</label>
+              <input id="item-name" type="text" maxlength="200" autocomplete="off" required />
+              <div id="item-fields" class="item-fields"></div>
+              <label for="item-notes" data-i18n="editor.notes">Notes</label>
+              <textarea id="item-notes" maxlength="16384" rows="3"></textarea>
+              <p id="item-form-error" class="form-error" role="alert" hidden></p>
+              <div class="dialog-actions">
+                <button id="cancel-item-button" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
+                <button id="save-item-button" type="submit" class="dialog-save-button" data-i18n="editor.saveItem">Save</button>
               </div>
             </form>
           </dialog>
@@ -608,65 +684,116 @@
           </div>
           <button id="close-settings-dialog" type="button" class="dialog-close" aria-label="Close settings" data-i18n-aria-label="settings.close">×</button>
         </div>
-        <div class="settings-field">
-          <label for="settings-language" data-i18n="settings.language">Language</label>
-          <select id="settings-language" class="settings-select" aria-describedby="settings-language-hint"></select>
-          <p id="settings-language-hint" class="settings-hint" data-i18n="settings.languageHint">Applies to the whole app, including system dialogs.</p>
-          <p id="settings-error" class="form-error" role="alert" hidden></p>
-        </div>
-        <p id="settings-vault-locked" class="settings-hint settings-vault-locked" data-i18n="settings.vaultLocked">Open a vault to manage its recovery key, backups, import, or deletion. Each vault has its own settings.</p>
-        <div id="settings-vault" class="settings-vault" hidden>
-          <section class="settings-field settings-section" aria-labelledby="settings-recovery-title">
-            <h4 id="settings-recovery-title" class="settings-section-title" data-i18n="settings.recoveryTitle">Recovery key</h4>
-            <p id="settings-recovery-status" class="settings-hint"></p>
-            <div class="settings-actions">
-              <button id="settings-recovery-button" type="button" class="secondary-button" data-settings-action="recovery"></button>
-            </div>
-          </section>
-          <section class="settings-field settings-section" aria-labelledby="settings-touchid-title">
-            <h4 id="settings-touchid-title" class="settings-section-title" data-i18n="touchId.title">Touch ID</h4>
-            <p id="settings-touchid-status" class="settings-hint"></p>
-            <div class="settings-actions">
-              <button id="settings-touchid-enable" type="button" class="secondary-button" data-settings-action="touchid" data-i18n="touchId.enable" hidden>Turn on Touch ID…</button>
-              <button id="settings-touchid-disable" type="button" class="secondary-button" data-i18n="touchId.disable" hidden>Turn off Touch ID</button>
-            </div>
-          </section>
-          <section class="settings-field settings-section" aria-labelledby="settings-backup-title">
-            <h4 id="settings-backup-title" class="settings-section-title" data-i18n="settings.backupTitle">Backups and import</h4>
-            <p class="settings-hint" data-i18n="settings.backupHint">A backup opens with your master passphrase or recovery key. Import adds logins from Bitwarden, 1Password, or another Mnemo backup to this vault.</p>
-            <div class="settings-actions">
-              <button id="settings-export-button" type="button" class="secondary-button" data-settings-action="export" data-i18n="settings.exportButton">Export backup…</button>
-              <button id="settings-import-button" type="button" class="secondary-button" data-i18n="settings.importButton">Import…</button>
-            </div>
-          </section>
-          <section class="settings-field settings-section" aria-labelledby="settings-delete-title">
-            <h4 id="settings-delete-title" class="settings-section-title" data-i18n="settings.deleteTitle">Delete vault</h4>
-            <p class="settings-hint" data-i18n="settings.deleteHint">Removes this vault and its encrypted file from this Mac. Backups you saved are not affected.</p>
-            <div class="settings-actions">
-              <button id="settings-delete-button" type="button" class="secondary-button settings-danger-button" data-settings-action="delete" data-i18n="settings.deleteButton">Delete this vault…</button>
-            </div>
-          </section>
-          <form id="settings-confirm-form" class="settings-confirm-form" hidden>
-            <p id="settings-confirm-prompt" class="settings-hint"></p>
-            <label for="settings-confirm-passphrase" data-i18n="settings.confirmPassphrase">Current master passphrase</label>
-            <div class="secret-input-row">
-              <input
-                id="settings-confirm-passphrase"
-                type="password"
-                autocomplete="current-password"
-                maxlength="1024"
-                required
-              />
-              <button type="button" class="password-visibility-toggle" data-password-visibility-for="settings-confirm-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="settings-confirm-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
-              </button>
-            </div>
-            <p id="settings-confirm-error" class="form-error" role="alert" hidden></p>
-            <div class="dialog-actions">
-              <button id="settings-confirm-cancel" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
-              <button id="settings-confirm-submit" type="submit" class="dialog-save-button"></button>
-            </div>
-          </form>
+        <div class="settings-layout">
+          <nav class="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Settings categories" data-i18n-aria-label="settings.categories">
+            <button id="settings-tab-general" type="button" class="settings-tab" role="tab" aria-selected="true" aria-controls="settings-pane-general" data-settings-tab="general" data-i18n="settings.tabGeneral">General</button>
+            <button id="settings-tab-security" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-security" tabindex="-1" data-settings-tab="security" data-i18n="settings.tabSecurity">Security</button>
+            <button id="settings-tab-data" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-data" tabindex="-1" data-settings-tab="data" data-i18n="settings.tabData">Data</button>
+            <button id="settings-tab-vault" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-vault" tabindex="-1" data-settings-tab="vault" data-i18n="settings.tabVault">Vault</button>
+          </nav>
+          <div class="settings-panes">
+            <section id="settings-pane-general" class="settings-pane" role="tabpanel" aria-labelledby="settings-tab-general">
+              <div class="settings-field settings-section">
+                <label for="settings-language" data-i18n="settings.language">Language</label>
+                <select id="settings-language" class="settings-select" aria-describedby="settings-language-hint"></select>
+                <p id="settings-language-hint" class="settings-hint" data-i18n="settings.languageHint">Applies to the whole app, including system dialogs.</p>
+                <p id="settings-error" class="form-error" role="alert" hidden></p>
+              </div>
+              <div class="settings-field settings-section">
+                <span id="settings-theme-label" class="settings-field-label" data-i18n="settings.theme">Theme</span>
+                <p class="settings-hint" data-i18n="settings.themeHint">Choose how Mnemo looks. System follows the macOS appearance.</p>
+                <div class="theme-options" role="radiogroup" aria-labelledby="settings-theme-label">
+                  <label class="theme-option">
+                    <input type="radio" name="settings-theme" value="system" class="visually-hidden" />
+                    <span class="theme-preview" aria-hidden="true"><span class="theme-mock theme-mock-dark"><span class="theme-mock-window"><span class="theme-mock-dots"><i></i><i></i><i></i></span><span class="theme-mock-side"><i></i><i></i><i></i><b></b></span><span class="theme-mock-main"><i></i><i class="theme-mock-short"></i><span class="theme-mock-tiles"><i></i><i></i><i></i></span></span></span></span><span class="theme-mock theme-mock-light"><span class="theme-mock-window"><span class="theme-mock-dots"><i></i><i></i><i></i></span><span class="theme-mock-side"><i></i><i></i><i></i><b></b></span><span class="theme-mock-main"><i></i><i class="theme-mock-short"></i><span class="theme-mock-tiles"><i></i><i></i><i></i></span></span></span></span></span>
+                    <span class="theme-option-name" data-i18n="settings.themeSystem">System</span>
+                  </label>
+                  <label class="theme-option">
+                    <input type="radio" name="settings-theme" value="dark" class="visually-hidden" />
+                    <span class="theme-preview" aria-hidden="true"><span class="theme-mock theme-mock-dark"><span class="theme-mock-window"><span class="theme-mock-dots"><i></i><i></i><i></i></span><span class="theme-mock-side"><i></i><i></i><i></i><b></b></span><span class="theme-mock-main"><i></i><i class="theme-mock-short"></i><span class="theme-mock-tiles"><i></i><i></i><i></i></span></span></span></span></span>
+                    <span class="theme-option-name" data-i18n="settings.themeDark">Dark</span>
+                  </label>
+                  <label class="theme-option">
+                    <input type="radio" name="settings-theme" value="light" class="visually-hidden" />
+                    <span class="theme-preview" aria-hidden="true"><span class="theme-mock theme-mock-light"><span class="theme-mock-window"><span class="theme-mock-dots"><i></i><i></i><i></i></span><span class="theme-mock-side"><i></i><i></i><i></i><b></b></span><span class="theme-mock-main"><i></i><i class="theme-mock-short"></i><span class="theme-mock-tiles"><i></i><i></i><i></i></span></span></span></span></span>
+                    <span class="theme-option-name" data-i18n="settings.themeLight">Light</span>
+                  </label>
+                </div>
+                <p id="settings-theme-error" class="form-error" role="alert" hidden></p>
+              </div>
+            </section>
+
+            <section id="settings-pane-security" class="settings-pane" role="tabpanel" aria-labelledby="settings-tab-security" hidden>
+              <p class="settings-hint settings-pane-locked" data-i18n="settings.vaultLocked">Open a vault to manage its recovery key, backups, import, or deletion. Each vault has its own settings.</p>
+              <div class="settings-pane-body" hidden>
+                <section class="settings-field settings-section" aria-labelledby="settings-touchid-title">
+                  <h4 id="settings-touchid-title" class="settings-section-title" data-i18n="touchId.title">Touch ID</h4>
+                  <p id="settings-touchid-status" class="settings-hint"></p>
+                  <div class="settings-actions">
+                    <button id="settings-touchid-enable" type="button" class="secondary-button" data-settings-action="touchid" data-i18n="touchId.enable" hidden>Turn on Touch ID…</button>
+                    <button id="settings-touchid-disable" type="button" class="secondary-button" data-i18n="touchId.disable" hidden>Turn off Touch ID</button>
+                  </div>
+                </section>
+                <section class="settings-field settings-section" aria-labelledby="settings-recovery-title">
+                  <h4 id="settings-recovery-title" class="settings-section-title" data-i18n="settings.recoveryTitle">Recovery key</h4>
+                  <p id="settings-recovery-status" class="settings-hint"></p>
+                  <div class="settings-actions">
+                    <button id="settings-recovery-button" type="button" class="secondary-button" data-settings-action="recovery"></button>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <section id="settings-pane-data" class="settings-pane" role="tabpanel" aria-labelledby="settings-tab-data" hidden>
+              <p class="settings-hint settings-pane-locked" data-i18n="settings.vaultLocked">Open a vault to manage its recovery key, backups, import, or deletion. Each vault has its own settings.</p>
+              <div class="settings-pane-body" hidden>
+                <section class="settings-field settings-section" aria-labelledby="settings-backup-title">
+                  <h4 id="settings-backup-title" class="settings-section-title" data-i18n="settings.backupTitle">Backups and import</h4>
+                  <p class="settings-hint" data-i18n="settings.backupHint">A backup opens with your master passphrase or recovery key. Import adds logins from Bitwarden, 1Password, or another Mnemo backup to this vault.</p>
+                  <div class="settings-actions">
+                    <button id="settings-export-button" type="button" class="secondary-button" data-settings-action="export" data-i18n="settings.exportButton">Export backup…</button>
+                    <button id="settings-import-button" type="button" class="secondary-button" data-i18n="settings.importButton">Import…</button>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <section id="settings-pane-vault" class="settings-pane" role="tabpanel" aria-labelledby="settings-tab-vault" hidden>
+              <p class="settings-hint settings-pane-locked" data-i18n="settings.vaultLocked">Open a vault to manage its recovery key, backups, import, or deletion. Each vault has its own settings.</p>
+              <div class="settings-pane-body" hidden>
+                <section class="settings-field settings-section" aria-labelledby="settings-delete-title">
+                  <h4 id="settings-delete-title" class="settings-section-title" data-i18n="settings.deleteTitle">Delete vault</h4>
+                  <p class="settings-hint" data-i18n="settings.deleteHint">Removes this vault and its encrypted file from this Mac. Backups you saved are not affected.</p>
+                  <div class="settings-actions">
+                    <button id="settings-delete-button" type="button" class="secondary-button settings-danger-button" data-settings-action="delete" data-i18n="settings.deleteButton">Delete this vault…</button>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <!-- Shared passphrase confirmation; moved into the pane of the action that needs it. -->
+            <form id="settings-confirm-form" class="settings-confirm-form" hidden>
+              <p id="settings-confirm-prompt" class="settings-hint"></p>
+              <label for="settings-confirm-passphrase" data-i18n="settings.confirmPassphrase">Current master passphrase</label>
+              <div class="secret-input-row">
+                <input
+                  id="settings-confirm-passphrase"
+                  type="password"
+                  autocomplete="current-password"
+                  maxlength="1024"
+                  required
+                />
+                <button type="button" class="password-visibility-toggle" data-password-visibility-for="settings-confirm-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="settings-confirm-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                </button>
+              </div>
+              <p id="settings-confirm-error" class="form-error" role="alert" hidden></p>
+              <div class="dialog-actions">
+                <button id="settings-confirm-cancel" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
+                <button id="settings-confirm-submit" type="submit" class="dialog-save-button"></button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </dialog>
@@ -794,13 +921,19 @@
     <script src="./src/renderer/shared/ui/password-visibility.js"></script>
     <script src="./src/renderer/entities/vault-profile/model/profile.js"></script>
     <script src="./src/renderer/entities/vault-profile/ui/profile-list.js"></script>
+    <script src="./src/renderer/shared/item-types.js"></script>
     <script src="./src/renderer/entities/login/model/login.js"></script>
     <script src="./src/renderer/entities/login/ui/site-icon.js"></script>
     <script src="./src/renderer/entities/login/ui/login-list.js"></script>
     <script src="./src/renderer/entities/login/ui/login-detail.js"></script>
+    <script src="./src/renderer/features/totp-code/index.js"></script>
     <script src="./src/renderer/features/password-generator/index.js"></script>
     <script src="./src/renderer/features/profile-management/index.js"></script>
     <script src="./src/renderer/features/login-editor/index.js"></script>
+    <script src="./src/renderer/shared/lib/card-tools.js"></script>
+    <script src="./src/renderer/features/card-input/index.js"></script>
+    <script src="./src/renderer/features/item-editor/index.js"></script>
+    <script src="./src/renderer/entities/login/ui/item-detail.js"></script>
     <script src="./src/renderer/features/login-actions/index.js"></script>
     <script src="./src/renderer/features/vault-access/index.js"></script>
     <script src="./src/renderer/features/backup/index.js"></script>

@@ -17,6 +17,7 @@
     ui.url.textContent = entry.url;
     ui.username.textContent = entry.username || "—";
     ui.password.textContent = "••••••••••••";
+    ui.totpField.hidden = !entry.hasTotp;
     ui.notes.textContent = notes;
     ui.notesField.hidden = !notes;
     ui.copyUsername.disabled = !entry.username;

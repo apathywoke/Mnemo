@@ -9,6 +9,12 @@
     const form = $("#entry-form");
     const dialog = $("#entry-dialog");
     const passwordInput = $("#entry-password");
+    const totpInput = $("#entry-totp");
+    const removeTotp = $("#entry-remove-totp");
+    removeTotp.addEventListener("change", () => {
+      totpInput.disabled = removeTotp.checked;
+      if (removeTotp.checked) totpInput.value = "";
+    });
     const error = $("#entry-form-error");
 
     // The data-i18n key keeps the title correct if the language changes while
@@ -26,6 +32,12 @@
       passwordInput.required = true;
       passwordInput.placeholder = "";
       passwordInput.removeAttribute("data-i18n-placeholder");
+      totpInput.value = "";
+      totpInput.dataset.i18nPlaceholder = "editor.totpPlaceholder";
+      totpInput.placeholder = t("editor.totpPlaceholder");
+      $("#entry-remove-totp").checked = false;
+      $("#entry-remove-totp-field").hidden = true;
+      totpInput.disabled = false;
       conceal(form);
       error.hidden = true;
       $("#password-length-value").value = $("#password-length").value;
@@ -63,6 +75,12 @@
       passwordInput.dataset.i18nPlaceholder = "editor.keepPassword";
       passwordInput.placeholder = t("editor.keepPassword");
       $("#entry-notes").value = entry.notes;
+      // Like the password, the TOTP secret stays in main: blank keeps it.
+      if (entry.hasTotp) {
+        totpInput.dataset.i18nPlaceholder = "editor.totpKeep";
+        totpInput.placeholder = t("editor.totpKeep");
+        $("#entry-remove-totp-field").hidden = false;
+      }
       conceal(form);
       passwordGenerator.updatePasswordStrength();
       dialog.showModal();
@@ -85,6 +103,8 @@
           password: passwordInput.value,
           url: $("#entry-url").value,
           notes: $("#entry-notes").value,
+          totp: removeTotp.checked ? "" : totpInput.value,
+          removeTotp: removeTotp.checked,
         });
         dialog.close();
         await refreshEntries(savedEntry.id);
@@ -97,7 +117,6 @@
       }
     });
 
-    $("#create-entry-button").addEventListener("click", openNew);
     $("#empty-create-button").addEventListener("click", openNew);
     $("#edit-entry-button").addEventListener("click", openEdit);
     $("#cancel-entry-button").addEventListener("click", () => dialog.close());

@@ -1,9 +1,10 @@
 (() => {
   const ns = window.mnemoRenderer;
-  const { $ } = ns.shared.dom;
+  const { $, $$ } = ns.shared.dom;
   const { i18n } = ns.shared;
   const { show: showToast } = ns.shared.toast;
   let resetVaultActions = () => {};
+  let savedTheme = "system";
   let showVaultLocked = () => {};
 
   // Actions that need the master passphrase again. Each names its prompt,
@@ -63,10 +64,69 @@
       }
     });
 
-    // Vault sections: recovery key, backups and import, deletion. They need an
-    // unlocked vault; otherwise a single hint explains that.
-    const vaultSections = $("#settings-vault");
-    const lockedHint = $("#settings-vault-locked");
+    // Theme: applying is done by main through nativeTheme; theme.js follows
+    // the resulting prefers-color-scheme change.
+    const themeInputs = $$("input[name='settings-theme']", dialog);
+    const themeError = $("#settings-theme-error");
+    function showSavedTheme() {
+      for (const input of themeInputs) input.checked = input.value === savedTheme;
+    }
+    for (const input of themeInputs) {
+      input.addEventListener("change", async () => {
+        if (!input.checked) return;
+        themeError.hidden = true;
+        try {
+          savedTheme = (await ctx.api.setTheme(input.value)).theme;
+        } catch (cause) {
+          ctx.setError(themeError, i18n.errorText(cause, "errors.saveSettings"));
+        }
+        showSavedTheme();
+      });
+    }
+
+    // Categories. General works any time; the others act on the open vault
+    // and show a hint instead while it is locked.
+    const tabs = $$("[data-settings-tab]", dialog);
+    let activeTab = "general";
+
+    function selectTab(name, { focus = false } = {}) {
+      activeTab = name;
+      resetVaultActions();
+      for (const tab of tabs) {
+        const selected = tab.dataset.settingsTab === name;
+        tab.setAttribute("aria-selected", String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+        $(`#${tab.getAttribute("aria-controls")}`).hidden = !selected;
+        if (selected && focus) tab.focus();
+      }
+    }
+
+    for (const tab of tabs) {
+      tab.addEventListener("click", () => selectTab(tab.dataset.settingsTab));
+      tab.addEventListener("keydown", (event) => {
+        const index = tabs.indexOf(tab);
+        const next = {
+          ArrowDown: index + 1,
+          ArrowRight: index + 1,
+          ArrowUp: index - 1,
+          ArrowLeft: index - 1,
+          Home: 0,
+          End: tabs.length - 1,
+        }[event.key];
+        if (next === undefined) return;
+        event.preventDefault();
+        const target = tabs[(next + tabs.length) % tabs.length];
+        selectTab(target.dataset.settingsTab, { focus: true });
+      });
+    }
+
+    const paneBodies = $$(".settings-pane-body", dialog);
+    const lockedHints = $$(".settings-pane-locked", dialog);
+    const actionButtons = $$("[data-settings-action]", dialog);
+    function setVaultUnlocked(unlocked) {
+      for (const body of paneBodies) body.hidden = !unlocked;
+      for (const hint of lockedHints) hint.hidden = unlocked;
+    }
     const recoveryStatus = $("#settings-recovery-status");
     const recoveryButton = $("#settings-recovery-button");
     const confirmForm = $("#settings-confirm-form");
@@ -109,16 +169,13 @@
       confirmError.hidden = true;
       confirmSubmit.classList.remove("danger-confirm-button");
       ns.shared.passwordVisibility.conceal(confirmForm);
-      for (const button of vaultSections.querySelectorAll("[data-settings-action]")) {
-        button.disabled = false;
-      }
+      for (const button of actionButtons) button.disabled = false;
     };
 
     showVaultLocked = () => {
       resetVaultActions();
       recoveryEnabled = null;
-      vaultSections.hidden = true;
-      lockedHint.hidden = false;
+      setVaultUnlocked(false);
     };
 
     async function refreshVault() {
@@ -127,8 +184,7 @@
         return;
       }
       resetVaultActions();
-      lockedHint.hidden = true;
-      vaultSections.hidden = false;
+      setVaultUnlocked(true);
       recoveryEnabled = null;
       touchId = null;
       renderVault();
@@ -143,13 +199,15 @@
       }
     }
 
-    function askPassphrase(action) {
+    function askPassphrase(action, button) {
       resetVaultActions();
       pendingAction = action;
       confirmSubmit.classList.toggle("danger-confirm-button", action === "delete");
       renderVault();
-      for (const button of vaultSections.querySelectorAll("[data-settings-action]")) {
-        button.disabled = button.dataset.settingsAction !== action;
+      // The form sits under the section of the action it confirms.
+      button.closest(".settings-pane-body").append(confirmForm);
+      for (const other of actionButtons) {
+        other.disabled = other.dataset.settingsAction !== action;
       }
       confirmForm.hidden = false;
       confirmPassphrase.focus();
@@ -182,8 +240,8 @@
       }
     }
 
-    for (const button of vaultSections.querySelectorAll("[data-settings-action]")) {
-      button.addEventListener("click", () => askPassphrase(button.dataset.settingsAction));
+    for (const button of actionButtons) {
+      button.addEventListener("click", () => askPassphrase(button.dataset.settingsAction, button));
     }
     $("#settings-confirm-cancel").addEventListener("click", resetVaultActions);
     touchIdDisable.addEventListener("click", async () => {
@@ -224,6 +282,9 @@
 
     $("#settings-button").addEventListener("click", () => {
       error.hidden = true;
+      themeError.hidden = true;
+      showSavedTheme();
+      selectTab(activeTab);
       dialog.showModal();
       void refreshVault();
     });
@@ -235,6 +296,7 @@
     try {
       const settings = await ctx.api.getSettings();
       i18n.setLanguage(settings.language);
+      savedTheme = settings.theme ?? "system";
     } catch {
       i18n.setLanguage(i18n.language);
     }

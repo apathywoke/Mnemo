@@ -19,6 +19,7 @@
           entries: [],
           selectedEntryId: null,
           selectedEntryNotes: "",
+          typeFilter: "all",
           fetchingFaviconForId: null,
         },
         ui: {
@@ -62,6 +63,7 @@
           "profile-name",
           "restore-profile-name",
           "entry-password",
+          "entry-totp",
         ]) {
           const input = $(`#${id}`);
           if (input) input.value = "";

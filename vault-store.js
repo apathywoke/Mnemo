@@ -12,6 +12,11 @@ const {
   timingSafeEqual,
 } = require("node:crypto");
 
+const { generateTotp, parseTotpInput, toOtpauthUri } = require("./totp");
+const { ITEM_TYPES } = require("./src/renderer/shared/item-types");
+const { describeSshKey, isPrivateKey } = require("./ssh-keys");
+const cardTools = require("./src/renderer/shared/lib/card-tools");
+
 const scryptAsync = promisify(scrypt);
 const FORMAT = "local-vault";
 // Format 2 adds a recovery key: the data key is wrapped a second time under a
@@ -205,6 +210,34 @@ function decryptGcm(record, key, aad, exactCiphertextLength = null) {
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }
 
+// One-time code settings are sealed like passwords, under their own purpose
+// label so a sealed password and a sealed TOTP secret cannot be swapped.
+function getTotpAad(entryId) {
+  return Buffer.from(
+    `local-vault:entry-totp:v${VAULT_SCHEMA_VERSION}:${entryId}`,
+    "utf8",
+  );
+}
+
+function sealTotp(config, dataKey, entryId) {
+  const plaintext = Buffer.from(JSON.stringify(config), "utf8");
+  try {
+    return encryptGcm(plaintext, dataKey, getTotpAad(entryId));
+  } finally {
+    plaintext.fill(0);
+  }
+}
+
+function openTotp(record, dataKey, entryId) {
+  const plaintext = decryptGcm(record, dataKey, getTotpAad(entryId));
+  try {
+    // Re-validate through the parser so stored values meet the same rules.
+    return parseTotpInput(toOtpauthUri(JSON.parse(plaintext.toString("utf8"))));
+  } finally {
+    plaintext.fill(0);
+  }
+}
+
 function getPasswordAad(entryId) {
   return Buffer.from(
     `local-vault:entry-password:v${VAULT_SCHEMA_VERSION}:${entryId}`,
@@ -370,36 +403,193 @@ function validateVaultData(value) {
       value.schemaVersion === LEGACY_VAULT_SCHEMA_VERSION) &&
     Array.isArray(value.entries) &&
     value.entries.length <= MAX_ENTRIES &&
-    value.entries.every((entry) => isValidLoginEntry(entry, value.schemaVersion)) &&
+    value.entries.every((entry) =>
+      entry?.type === "login"
+        ? isValidLoginEntry(entry, value.schemaVersion)
+        : value.schemaVersion === VAULT_SCHEMA_VERSION && isValidItemEntry(entry)) &&
     new Set(value.entries.map((entry) => entry.id)).size === value.entries.length
+  );
+}
+
+// Cards, notes, identities, and SSH keys share one shape: plain `fields`
+// (including values derived on save) and per-field sealed `secrets`.
+const ITEM_ENTRY_KEYS = Object.freeze([
+  "id", "type", "name", "notes", "fields", "secrets", "createdAt", "updatedAt",
+]);
+const MAX_ITEM_NAME = 200;
+const MAX_DERIVED_LENGTH = 16384;
+
+function itemSchema(type) {
+  const schema = ITEM_TYPES[type];
+  return {
+    plain: new Map(schema.fields.filter((field) => field.kind !== "secret").map((field) => [field.key, field])),
+    secret: new Map(schema.fields.filter((field) => field.kind === "secret").map((field) => [field.key, field])),
+    derived: new Set(schema.derived),
+  };
+}
+
+function isValidItemEntry(entry) {
+  if (
+    !hasExactKeys(entry, ITEM_ENTRY_KEYS) ||
+    !Object.hasOwn(ITEM_TYPES, entry.type) ||
+    !UUID_PATTERN.test(entry.id) ||
+    typeof entry.name !== "string" ||
+    !entry.name.trim() ||
+    entry.name.length > MAX_ITEM_NAME ||
+    typeof entry.notes !== "string" ||
+    entry.notes.length > ENTRY_LIMITS.notes ||
+    !Number.isSafeInteger(entry.createdAt) ||
+    !Number.isSafeInteger(entry.updatedAt) ||
+    entry.createdAt <= 0 ||
+    entry.updatedAt < entry.createdAt ||
+    !isPlainObject(entry.fields) ||
+    !isPlainObject(entry.secrets)
+  ) {
+    return false;
+  }
+  const schema = itemSchema(entry.type);
+  return (
+    Object.entries(entry.fields).every(([key, value]) =>
+      typeof value === "string" &&
+      (schema.plain.has(key)
+        ? value.length <= schema.plain.get(key).max
+        : schema.derived.has(key) && value.length <= MAX_DERIVED_LENGTH)) &&
+    Object.entries(entry.secrets).every(([key, value]) =>
+      schema.secret.has(key) && isValidSealedPassword(value))
+  );
+}
+
+function getItemSecretAad(entryId, field) {
+  return Buffer.from(
+    `local-vault:item-secret:v${VAULT_SCHEMA_VERSION}:${entryId}:${field}`,
+    "utf8",
+  );
+}
+
+function sealItemSecret(value, dataKey, entryId, field) {
+  const plaintext = Buffer.from(value, "utf8");
+  try {
+    return encryptGcm(plaintext, dataKey, getItemSecretAad(entryId, field));
+  } finally {
+    plaintext.fill(0);
+  }
+}
+
+function openItemSecret(record, dataKey, entryId, field) {
+  const plaintext = decryptGcm(record, dataKey, getItemSecretAad(entryId, field));
+  try {
+    return plaintext.toString("utf8");
+  } finally {
+    plaintext.fill(0);
+  }
+}
+
+// Per-type checks and normalization for values typed into the editor.
+const ITEM_NORMALIZERS = Object.freeze({
+  card: {
+    // Same rules as the editor (card-tools.js): known lengths and a valid
+    // check digit. Expired dates are allowed; old cards may be kept.
+    number(value) {
+      if (/[^\d\s-]/.test(value)) throw new Error("Enter a valid card number.");
+      const digits = cardTools.digitsOnly(value);
+      if (digits && cardTools.numberStatus(digits) !== "complete") {
+        throw new Error("Enter a valid card number.");
+      }
+      return digits;
+    },
+    expiry(value) {
+      if (!value.trim()) return "";
+      const formatted = cardTools.formatExpiry(value);
+      const status = cardTools.expiryStatus(formatted);
+      if (status !== "complete" && status !== "expired") {
+        throw new Error("Enter the expiry date as MM/YY.");
+      }
+      return formatted;
+    },
+    cvv(value) {
+      if (value && !/^\d{3,4}$/.test(value)) throw new Error("The security code must be 3 or 4 digits.");
+      return value;
+    },
+    pin(value) {
+      if (value && !/^\d{4,12}$/.test(value)) throw new Error("The PIN must be 4 to 12 digits.");
+      return value;
+    },
+  },
+  ssh: {
+    privateKey(value) {
+      const text = value.trim();
+      if (text && !isPrivateKey(text)) throw new Error("Paste the private key in OpenSSH or PEM format.");
+      return text ? `${text}\n` : "";
+    },
+  },
+});
+
+// `fields` holds every editable field as a string. For secret fields an empty
+// string keeps the stored value, so the editor never needs to read secrets.
+function normalizeItemInput(input) {
+  if (
+    !hasExactKeys(input, ["id", "type", "name", "notes", "fields"]) ||
+    !Object.hasOwn(ITEM_TYPES, input.type) ||
+    (input.id !== "" && (typeof input.id !== "string" || !UUID_PATTERN.test(input.id))) ||
+    typeof input.name !== "string" ||
+    typeof input.notes !== "string" ||
+    !isPlainObject(input.fields)
+  ) {
+    throw new Error("Invalid login entry.");
+  }
+  const name = input.name.trim();
+  if (!name) throw new Error("Enter a name for this item.");
+  if (name.length > MAX_ITEM_NAME) throw new Error("name is invalid or too long.");
+  if (input.notes.length > ENTRY_LIMITS.notes) throw new Error("notes is invalid or too long.");
+
+  const schema = ITEM_TYPES[input.type];
+  const normalizers = ITEM_NORMALIZERS[input.type] ?? {};
+  const known = new Set(schema.fields.map((field) => field.key));
+  if (!Object.keys(input.fields).every((key) => known.has(key))) {
+    throw new Error("Invalid login entry.");
+  }
+  const plain = {};
+  const secrets = {};
+  for (const field of schema.fields) {
+    const raw = input.fields[field.key] ?? "";
+    if (typeof raw !== "string" || raw.length > field.max) {
+      throw new Error(`${field.key} is invalid or too long.`);
+    }
+    const value = normalizers[field.key] ? normalizers[field.key](raw) : raw;
+    if (field.kind === "secret") secrets[field.key] = value;
+    else plain[field.key] = value;
+  }
+  return { id: input.id, type: input.type, name, notes: input.notes, plain, secrets };
+}
+
+const REQUIRED_ENTRY_KEYS = Object.freeze([
+  "id",
+  "type",
+  "name",
+  "username",
+  "password",
+  "url",
+  "notes",
+  "createdAt",
+  "updatedAt",
+]);
+const OPTIONAL_ENTRY_KEYS = Object.freeze(["favicon", "totp"]);
+
+function hasAllowedEntryKeys(entry) {
+  return (
+    isPlainObject(entry) &&
+    REQUIRED_ENTRY_KEYS.every((key) => Object.hasOwn(entry, key)) &&
+    Object.keys(entry).every(
+      (key) => REQUIRED_ENTRY_KEYS.includes(key) || OPTIONAL_ENTRY_KEYS.includes(key),
+    )
   );
 }
 
 function isValidLoginEntry(entry, schemaVersion) {
   if (
-    (!hasExactKeys(entry, [
-      "id",
-      "type",
-      "name",
-      "username",
-      "password",
-      "url",
-      "notes",
-      "createdAt",
-      "updatedAt",
-    ]) &&
-      !hasExactKeys(entry, [
-        "id",
-        "type",
-        "name",
-        "username",
-        "password",
-        "url",
-        "notes",
-        "createdAt",
-        "updatedAt",
-        "favicon",
-      ])) ||
+    !hasAllowedEntryKeys(entry) ||
+    (Object.hasOwn(entry, "totp") &&
+      (schemaVersion === LEGACY_VAULT_SCHEMA_VERSION || !isValidSealedPassword(entry.totp))) ||
     !UUID_PATTERN.test(entry.id) ||
     entry.type !== "login" ||
     !Number.isSafeInteger(entry.createdAt) ||
@@ -450,7 +640,27 @@ function upgradeVaultData(vaultData, dataKey) {
   };
 }
 
+function itemSubtitle(entry) {
+  const fields = entry.fields;
+  if (entry.type === "card") return fields.last4 ? `•••• ${fields.last4}` : fields.cardholder ?? "";
+  if (entry.type === "identity") {
+    return [fields.firstName, fields.lastName].filter(Boolean).join(" ") || fields.email || "";
+  }
+  if (entry.type === "ssh") return fields.fingerprint ?? "";
+  return "";
+}
+
 function toEntrySummary(entry) {
+  if (entry.type !== "login") {
+    return {
+      id: entry.id,
+      type: entry.type,
+      name: entry.name,
+      subtitle: itemSubtitle(entry),
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+    };
+  }
   return {
     id: entry.id,
     type: entry.type,
@@ -458,12 +668,21 @@ function toEntrySummary(entry) {
     username: entry.username,
     url: entry.url,
     favicon: entry.favicon ?? "",
+    hasTotp: Boolean(entry.totp),
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
   };
 }
 
 function toEntryDetails(entry) {
+  if (entry.type !== "login") {
+    return {
+      ...toEntrySummary(entry),
+      notes: entry.notes,
+      fields: { ...entry.fields },
+      secretFields: Object.keys(entry.secrets),
+    };
+  }
   return { ...toEntrySummary(entry), notes: entry.notes };
 }
 
@@ -508,8 +727,17 @@ function isAllowedWebsite(value) {
 }
 
 function normalizeLoginInput(input) {
+  // `totp` (an otpauth link or Base32 secret; empty keeps the current one)
+  // and `removeTotp` are optional so older callers keep working.
   const inputKeys = ["id", "name", "username", "password", "url", "notes"];
-  if (!hasExactKeys(input, inputKeys)) {
+  const optionalKeys = ["totp", "removeTotp"];
+  if (
+    !isPlainObject(input) ||
+    !inputKeys.every((key) => Object.hasOwn(input, key)) ||
+    !Object.keys(input).every((key) => inputKeys.includes(key) || optionalKeys.includes(key)) ||
+    (Object.hasOwn(input, "totp") && (typeof input.totp !== "string" || input.totp.length > 2048)) ||
+    (Object.hasOwn(input, "removeTotp") && typeof input.removeTotp !== "boolean")
+  ) {
     throw new Error("Invalid login entry.");
   }
 
@@ -535,7 +763,14 @@ function normalizeLoginInput(input) {
     throw new Error("Invalid login entry.");
   }
 
-  return { ...input, id: input.id, name, url };
+  return {
+    ...input,
+    id: input.id,
+    name,
+    url,
+    totp: (input.totp ?? "").trim(),
+    removeTotp: input.removeTotp === true,
+  };
 }
 
 class VaultStore {
@@ -763,11 +998,108 @@ class VaultStore {
 
   revealPassword(id) {
     const entry = this.findEntry(id);
+    if (entry.type !== "login") throw new Error("Invalid login entry.");
     try {
       return openPassword(entry.password, this.dataKey, entry.id);
     } catch {
       throw new Error("Could not decrypt this password.");
     }
+  }
+
+  // A secret field of a card, identity, or SSH key, for copy or reveal.
+  revealItemSecret(id, field) {
+    const entry = this.findEntry(id);
+    if (entry.type === "login" || !Object.hasOwn(entry.secrets, field)) {
+      throw new Error("Could not copy this value.");
+    }
+    try {
+      return openItemSecret(entry.secrets[field], this.dataKey, entry.id, field);
+    } catch {
+      throw new Error("Could not decrypt this password.");
+    }
+  }
+
+  // Builds the stored form of an item from normalized input, keeping secrets
+  // that were left blank and recomputing derived fields.
+  buildItemEntry(normalized, existing, id, timestamp) {
+    const secrets = {};
+    const plainSecrets = {};
+    for (const [key, value] of Object.entries(normalized.secrets)) {
+      if (value) {
+        secrets[key] = sealItemSecret(value, this.dataKey, id, key);
+        plainSecrets[key] = value;
+      } else if (existing?.secrets[key]) {
+        secrets[key] = existing.secrets[key];
+      }
+    }
+    const secretValue = (key) =>
+      plainSecrets[key] ??
+      (existing?.secrets[key] ? openItemSecret(existing.secrets[key], this.dataKey, id, key) : "");
+
+    const fields = { ...normalized.plain };
+    if (normalized.type === "card") {
+      const number = secretValue("number");
+      if (number) fields.last4 = number.slice(-4);
+    } else if (normalized.type === "ssh") {
+      const privateKey = secretValue("privateKey");
+      if (!privateKey && !fields.publicKey.trim()) throw new Error("Add a private or public key.");
+      const described = describeSshKey({
+        privateKey,
+        publicKey: fields.publicKey,
+        passphrase: secretValue("passphrase"),
+      });
+      fields.publicKey = described.publicKey;
+      if (described.keyType) fields.keyType = described.keyType;
+      if (described.fingerprint) fields.fingerprint = described.fingerprint;
+    }
+    for (const key of Object.keys(fields)) {
+      if (fields[key] === "") delete fields[key];
+    }
+    return {
+      id,
+      type: normalized.type,
+      name: normalized.name,
+      notes: normalized.notes,
+      fields,
+      secrets,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: Math.max(timestamp, existing?.createdAt ?? 0),
+    };
+  }
+
+  async saveItem(input) {
+    return this.enqueueMutation(async () => {
+      this.requireUnlocked();
+      const normalized = normalizeItemInput(input);
+      const existingIndex = normalized.id
+        ? this.vaultData.entries.findIndex((entry) => entry.id === normalized.id)
+        : -1;
+      if (normalized.id && existingIndex === -1) throw new Error("This login no longer exists.");
+      const existing = existingIndex >= 0 ? this.vaultData.entries[existingIndex] : null;
+      if (existing && existing.type !== normalized.type) throw new Error("Invalid login entry.");
+      if (!existing && this.vaultData.entries.length >= MAX_ENTRIES) {
+        throw new Error("The vault has reached its entry limit.");
+      }
+      const saved = this.buildItemEntry(normalized, existing, existing?.id ?? randomUUID(), Date.now());
+      const entries = this.vaultData.entries.slice();
+      if (existingIndex >= 0) entries[existingIndex] = saved;
+      else entries.push(saved);
+      await this.persistVaultData({ schemaVersion: VAULT_SCHEMA_VERSION, entries });
+      return toEntryDetails(saved);
+    });
+  }
+
+  // The current one-time code for an entry. The secret stays here.
+  getTotpCode(id, now = Date.now()) {
+    const entry = this.findEntry(id);
+    if (!entry.totp) throw new Error("This login has no one-time code.");
+    let config;
+    try {
+      config = openTotp(entry.totp, this.dataKey, entry.id);
+    } catch {
+      throw new Error("Could not read the one-time code settings.");
+    }
+    return generateTotp(config, now);
   }
 
   findEntry(id) {
@@ -791,6 +1123,9 @@ class VaultStore {
       if (normalized.id && existingIndex === -1) {
         throw new Error("This login no longer exists.");
       }
+      if (existingIndex >= 0 && this.vaultData.entries[existingIndex].type !== "login") {
+        throw new Error("Invalid login entry.");
+      }
       if (existingIndex === -1 && this.vaultData.entries.length >= MAX_ENTRIES) {
         throw new Error("The vault has reached its entry limit.");
       }
@@ -804,6 +1139,7 @@ class VaultStore {
         throw new Error("Enter a password for this login.");
       }
       const id = existing?.id ?? randomUUID();
+      const totpConfig = normalized.totp ? parseTotpInput(normalized.totp) : null;
       const timestamp = Math.max(Date.now(), existing?.createdAt ?? 0);
       const savedEntry = {
         id,
@@ -819,6 +1155,11 @@ class VaultStore {
         createdAt: existing?.createdAt ?? timestamp,
         updatedAt: timestamp,
       };
+      if (totpConfig) {
+        savedEntry.totp = sealTotp(totpConfig, this.dataKey, id);
+      } else if (existing?.totp && !normalized.removeTotp) {
+        savedEntry.totp = existing.totp;
+      }
       const entries = this.vaultData.entries.slice();
       if (existingIndex >= 0) entries[existingIndex] = savedEntry;
       else entries.push(savedEntry);
@@ -839,7 +1180,9 @@ class VaultStore {
       const entries = this.vaultData.entries.slice();
       const existingKeys = new Map();
       for (const entry of entries) {
-        const key = JSON.stringify([entry.name, entry.username, entry.url]);
+        const key = entry.type === "login"
+          ? JSON.stringify([entry.name, entry.username, entry.url])
+          : JSON.stringify([entry.type, entry.name, entry.fields]);
         if (!existingKeys.has(key)) existingKeys.set(key, []);
         existingKeys.get(key).push(entry);
       }
@@ -847,8 +1190,36 @@ class VaultStore {
       let imported = 0;
       let duplicates = 0;
       let invalid = 0;
+      let totpSkipped = 0;
       const timestamp = Date.now();
       for (const login of logins) {
+        // Cards, notes, identities, and SSH keys (from Mnemo backups).
+        if (login?.type && login.type !== "login") {
+          let entry;
+          try {
+            const normalized = normalizeItemInput({
+              id: "",
+              type: login.type,
+              name: login.name,
+              notes: login.notes ?? "",
+              fields: login.fields ?? {},
+            });
+            entry = this.buildItemEntry(normalized, null, randomUUID(), timestamp);
+          } catch {
+            invalid += 1;
+            continue;
+          }
+          const key = JSON.stringify([entry.type, entry.name, entry.fields]);
+          if (existingKeys.has(key)) {
+            duplicates += 1;
+            continue;
+          }
+          if (entries.length >= MAX_ENTRIES) throw new Error("The vault has reached its entry limit.");
+          entries.push(entry);
+          existingKeys.set(key, [entry]);
+          imported += 1;
+          continue;
+        }
         let normalized;
         try {
           normalized = normalizeLoginInput({ id: "", ...login });
@@ -858,7 +1229,7 @@ class VaultStore {
           continue;
         }
         const key = JSON.stringify([normalized.name, normalized.username, normalized.url]);
-        const sameLabel = existingKeys.get(key) ?? [];
+        const sameLabel = (existingKeys.get(key) ?? []).filter((entry) => entry.type === "login");
         if (sameLabel.some((entry) => openPassword(entry.password, this.dataKey, entry.id) === normalized.password)) {
           duplicates += 1;
           continue;
@@ -879,6 +1250,14 @@ class VaultStore {
           createdAt: timestamp,
           updatedAt: timestamp,
         };
+        // A one-time code in an unsupported form does not block the login.
+        if (normalized.totp) {
+          try {
+            entry.totp = sealTotp(parseTotpInput(normalized.totp), this.dataKey, id);
+          } catch {
+            totpSkipped += 1;
+          }
+        }
         entries.push(entry);
         if (!existingKeys.has(key)) existingKeys.set(key, []);
         existingKeys.get(key).push(entry);
@@ -888,7 +1267,7 @@ class VaultStore {
       if (imported > 0) {
         await this.persistVaultData({ schemaVersion: VAULT_SCHEMA_VERSION, entries });
       }
-      return { imported, duplicates, invalid };
+      return { imported, duplicates, invalid, totpSkipped };
     });
   }
 
@@ -914,13 +1293,30 @@ class VaultStore {
       recoveryKeyBytes?.fill(0);
     }
     try {
-      return opened.vaultData.entries.map((entry) => ({
+      return opened.vaultData.entries.map((entry) => entry.type !== "login"
+        ? {
+          type: entry.type,
+          name: entry.name,
+          notes: entry.notes,
+          fields: Object.fromEntries(
+            ITEM_TYPES[entry.type].fields.map((field) => [
+              field.key,
+              field.kind === "secret"
+                ? (entry.secrets[field.key]
+                  ? openItemSecret(entry.secrets[field.key], opened.dataKey, entry.id, field.key)
+                  : "")
+                : entry.fields[field.key] ?? "",
+            ]),
+          ),
+        }
+        : {
         name: entry.name,
         username: entry.username,
         password: openPassword(entry.password, opened.dataKey, entry.id),
         url: entry.url,
         notes: entry.notes,
-      }));
+        totp: entry.totp ? toOtpauthUri(openTotp(entry.totp, opened.dataKey, entry.id)) : "",
+      });
     } finally {
       opened.dataKey.fill(0);
     }
@@ -942,7 +1338,9 @@ class VaultStore {
       const existingIndex = this.vaultData.entries.findIndex(
         (entry) => entry.id === id,
       );
-      if (existingIndex === -1) throw new Error("This login no longer exists.");
+      if (existingIndex === -1 || this.vaultData.entries[existingIndex].type !== "login") {
+        throw new Error("This login no longer exists.");
+      }
 
       const savedEntry = {
         ...this.vaultData.entries[existingIndex],

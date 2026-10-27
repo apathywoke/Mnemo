@@ -7,6 +7,7 @@ const {
   clipboard,
   dialog,
   ipcMain,
+  nativeTheme,
   powerMonitor,
   safeStorage,
   session,
@@ -17,6 +18,8 @@ const ProfileManager = require("./profile-manager");
 const SettingsStore = require("./settings-store");
 const BiometricUnlock = require("./biometric-unlock");
 const { parseImportFile } = require("./importers");
+const { ITEM_TYPES } = require("./src/renderer/shared/item-types");
+const cardTools = require("./src/renderer/shared/lib/card-tools");
 const i18nCatalog = require("./src/renderer/shared/i18n/messages");
 const { createTranslator, encodeIpcError } = require("./src/renderer/shared/i18n/translate");
 const VaultStore = require("./vault-store");
@@ -25,7 +28,9 @@ const { fetchSiteFavicon, getFaviconHost } = require("./favicon-fetcher");
 const APP_PAGE = path.join(__dirname, "index.html");
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 const CLIPBOARD_CLEAR_MS = 30_000;
-const COPYABLE_ENTRY_FIELDS = new Set(["username", "password"]);
+// Windows that show a secret close on their own, like the clipboard clears.
+const REVEAL_DIALOG_MS = 30_000;
+const COPYABLE_ENTRY_FIELDS = new Set(["username", "password", "totp"]);
 // Chromium's remote debugging switches have no Electron fuse. A local process
 // that relaunches the app with them could drive the unlocked renderer and call
 // the preload API, so packaged builds refuse to start with them.
@@ -65,14 +70,33 @@ const IMPORT_SOURCES = Object.freeze({
 // password does not stay on screen after the vault locks.
 const openVaultDialogs = new Set();
 
-async function showVaultDialog(options) {
+async function showVaultDialog(options, { closeAfterMs = 0 } = {}) {
   const controller = new AbortController();
   openVaultDialogs.add(controller);
+  const timer = closeAfterMs ? setTimeout(() => controller.abort(), closeAfterMs) : null;
   try {
     return await dialog.showMessageBox(mainWindow, { ...options, signal: controller.signal });
   } finally {
+    if (timer) clearTimeout(timer);
     openVaultDialogs.delete(controller);
   }
+}
+
+// A native window with one secret value. It is drawn by macOS, so the value
+// never enters the renderer, and it closes after REVEAL_DIALOG_MS or on lock.
+function showSecretDialog({ entryName, fieldLabel, value }) {
+  return showVaultDialog({
+    type: "none",
+    title: entryName,
+    // The value is alone in `detail` so selecting it copies nothing extra;
+    // the auto-close note goes under the heading instead.
+    message: `${entryName} · ${fieldLabel}\n${tr("dialog.revealCloses", { seconds: REVEAL_DIALOG_MS / 1000 })}`,
+    detail: value,
+    buttons: [tr("dialog.done")],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  }, { closeAfterMs: REVEAL_DIALOG_MS });
 }
 
 function tr(key, params) {
@@ -231,7 +255,9 @@ function createWindow() {
   return mainWindow;
 }
 
-function registerHandler(channel, handler) {
+// `countsAsActivity: false` is for background refreshes (one-time codes)
+// that must not keep an idle vault unlocked.
+function registerHandler(channel, handler, { countsAsActivity = true } = {}) {
   ipcMain.handle(channel, async (event, ...args) => {
     try {
       if (
@@ -242,7 +268,7 @@ function registerHandler(channel, handler) {
       }
 
       const result = await handler(...args);
-      resetAutoLockTimer();
+      if (countsAsActivity) resetAutoLockTimer();
       return result;
     } catch (error) {
       throw toIpcError(error);
@@ -295,14 +321,23 @@ if (launchedWithRemoteDebugging) {
       isSupportedLanguage: translator.isSupported,
       defaultLanguage: translator.pickLanguage(app.getPreferredSystemLanguages?.()),
     });
+    // nativeTheme drives both the native dialogs and the renderer's
+    // prefers-color-scheme, so "system" follows macOS automatically.
     settingsLoaded = settingsStore.load().then((settings) => {
       language = settings.language;
+      if (nativeTheme) nativeTheme.themeSource = settings.theme;
     });
 
     registerHandler("app:get-version", () => app.getVersion());
     registerHandler("settings:get", async () => {
       await settingsLoaded;
       return settingsStore.get();
+    });
+    registerHandler("settings:set-theme", async (theme) => {
+      await settingsLoaded;
+      const settings = await settingsStore.setTheme(theme);
+      if (nativeTheme) nativeTheme.themeSource = settings.theme;
+      return settings;
     });
     registerHandler("settings:set-language", async (code) => {
       await settingsLoaded;
@@ -522,6 +557,12 @@ if (launchedWithRemoteDebugging) {
     // process on an explicit copy or reveal and are never returned over IPC.
     registerHandler("vault:list-entries", () => vaultStore.listEntries());
     registerHandler("vault:get-entry", (entryId) => vaultStore.getEntry(entryId));
+    // The current one-time code only; the secret never leaves this process.
+    registerHandler(
+      "vault:get-totp",
+      (entryId) => vaultStore.getTotpCode(entryId),
+      { countsAsActivity: false },
+    );
     registerHandler("vault:save-entry", (entry) =>
       vaultStore.saveEntry(entry),
     );
@@ -554,30 +595,60 @@ if (launchedWithRemoteDebugging) {
       };
     });
     registerHandler("vault:delete-entry", (id) => vaultStore.deleteEntry(id));
-    registerHandler("vault:copy-entry-field", (entryId, field) => {
-      if (!COPYABLE_ENTRY_FIELDS.has(field)) {
-        throw new Error("Could not copy this value.");
+    // Item fields a user may copy: schema fields marked `copy` and the SSH
+    // fingerprint. Secret fields are read here and never returned.
+    function copyableItemValue(entry, field) {
+      const schemaField = ITEM_TYPES[entry.type].fields.find((item) => item.key === field);
+      if (schemaField?.copy) {
+        return schemaField.kind === "secret"
+          ? vaultStore.revealItemSecret(entry.id, field)
+          : entry.fields[field] ?? "";
       }
-      const value = field === "password"
-        ? vaultStore.revealPassword(entryId)
-        : vaultStore.getEntry(entryId).username;
+      if (entry.type === "ssh" && field === "fingerprint") return entry.fields.fingerprint ?? "";
+      throw new Error("Could not copy this value.");
+    }
+
+    registerHandler("vault:copy-entry-field", (entryId, field) => {
+      if (typeof field !== "string") throw new Error("Could not copy this value.");
+      const entry = vaultStore.getEntry(entryId);
+      let value;
+      if (entry.type !== "login") {
+        value = copyableItemValue(entry, field);
+      } else if (!COPYABLE_ENTRY_FIELDS.has(field)) {
+        throw new Error("Could not copy this value.");
+      } else {
+        value = field === "password"
+          ? vaultStore.revealPassword(entryId)
+          : field === "totp"
+            ? vaultStore.getTotpCode(entryId).code
+            : entry.username;
+      }
       if (!value) throw new Error("Could not copy this value.");
       return copyToClipboardTemporarily(value);
+    });
+    registerHandler("vault:save-item", (item) => vaultStore.saveItem(item));
+    registerHandler("vault:reveal-field", async (entryId, field) => {
+      const entry = vaultStore.getEntry(entryId);
+      if (entry.type === "login" || !entry.secretFields.includes(field)) {
+        throw new Error("Could not copy this value.");
+      }
+      const raw = vaultStore.revealItemSecret(entry.id, field);
+      // Card numbers are easier to read and compare in groups of four.
+      const value = entry.type === "card" && field === "number" ? cardTools.formatNumber(raw) : raw;
+      await showSecretDialog({
+        entryName: entry.name,
+        fieldLabel: tr(`item.field.${entry.type}.${field}`),
+        value,
+      });
+      return { shown: true };
     });
     registerHandler("vault:reveal-password", async (entryId) => {
       const entry = vaultStore.getEntry(entryId);
       const password = vaultStore.revealPassword(entry.id);
-      // Shown in a native dialog owned by the main process, so the plaintext
-      // never enters the renderer's JavaScript heap or DOM.
-      await showVaultDialog({
-        type: "none",
-        title: entry.name,
-        message: entry.name,
-        detail: password,
-        buttons: [tr("dialog.done")],
-        defaultId: 0,
-        cancelId: 0,
-        noLink: true,
+      await showSecretDialog({
+        entryName: entry.name,
+        fieldLabel: tr("editor.password"),
+        value: password,
       });
       return { shown: true };
     });
@@ -631,7 +702,14 @@ if (launchedWithRemoteDebugging) {
         const logins = await VaultStore.readBackupLogins(filePath, backupCredentials);
         parsed = {
           logins,
-          stats: { found: logins.length, nonLogin: 0, noPassword: 0, archived: 0, totpNotImported: 0 },
+          stats: {
+            found: logins.length,
+            nonLogin: 0,
+            noPassword: 0,
+            archived: 0,
+            withTotp: logins.filter((login) => login.totp).length,
+            totpNotImported: 0,
+          },
         };
       } else {
         parsed = await parseImportFile(source, filePath, { fallbackName: tr("import.untitled") });

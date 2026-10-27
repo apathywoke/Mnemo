@@ -3,9 +3,12 @@
 //
 // Supported: Bitwarden unencrypted JSON and CSV; 1Password 1PUX and CSV.
 // Mnemo stores logins only, so other item types are counted and skipped.
+// One-time code (TOTP) settings come along when they are standard; others,
+// such as Steam Guard, are counted and left out.
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const zlib = require("node:zlib");
+const { parseTotpInput } = require("./totp");
 
 const MAX_IMPORT_FILE_BYTES = 100 * 1024 * 1024;
 const MAX_EXPORT_DATA_BYTES = 50 * 1024 * 1024;
@@ -17,7 +20,7 @@ const SOURCES = Object.freeze({
 });
 
 function emptyStats() {
-  return { found: 0, nonLogin: 0, noPassword: 0, archived: 0, totpNotImported: 0 };
+  return { found: 0, nonLogin: 0, noPassword: 0, archived: 0, withTotp: 0, totpNotImported: 0 };
 }
 
 function text(value) {
@@ -51,7 +54,7 @@ function hostOf(url) {
   }
 }
 
-function toLogin({ name, username, password, url, notes }, fallbackName) {
+function toLogin({ name, username, password, url, notes, totp }, fallbackName) {
   const cleanUrl = pickUrl(Array.isArray(url) ? url : [url]);
   return {
     name: text(name).trim() || hostOf(cleanUrl) || text(username).trim() || fallbackName,
@@ -59,6 +62,7 @@ function toLogin({ name, username, password, url, notes }, fallbackName) {
     password: text(password),
     url: cleanUrl,
     notes: text(notes),
+    totp: text(totp).trim(),
   };
 }
 
@@ -68,8 +72,17 @@ function addLogin(result, fields, fallbackName) {
     result.stats.noPassword += 1;
     return;
   }
-  if (text(fields.totp).trim()) result.stats.totpNotImported += 1;
-  result.logins.push(toLogin(fields, fallbackName));
+  const login = toLogin(fields, fallbackName);
+  if (login.totp) {
+    try {
+      parseTotpInput(login.totp);
+      result.stats.withTotp += 1;
+    } catch {
+      result.stats.totpNotImported += 1;
+      login.totp = "";
+    }
+  }
+  result.logins.push(login);
 }
 
 function checkItemCount(count) {
