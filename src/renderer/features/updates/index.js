@@ -12,8 +12,8 @@
   });
 
   // Shows update state from main: a banner across the window when a new
-  // version is available or ready, and a status line in Settings. Main does
-  // the checking, downloading, verification, and installation.
+  // version is available or ready, and a status card in Settings → Updates.
+  // Main does the checking, downloading, verification, and installation.
   function init(ctx) {
     const banner = $("#update-banner");
     const title = $("#update-banner-title");
@@ -23,8 +23,16 @@
     const notes = $("#update-notes");
     const progress = $("#update-progress");
     const progressBar = $("#update-progress-bar");
-    const settingsStatus = $("#settings-update-status");
-    const autoUpdate = $("#settings-auto-update");
+    const card = $("#update-status-card");
+    const cardTitle = $("#update-status-title");
+    const cardDetail = $("#update-status-detail");
+    const cardProgress = $("#update-status-progress");
+    const cardProgressBar = $("#update-status-progress-bar");
+    const cardAction = $("#settings-update-action");
+    const cardNotesButton = $("#settings-update-notes-button");
+    const cardNotes = $("#settings-update-notes");
+    const tabDot = $("#settings-updates-dot");
+    const interval = $("#settings-update-interval");
     const checkButton = $("#settings-check-updates");
     let state = null;
     let dismissedVersion = null;
@@ -70,33 +78,61 @@
       banner.classList.toggle("has-error", Boolean(state.error) && state.status === "available");
     }
 
-    function renderSettings() {
-      if (!state) return;
-      autoUpdate.checked = state.autoUpdate;
-      const current = { version: state.currentVersion };
-      let text;
+    // Title, detail, and the main button for each state.
+    function describe() {
+      const current = state.currentVersion;
+      const blocked = t(BLOCKER_KEYS[state.blocker] ?? "updates.blockerDevelopment");
       switch (state.status) {
         case "checking":
-          text = t("updates.statusChecking");
-          break;
+          return { title: t("updates.cardChecking"), detail: t("updates.cardCurrent", { current }) };
         case "upToDate":
-          text = t("updates.statusUpToDate", { ...current, time: formatTime(state.checkedAt) });
-          break;
+          return {
+            title: t("updates.cardUpToDate"),
+            detail: t("updates.cardChecked", { current, time: formatTime(state.checkedAt) }),
+          };
         case "available":
+          return {
+            title: t("updates.availableTitle", { version: state.version }),
+            detail: state.error || (state.canInstall ? t("updates.cardAvailable", { current }) : blocked),
+            action: state.canInstall ? "updates.downloadInstall" : "updates.downloadGitHub",
+          };
         case "downloading":
-          text = t("updates.statusAvailable", { version: state.version, current: state.currentVersion });
-          break;
+          return {
+            title: t("updates.downloadingTitle", { version: state.version }),
+            detail: t("updates.downloadingDetail", { percent: state.progress ?? 0 }),
+          };
         case "ready":
-          text = t("updates.readyTitle", { version: state.version });
-          break;
+          return { title: t("updates.readyTitle", { version: state.version }), detail: t("updates.readyDetail"), action: "updates.restart" };
         case "error":
-          text = `${t("updates.statusVersion", current)} ${state.error}`;
-          break;
+          return { title: t("updates.cardError"), detail: state.error };
         default:
-          text = t("updates.statusVersion", current);
+          return {
+            title: t("updates.cardCurrent", { current }),
+            detail: t(state.updateInterval === "off" ? "updates.cardOff" : "updates.cardNotChecked"),
+          };
       }
-      settingsStatus.textContent = text;
+    }
+
+    function renderSettings() {
+      if (!state) return;
+      const { title, detail, action: actionKey } = describe();
+      card.dataset.status = state.status;
+      card.classList.toggle("has-error", Boolean(state.error) && ["available", "error"].includes(state.status));
+      cardTitle.textContent = title;
+      cardDetail.textContent = detail;
+      cardProgress.hidden = state.status !== "downloading";
+      cardProgressBar.style.width = `${state.progress ?? 0}%`;
+      cardAction.hidden = !actionKey;
+      if (actionKey) cardAction.textContent = t(actionKey);
+      const hasNotes = Boolean(state.notes) && ["available", "downloading", "ready"].includes(state.status);
+      cardNotesButton.hidden = !hasNotes;
+      cardNotes.textContent = state.notes ?? "";
+      if (!hasNotes) cardNotes.hidden = true;
+      cardNotesButton.setAttribute("aria-expanded", String(!cardNotes.hidden));
+      checkButton.hidden = state.status === "ready";
       checkButton.disabled = state.status === "checking" || state.status === "downloading";
+      tabDot.hidden = !["available", "ready"].includes(state.status);
+      interval.value = state.updateInterval;
     }
 
     // "Later" hides the banner for that version only; a newer one shows again.
@@ -106,7 +142,7 @@
       renderSettings();
     }
 
-    action.addEventListener("click", async () => {
+    async function runAction() {
       try {
         if (state.status === "ready") {
           await ctx.api.installUpdate();
@@ -118,11 +154,15 @@
       } catch (cause) {
         showToast(errorText(cause, "errors.updateInstall"), { type: "error" });
       }
-    });
-    notesButton.addEventListener("click", () => {
-      notes.hidden = !notes.hidden;
-      notesButton.setAttribute("aria-expanded", String(!notes.hidden));
-    });
+    }
+    action.addEventListener("click", runAction);
+    cardAction.addEventListener("click", runAction);
+    for (const [button, panel] of [[notesButton, notes], [cardNotesButton, cardNotes]]) {
+      button.addEventListener("click", () => {
+        panel.hidden = !panel.hidden;
+        button.setAttribute("aria-expanded", String(!panel.hidden));
+      });
+    }
     $("#update-later-button").addEventListener("click", () => {
       dismissedVersion = state?.version ?? null;
       renderBanner();
@@ -138,11 +178,11 @@
         showToast(errorText(cause, "errors.updateCheck"), { type: "error" });
       }
     });
-    autoUpdate.addEventListener("change", async () => {
+    interval.addEventListener("change", async () => {
       try {
-        await ctx.api.setAutoUpdate(autoUpdate.checked);
+        await ctx.api.setUpdateInterval(interval.value);
       } catch (cause) {
-        autoUpdate.checked = !autoUpdate.checked;
+        if (state) interval.value = state.updateInterval;
         showToast(errorText(cause, "errors.saveSettings"), { type: "error" });
       }
     });

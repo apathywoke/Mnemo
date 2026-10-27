@@ -35,7 +35,7 @@ again whenever a trigger at the end of this document applies. Updated
  │    ── fs (0700 dir / 0600 files) ──── vault files, profiles.json    │  B2
  │    ── clipboard ───────────────────── other apps, Universal Clip.   │  B3
  │    ── HTTPS (user-initiated only) ─── website for its favicon       │  B4
- │    ── HTTPS (daily, can be off) ───── GitHub releases (updates)     │  B6
+ │    ── HTTPS (scheduled, can be off) ─ GitHub releases (updates)     │  B6
  │    ── native dialogs ──────────────── reveal password, file pickers │
  └─────────────────────────────────────────────────────────────────────┘
    B5: GitHub Actions build → ad-hoc signature → GitHub release → user's Mac

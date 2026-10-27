@@ -63,8 +63,9 @@ separate Electron processes.
 - Renderer-originated remote HTTP(S) and WebSocket requests are blocked;
   renderer `connect-src` is also set to `none`. The main process makes two
   kinds of requests: the explicit site-icon request described below, and the
-  update check against this project's GitHub releases (daily and on demand;
-  it can be turned off in Settings → General).
+  update check against this project's GitHub releases (on demand and on a
+  schedule chosen in Settings → Updates: every 30 minutes, hour, 6 hours, or
+  day, or never; daily by default).
 - Each profile has its own vault under Electron's per-user application data
   directory. The existing `vault.json` is retained as the “Local Vault” profile.
 - Profile names are stored locally in `profiles.json` in plain text; vault

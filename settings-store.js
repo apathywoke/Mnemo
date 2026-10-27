@@ -6,6 +6,8 @@ const SETTINGS_VERSION = 1;
 const MAX_SETTINGS_BYTES = 4096;
 const THEMES = Object.freeze(["system", "dark", "light"]);
 const DEFAULT_THEME = "system";
+const UPDATE_INTERVALS = Object.freeze(["30m", "1h", "6h", "1d", "off"]);
+const DEFAULT_UPDATE_INTERVAL = "1d";
 
 // Non-secret application preferences (interface language and theme), kept
 // next to the profile registry in the per-user application data folder.
@@ -13,9 +15,9 @@ class SettingsStore {
   constructor(directory, { isSupportedLanguage, defaultLanguage }) {
     this.filePath = path.join(directory, "settings.json");
     this.isSupportedLanguage = isSupportedLanguage;
-    // Update checks contact GitHub; on by default because they deliver
-    // security fixes, and switchable in Settings.
-    this.settings = { language: defaultLanguage, theme: DEFAULT_THEME, autoUpdate: true };
+    // Update checks contact GitHub; daily by default because they deliver
+    // security fixes, and adjustable or off in Settings.
+    this.settings = { language: defaultLanguage, theme: DEFAULT_THEME, updateInterval: DEFAULT_UPDATE_INTERVAL };
     this.writeQueue = Promise.resolve();
   }
 
@@ -31,7 +33,9 @@ class SettingsStore {
             ? parsed.language
             : this.settings.language,
           theme: THEMES.includes(parsed.theme) ? parsed.theme : DEFAULT_THEME,
-          autoUpdate: typeof parsed.autoUpdate === "boolean" ? parsed.autoUpdate : true,
+          updateInterval: UPDATE_INTERVALS.includes(parsed.updateInterval)
+            ? parsed.updateInterval
+            : parsed.autoUpdate === false ? "off" : DEFAULT_UPDATE_INTERVAL,
         };
       }
     } catch {
@@ -58,11 +62,11 @@ class SettingsStore {
     return this.update({ theme });
   }
 
-  setAutoUpdate(enabled) {
-    if (typeof enabled !== "boolean") {
+  setUpdateInterval(interval) {
+    if (!UPDATE_INTERVALS.includes(interval)) {
       return Promise.reject(new Error("Could not save the settings."));
     }
-    return this.update({ autoUpdate: enabled });
+    return this.update({ updateInterval: interval });
   }
 
   // Queued so that quick successive changes each build on the last one.
@@ -97,3 +101,4 @@ class SettingsStore {
 
 module.exports = SettingsStore;
 module.exports.THEMES = THEMES;
+module.exports.UPDATE_INTERVALS = UPDATE_INTERVALS;

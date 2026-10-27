@@ -83,10 +83,12 @@ passwords until the design has received independent security review.
   allow the first launch, and the signature proves only that the bundle is
   intact, not who made it. See `docs/RELEASING.md`.
 - Updates come from this project's GitHub releases. About 20 seconds after
-  launch and then once a day (or when the user clicks **Check now**), the
-  main process asks `api.github.com` for the latest release. GitHub sees the
-  device's IP address and the app version in the User-Agent; nothing else is
-  sent. Automatic checks can be turned off in Settings → General.
+  launch and then on the schedule chosen in Settings → Updates (every 30
+  minutes, hour, 6 hours, or day; daily by default; or never), and when the
+  user clicks **Check for updates**, the main process asks `api.github.com`
+  for the latest release. The schedule counts from the last check by the
+  clock, so time asleep counts. GitHub sees the device's IP address and the
+  app version in the User-Agent; nothing else is sent.
 - Every release carries `update-manifest.json` and an Ed25519 signature over
   its exact bytes. The app trusts only the public keys bundled in it
   (`build/update-keys/*.pem`); a manifest that does not verify is ignored.

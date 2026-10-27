@@ -46,8 +46,16 @@ let language = translator.defaultLanguage;
 let settingsStore = null;
 let biometricUnlock = null;
 let updater = null;
+// Automatic checks wait at least this long after launch, wake, or a
+// schedule change, so the network has time to come up.
 const UPDATE_FIRST_CHECK_MS = 20_000;
-const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const UPDATE_INTERVALS_MS = Object.freeze({
+  "30m": 30 * 60 * 1000,
+  "1h": 60 * 60 * 1000,
+  "6h": 6 * 60 * 60 * 1000,
+  "1d": 24 * 60 * 60 * 1000,
+});
+let updateTimer = null;
 // What the renderer shows about updates. `available` holds the verified
 // manifest data for the newest release while one is pending.
 let updateState = { status: "idle", checkedAt: null, version: null, notes: "", progress: 0, error: null };
@@ -147,8 +155,21 @@ function publicUpdateState() {
     currentVersion: app.getVersion(),
     canInstall: blocker === null,
     blocker,
-    autoUpdate: settingsStore?.get().autoUpdate ?? true,
+    updateInterval: settingsStore?.get().updateInterval ?? "1d",
   };
+}
+
+// Plans the next automatic check from the last one (wall clock), so a new
+// interval applies at once and time asleep counts. Off, or with an update
+// already downloaded, nothing is planned.
+function scheduleUpdateCheck() {
+  clearTimeout(updateTimer);
+  updateTimer = null;
+  const interval = UPDATE_INTERVALS_MS[settingsStore?.get().updateInterval];
+  if (!interval || !updater || updateState.status === "ready") return;
+  const due = updateState.checkedAt ? updateState.checkedAt + interval - Date.now() : 0;
+  updateTimer = setTimeout(() => void checkForUpdates(), Math.max(due, UPDATE_FIRST_CHECK_MS));
+  updateTimer.unref?.();
 }
 
 function setUpdateState(patch) {
@@ -181,6 +202,7 @@ function checkForUpdates() {
     } catch (error) {
       setUpdateState({ status: "error", error: toIpcError(error).message, checkedAt: Date.now() });
     }
+    scheduleUpdateCheck();
     return publicUpdateState();
   });
 }
@@ -195,6 +217,7 @@ function downloadUpdate() {
         if (progress !== updateState.progress) setUpdateState({ progress });
       });
       setUpdateState({ status: "ready", progress: 100 });
+      scheduleUpdateCheck();
     } catch (error) {
       setUpdateState({ status: "available", error: toIpcError(error).message });
       throw error;
@@ -407,13 +430,9 @@ if (launchedWithRemoteDebugging) {
       tempDirectory: app.getPath("temp"),
     });
     void updater.cleanUpLeftovers();
-    void settingsLoaded.then(() => {
-      if (!settingsStore.get().autoUpdate) return;
-      setTimeout(() => void checkForUpdates(), UPDATE_FIRST_CHECK_MS).unref?.();
-    });
-    setInterval(() => {
-      if (settingsStore.get().autoUpdate) void checkForUpdates();
-    }, UPDATE_CHECK_INTERVAL_MS).unref?.();
+    void settingsLoaded.then(() => scheduleUpdateCheck());
+    // Timers stand still while the Mac sleeps; re-plan from the clock.
+    powerMonitor.on("resume", () => scheduleUpdateCheck());
 
     // Update state changes do not count as user activity.
     registerHandler("updates:get-state", () => publicUpdateState(), { countsAsActivity: false });
@@ -434,9 +453,10 @@ if (launchedWithRemoteDebugging) {
       await shell.openExternal(url);
       return { opened: true };
     });
-    registerHandler("settings:set-auto-update", async (enabled) => {
+    registerHandler("settings:set-update-interval", async (interval) => {
       await settingsLoaded;
-      const settings = await settingsStore.setAutoUpdate(enabled);
+      const settings = await settingsStore.setUpdateInterval(interval);
+      scheduleUpdateCheck();
       setUpdateState({});
       return settings;
     });

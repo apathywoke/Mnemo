@@ -163,8 +163,10 @@ a shared machine.
 
 ### What the app does
 
-About 20 seconds after launch and then daily (unless turned off in
-Settings → General), the app reads the latest release, verifies the manifest
+About 20 seconds after launch and then on the schedule chosen in
+Settings → Updates (every 30 minutes, hour, 6 hours, or day; daily by
+default; or never), and whenever the user clicks **Check for updates**,
+the app reads the latest release, verifies the manifest
 signature with the bundled keys, and shows a banner when a newer version
 exists. **Install** downloads the archive for this Mac, checks its hash and
 size against the manifest, unpacks it next to the installed app, and checks

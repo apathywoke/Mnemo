@@ -703,6 +703,7 @@
         <div class="settings-layout">
           <nav class="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Settings categories" data-i18n-aria-label="settings.categories">
             <button id="settings-tab-general" type="button" class="settings-tab" role="tab" aria-selected="true" aria-controls="settings-pane-general" data-settings-tab="general" data-i18n="settings.tabGeneral">General</button>
+            <button id="settings-tab-updates" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-updates" tabindex="-1" data-settings-tab="updates"><span data-i18n="updates.title">Updates</span><span id="settings-updates-dot" class="settings-tab-dot" hidden></span></button>
             <button id="settings-tab-security" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-security" tabindex="-1" data-settings-tab="security" data-i18n="settings.tabSecurity">Security</button>
             <button id="settings-tab-data" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-data" tabindex="-1" data-settings-tab="data" data-i18n="settings.tabData">Data</button>
             <button id="settings-tab-vault" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-vault" tabindex="-1" data-settings-tab="vault" data-i18n="settings.tabVault">Vault</button>
@@ -737,17 +738,35 @@
                 </div>
                 <p id="settings-theme-error" class="form-error" role="alert" hidden></p>
               </div>
-              <div class="settings-field settings-section">
-                <span class="settings-field-label" data-i18n="updates.title">Updates</span>
-                <p id="settings-update-status" class="settings-hint"></p>
-                <label class="settings-checkbox">
-                  <input id="settings-auto-update" type="checkbox" />
-                  <span data-i18n="updates.auto">Check for updates automatically</span>
-                </label>
-                <p class="settings-hint" data-i18n="updates.privacy">Once a day Mnemo asks GitHub whether a new version exists. GitHub sees your IP address; nothing from your vault is sent. Each update is verified against Mnemo's signing key before it is installed.</p>
-                <div class="settings-actions">
-                  <button id="settings-check-updates" type="button" class="secondary-button" data-i18n="updates.checkNow">Check now</button>
+            </section>
+
+            <section id="settings-pane-updates" class="settings-pane" role="tabpanel" aria-labelledby="settings-tab-updates" hidden>
+              <div id="update-status-card" class="update-status-card" data-status="idle" role="status" aria-live="polite">
+                <div class="update-status-row">
+                  <span class="update-status-icon" aria-hidden="true"></span>
+                  <div class="update-status-text">
+                    <strong id="update-status-title"></strong>
+                    <span id="update-status-detail"></span>
+                    <button id="settings-update-notes-button" type="button" class="update-notes-link" aria-expanded="false" aria-controls="settings-update-notes" data-i18n="updates.whatsNew" hidden>What's new</button>
+                  </div>
                 </div>
+                <div id="update-status-progress" class="update-progress" hidden><span id="update-status-progress-bar"></span></div>
+                <div class="update-status-actions">
+                  <button id="settings-update-action" type="button" class="update-action-button" hidden></button>
+                  <button id="settings-check-updates" type="button" class="secondary-button" data-i18n="updates.checkNow">Check for updates</button>
+                </div>
+                <p id="settings-update-notes" class="update-notes" hidden></p>
+              </div>
+              <div class="settings-field settings-section">
+                <label for="settings-update-interval" data-i18n="updates.interval">Check automatically</label>
+                <select id="settings-update-interval" class="settings-select" aria-describedby="settings-update-privacy">
+                  <option value="30m" data-i18n="updates.interval30m">Every 30 minutes</option>
+                  <option value="1h" data-i18n="updates.interval1h">Every hour</option>
+                  <option value="6h" data-i18n="updates.interval6h">Every 6 hours</option>
+                  <option value="1d" data-i18n="updates.interval1d">Every day</option>
+                  <option value="off" data-i18n="updates.intervalOff">Never</option>
+                </select>
+                <p id="settings-update-privacy" class="settings-hint" data-i18n="updates.privacy">Each check asks GitHub whether a new version exists. GitHub sees your IP address; nothing from your vault is sent. Every update is verified against Mnemo's signing key before it is installed.</p>
               </div>
             </section>
 
