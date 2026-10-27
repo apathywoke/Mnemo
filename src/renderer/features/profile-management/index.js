@@ -2,6 +2,7 @@
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
   const { show: showToast } = ns.shared.toast;
+  const { t, errorText } = ns.shared.i18n;
 
   function init(ctx, { onDeleted }) {
     const dialog = $("#delete-profile-dialog");
@@ -16,7 +17,7 @@
       confirmInput.value = "";
       error.hidden = true;
       confirmButton.disabled = true;
-      confirmButton.textContent = "Delete vault";
+      confirmButton.textContent = t("deleteProfile.submit");
     }
 
     function open(profile) {
@@ -25,7 +26,7 @@
       confirmInput.value = "";
       error.hidden = true;
       confirmButton.disabled = true;
-      confirmButton.textContent = "Delete vault";
+      confirmButton.textContent = t("deleteProfile.submit");
       dialog.showModal();
       confirmInput.focus();
     }
@@ -38,17 +39,17 @@
       const profile = pendingProfile;
       if (!profile || confirmInput.value !== profile.name) return;
       confirmButton.disabled = true;
-      confirmButton.textContent = "Deleting…";
+      confirmButton.textContent = t("deleteProfile.deleting");
       error.hidden = true;
       try {
         await ctx.api.deleteProfile(profile.id);
         close();
         await onDeleted();
-        showToast("Vault deleted.");
+        showToast(t("toast.vaultDeleted"));
       } catch (cause) {
-        ctx.setError(error, cause.message || "Could not delete this vault.");
+        ctx.setError(error, errorText(cause, "errors.deleteVault"));
       } finally {
-        confirmButton.textContent = "Delete vault";
+        confirmButton.textContent = t("deleteProfile.submit");
         confirmButton.disabled = !pendingProfile || confirmInput.value !== pendingProfile.name;
       }
     });

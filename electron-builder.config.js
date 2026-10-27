@@ -37,6 +37,8 @@ module.exports = {
     "preload.js",
     "vault-store.js",
     "profile-manager.js",
+    "settings-store.js",
+    "importers.js",
     "favicon-fetcher.js",
     "index.html",
     "styles.css",

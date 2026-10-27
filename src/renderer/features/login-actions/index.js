@@ -2,6 +2,7 @@
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
   const { show: showToast } = ns.shared.toast;
+  const { t, errorText } = ns.shared.i18n;
 
   function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetail, updateSiteIconButton }) {
     const state = ctx.state.vault;
@@ -10,9 +11,9 @@
     async function copyField(entryId, field) {
       try {
         await ctx.api.copyEntryField(entryId, field);
-        showToast("Copied. Clipboard clears in 30 seconds.");
-      } catch {
-        showToast("Could not copy this value.", { type: "error" });
+        showToast(t("toast.copied"));
+      } catch (cause) {
+        showToast(errorText(cause, "errors.copyValue"), { type: "error" });
       }
     }
 
@@ -29,10 +30,10 @@
         deleteDialog.close();
         state.selectedEntryId = null;
         await refreshEntries(null, true);
-        showToast("Login deleted.");
+        showToast(t("toast.loginDeleted"));
       } catch (cause) {
         deleteDialog.close();
-        showToast(cause.message || "Could not delete this login.", { type: "error" });
+        showToast(errorText(cause, "errors.deleteLogin"), { type: "error" });
       } finally {
         button.disabled = false;
       }
@@ -46,7 +47,7 @@
       try {
         await ctx.api.revealPassword(entry.id);
       } catch (cause) {
-        showToast(cause.message || "Could not show this password.", { type: "error" });
+        showToast(errorText(cause, "errors.showPassword"), { type: "error" });
       }
     });
     $("#copy-username-button").addEventListener("click", () => {
@@ -72,11 +73,11 @@
         renderEntryList();
         if (state.selectedEntryId === requestedEntry.id) {
           renderEntryDetail(requestedEntry.id);
-          showToast("Icon from " + result.hostname + " saved inside the encrypted vault.");
+          showToast(t("toast.iconSaved", { hostname: result.hostname }));
         }
       } catch (cause) {
         if (state.selectedEntryId === requestedEntry.id) {
-          showToast(cause.message || "Could not load the site icon.", { type: "error" });
+          showToast(errorText(cause, "errors.loadIcon"), { type: "error" });
         }
       } finally {
         state.fetchingFaviconForId = null;

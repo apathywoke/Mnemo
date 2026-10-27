@@ -18,7 +18,7 @@
           <div class="wordmark" aria-label="Mnemo">
             <span>MNE</span>MO<span class="wordmark-dot">.</span>
           </div>
-          <span class="brand-caption">PRIVATE BY DESIGN</span>
+          <span class="brand-caption" data-i18n="brand.caption">PRIVATE BY DESIGN</span>
         </div>
 
         <div class="brand-art" aria-hidden="true">
@@ -34,15 +34,15 @@
 
         <footer class="brand-footer">
           <span>MNEMO</span>
-          <span>01 <i></i> PRIVATE</span>
+          <span>01 <i></i> <span data-i18n="brand.footerPrivate">PRIVATE</span></span>
         </footer>
       </aside>
 
       <section class="workspace">
         <header class="workspace-header">
-          <span class="eyebrow">SECURE ACCESS</span>
+          <span class="eyebrow" data-i18n="header.eyebrow">SECURE ACCESS</span>
           <div class="workspace-header-controls">
-            <button id="settings-button" type="button" class="quiet-button settings-button" aria-label="Settings" aria-haspopup="dialog" aria-controls="settings-dialog" title="Settings">
+            <button id="settings-button" type="button" class="quiet-button settings-button" aria-label="Settings" data-i18n-aria-label="header.settings" aria-haspopup="dialog" aria-controls="settings-dialog" title="Settings" data-i18n-title="header.settings">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <g fill="currentColor" stroke="none">
                   <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2"/>
@@ -58,46 +58,43 @@
                 <circle cx="12" cy="12" r="2.4" fill="#101010" stroke="currentColor" stroke-width="1.8"/>
               </svg>
             </button>
-            <div class="local-badge"><span></span> Stored on this Mac</div>
+            <div class="local-badge"><span></span> <span data-i18n="header.localBadge">Stored on this Mac</span></div>
           </div>
         </header>
 
         <section class="content" aria-live="polite">
         <section id="profiles-panel" class="vault-panel profiles-panel" hidden>
-          <p class="eyebrow section-label">LOCAL PROFILES</p>
-          <h2>Choose a vault</h2>
-          <p class="description">
-            Each profile has its own encrypted vault and master passphrase.
-            Profile names are stored locally; vault contents stay encrypted.
+          <p class="eyebrow section-label" data-i18n="profiles.eyebrow">LOCAL PROFILES</p>
+          <h2 data-i18n="profiles.title">Choose a vault</h2>
+          <p class="description" data-i18n="profiles.description">
+            Each profile has its own encrypted vault and master passphrase. Profile names are stored locally; vault contents stay encrypted.
           </p>
           <div id="profile-list" class="profile-list"></div>
           <div class="profile-actions">
-            <button id="new-profile-button" type="button" class="secondary-button">
+            <button id="new-profile-button" type="button" class="secondary-button" data-i18n="profiles.create">
               Create new vault
             </button>
-            <button id="restore-profile-button" type="button" class="text-button">
+            <button id="restore-profile-button" type="button" class="text-button" data-i18n="profiles.restore">
               Restore a backup as a new vault
             </button>
           </div>
         </section>
 
         <section id="setup-panel" class="vault-panel" hidden>
-          <p class="eyebrow section-label">NEW PROFILE</p>
-          <h2>Create a vault</h2>
-          <p class="description">
-            Choose a unique master passphrase with at least 7 characters.
-            Longer passphrases are safer. It encrypts your vault and is never
-            stored by the app.
+          <p class="eyebrow section-label" data-i18n="setup.eyebrow">NEW PROFILE</p>
+          <h2 data-i18n="setup.title">Create a vault</h2>
+          <p class="description" data-i18n="setup.description">
+            Choose a unique master passphrase with at least 7 characters. Longer passphrases are safer. It encrypts your vault and is never stored by the app.
           </p>
           <div class="recovery-warning" role="note">
             <span class="recovery-warning-mark" aria-hidden="true">!</span>
             <div>
-              <strong>Your master passphrase cannot be recovered</strong>
-              <p>If you lose it, this app cannot unlock your vault or backups. Keep it somewhere safe.</p>
+              <strong data-i18n="setup.recoveryTitle">Mnemo cannot recover your master passphrase</strong>
+              <p data-i18n="setup.recoveryBody">Next you’ll get a recovery key. It is the only way back in if you forget the passphrase, so keep both somewhere safe.</p>
             </div>
           </div>
           <form id="create-form" class="vault-form">
-            <label for="profile-name">Vault name</label>
+            <label for="profile-name" data-i18n="setup.vaultName">Vault name</label>
             <input
               id="profile-name"
               type="text"
@@ -105,7 +102,7 @@
               autocomplete="off"
               required
             />
-            <label for="create-passphrase">Master passphrase</label>
+            <label for="create-passphrase" data-i18n="common.masterPassphrase">Master passphrase</label>
             <div class="secret-input-row">
               <input
                 id="create-passphrase"
@@ -115,11 +112,11 @@
                 maxlength="1024"
                 required
               />
-              <button type="button" class="password-visibility-toggle" data-password-visibility-for="create-passphrase" aria-label="Show password" aria-controls="create-passphrase" aria-pressed="false" title="Show password">
+              <button type="button" class="password-visibility-toggle" data-password-visibility-for="create-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="create-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
               </button>
             </div>
-            <label for="confirm-passphrase">Confirm master passphrase</label>
+            <label for="confirm-passphrase" data-i18n="setup.confirmPassphrase">Confirm master passphrase</label>
             <div class="secret-input-row">
               <input
                 id="confirm-passphrase"
@@ -129,7 +126,7 @@
                 maxlength="1024"
                 required
               />
-              <button type="button" class="password-visibility-toggle" data-password-visibility-for="confirm-passphrase" aria-label="Show password" aria-controls="confirm-passphrase" aria-pressed="false" title="Show password">
+              <button type="button" class="password-visibility-toggle" data-password-visibility-for="confirm-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="confirm-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
               </button>
             </div>
@@ -137,13 +134,13 @@
             <button
               type="submit"
               class="primary-button"
-              aria-label="Create encrypted vault"
-            >Create</button>
+              aria-label="Create encrypted vault" data-i18n-aria-label="setup.submitAria"
+             data-i18n="setup.submit">Create</button>
           </form>
-          <button id="setup-restore-button" type="button" class="text-button">
+          <button id="setup-restore-button" type="button" class="text-button" data-i18n="common.restoreFromBackup">
             Restore from backup
           </button>
-          <button id="setup-back-button" type="button" class="text-button" hidden>
+          <button id="setup-back-button" type="button" class="text-button" hidden data-i18n="setup.back">
             Back to profiles
           </button>
         </section>
@@ -154,8 +151,8 @@
               id="unlock-profiles-button"
               type="button"
               class="back-button"
-              aria-label="Back to vault list"
-              title="Back to vault list"
+              aria-label="Back to vault list" data-i18n-aria-label="unlock.backAria"
+              title="Back to vault list" data-i18n-title="unlock.backAria"
             >
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M19 12H5m0 0 7 7m-7-7 7-7" />
@@ -165,10 +162,10 @@
               MNEMO · <span id="unlock-profile-name"></span>
             </p>
           </div>
-          <h2>Vault locked</h2>
-          <p class="description">Enter your master passphrase to unlock your vault.</p>
+          <h2 data-i18n="unlock.title">Vault locked</h2>
+          <p class="description" data-i18n="unlock.description">Enter your master passphrase to unlock your vault.</p>
           <form id="unlock-form" class="vault-form">
-            <label for="unlock-passphrase">Master passphrase</label>
+            <label for="unlock-passphrase" data-i18n="common.masterPassphrase">Master passphrase</label>
             <div class="secret-input-row">
               <input
                 id="unlock-passphrase"
@@ -177,7 +174,7 @@
                 maxlength="1024"
                 required
               />
-              <button type="button" class="password-visibility-toggle" data-password-visibility-for="unlock-passphrase" aria-label="Show password" aria-controls="unlock-passphrase" aria-pressed="false" title="Show password">
+              <button type="button" class="password-visibility-toggle" data-password-visibility-for="unlock-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="unlock-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
               </button>
             </div>
@@ -185,32 +182,92 @@
             <button
               type="submit"
               class="primary-button"
-              aria-label="Unlock vault"
-            >Unlock</button>
+              aria-label="Unlock vault" data-i18n-aria-label="unlock.submitAria"
+             data-i18n="unlock.submit">Unlock</button>
           </form>
-          <button id="unlock-restore-button" type="button" class="text-button">
-            Restore from backup
+          <div class="unlock-secondary-actions">
+            <button id="unlock-recover-button" type="button" class="text-button" data-i18n="unlock.forgot">
+              Forgot your master passphrase?
+            </button>
+            <button id="unlock-restore-button" type="button" class="text-button" data-i18n="common.restoreFromBackup">
+              Restore from backup
+            </button>
+          </div>
+        </section>
+
+        <section id="recover-panel" class="vault-panel" hidden>
+          <p class="eyebrow section-label" data-i18n="recover.eyebrow">ACCOUNT RECOVERY</p>
+          <h2 data-i18n="recover.title">Recover access</h2>
+          <p class="description" data-i18n="recover.description">Enter your saved recovery key and choose a new master passphrase. You’ll then get a new recovery key.</p>
+          <form id="recover-form" class="vault-form">
+            <label for="recover-key" data-i18n="recover.keyLabel">Recovery key</label>
+            <input
+              id="recover-key"
+              class="recovery-key-input"
+              type="text"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              maxlength="200"
+              placeholder="XXXX-XXXX-XXXX-…"
+              required
+            />
+            <label for="recover-passphrase" data-i18n="recover.newPassphrase">New master passphrase</label>
+            <div class="secret-input-row">
+              <input
+                id="recover-passphrase"
+                type="password"
+                autocomplete="new-password"
+                minlength="7"
+                maxlength="1024"
+                required
+              />
+              <button type="button" class="password-visibility-toggle" data-password-visibility-for="recover-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="recover-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+              </button>
+            </div>
+            <label for="recover-confirm-passphrase" data-i18n="recover.confirmPassphrase">Confirm new master passphrase</label>
+            <div class="secret-input-row">
+              <input
+                id="recover-confirm-passphrase"
+                type="password"
+                autocomplete="new-password"
+                minlength="7"
+                maxlength="1024"
+                required
+              />
+              <button type="button" class="password-visibility-toggle" data-password-visibility-for="recover-confirm-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="recover-confirm-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+              </button>
+            </div>
+            <p id="recover-error" class="form-error" role="alert" hidden></p>
+            <button
+              type="submit"
+              class="primary-button"
+              data-i18n="restore.submit"
+            >Continue</button>
+          </form>
+          <button id="recover-cancel-button" type="button" class="text-button" data-i18n="common.back">
+            Back
           </button>
         </section>
 
         <section id="restore-panel" class="vault-panel" hidden>
-          <p class="eyebrow section-label">RESTORE</p>
-          <h2>Open an encrypted backup</h2>
-          <p id="restore-description" class="description">
-            Choose a backup file and enter the master passphrase used to encrypt
-            it. If a vault already exists on this Mac, you’ll be asked to confirm
-            before replacing it.
+          <p class="eyebrow section-label" data-i18n="restore.eyebrow">RESTORE</p>
+          <h2 data-i18n="restore.title">Open an encrypted backup</h2>
+          <p id="restore-description" class="description" data-i18n="restore.descriptionDefault">
+            Choose a backup file and enter the master passphrase used to encrypt it. If a vault already exists on this Mac, you’ll be asked to confirm before replacing it.
           </p>
           <div class="recovery-warning" role="note">
             <span class="recovery-warning-mark" aria-hidden="true">!</span>
             <div>
-              <strong>Backups need the original master passphrase</strong>
-              <p>There is no reset or recovery. If you lose it, the backup cannot be opened.</p>
+              <strong data-i18n="restore.recoveryTitle">Backups open with their master passphrase or recovery key</strong>
+              <p data-i18n="restore.recoveryBody">Use the passphrase the backup was made with, or the recovery key that was valid at that time. Without either, the backup cannot be opened.</p>
             </div>
           </div>
           <form id="restore-form" class="vault-form">
             <div id="restore-profile-name-field" class="restore-profile-name-field" hidden>
-              <label for="restore-profile-name">Name for this vault</label>
+              <label for="restore-profile-name" data-i18n="restore.nameLabel">Name for this vault</label>
               <input
                 id="restore-profile-name"
                 type="text"
@@ -218,27 +275,57 @@
                 autocomplete="off"
               />
             </div>
-            <label for="restore-passphrase">Backup master passphrase</label>
-            <div class="secret-input-row">
-              <input
-                id="restore-passphrase"
-                type="password"
-                autocomplete="current-password"
-                maxlength="1024"
-                required
-              />
-              <button type="button" class="password-visibility-toggle" data-password-visibility-for="restore-passphrase" aria-label="Show password" aria-controls="restore-passphrase" aria-pressed="false" title="Show password">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
-              </button>
+            <div id="restore-passphrase-fields" class="restore-mode-fields">
+              <label for="restore-passphrase" data-i18n="restore.passphraseLabel">Backup master passphrase</label>
+              <div class="secret-input-row">
+                <input
+                  id="restore-passphrase"
+                  type="password"
+                  autocomplete="current-password"
+                  maxlength="1024"
+                  required
+                />
+                <button type="button" class="password-visibility-toggle" data-password-visibility-for="restore-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="restore-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                </button>
+              </div>
             </div>
+            <div id="restore-recovery-fields" class="restore-mode-fields" hidden>
+              <label for="restore-recovery-key" data-i18n="recover.keyLabel">Recovery key</label>
+              <input
+                id="restore-recovery-key"
+                class="recovery-key-input"
+                type="text"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                maxlength="200"
+                placeholder="XXXX-XXXX-XXXX-…"
+              />
+              <label for="restore-new-passphrase" data-i18n="recover.newPassphrase">New master passphrase</label>
+              <div class="secret-input-row">
+                <input id="restore-new-passphrase" type="password" autocomplete="new-password" minlength="7" maxlength="1024" />
+                <button type="button" class="password-visibility-toggle" data-password-visibility-for="restore-new-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="restore-new-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                </button>
+              </div>
+              <label for="restore-confirm-passphrase" data-i18n="recover.confirmPassphrase">Confirm new master passphrase</label>
+              <div class="secret-input-row">
+                <input id="restore-confirm-passphrase" type="password" autocomplete="new-password" minlength="7" maxlength="1024" />
+                <button type="button" class="password-visibility-toggle" data-password-visibility-for="restore-confirm-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="restore-confirm-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                </button>
+              </div>
+            </div>
+            <button id="restore-mode-button" type="button" class="text-button restore-mode-button" data-i18n="restore.useRecoveryKey">Forgot the backup’s passphrase? Use a recovery key</button>
             <p id="restore-error" class="form-error" role="alert" hidden></p>
             <button
               type="submit"
               class="primary-button"
-              aria-label="Choose and restore encrypted backup"
-            >Continue</button>
+              aria-label="Choose and restore encrypted backup" data-i18n-aria-label="restore.submitAria"
+             data-i18n="restore.submit">Continue</button>
           </form>
-          <button id="restore-cancel-button" type="button" class="text-button">
+          <button id="restore-cancel-button" type="button" class="text-button" data-i18n="common.back">
             Back
           </button>
         </section>
@@ -247,22 +334,19 @@
           <header class="dashboard-header">
             <div>
               <p class="eyebrow section-label">
-                YOUR VAULT · <span id="active-profile-name"></span>
+                <span data-i18n="vault.eyebrow">YOUR VAULT</span> · <span id="active-profile-name"></span>
               </p>
-              <h2>Logins</h2>
+              <h2 data-i18n="vault.title">Logins</h2>
             </div>
             <div class="dashboard-actions">
-              <button id="backup-button" type="button" class="quiet-button">
-                Backup
-              </button>
-              <button id="switch-profile-button" type="button" class="quiet-button">
+              <button id="switch-profile-button" type="button" class="quiet-button" data-i18n="vault.switch">
                 Switch vault
               </button>
-              <button id="lock-button" type="button" class="quiet-button">
+              <button id="lock-button" type="button" class="quiet-button" data-i18n="vault.lock">
                 Lock
               </button>
               <button id="create-entry-button" type="button" class="new-entry-button">
-                <span aria-hidden="true">+</span> New login
+                <span aria-hidden="true">+</span> <span data-i18n="vault.newLogin" data-i18n="editor.titleNew">New login</span>
               </button>
             </div>
           </header>
@@ -270,33 +354,33 @@
           <div id="backup-recovery-warning" class="recovery-warning backup-recovery-warning" role="note">
             <span class="recovery-warning-mark" aria-hidden="true">!</span>
             <div>
-              <strong>Keep your master passphrase safe</strong>
-              <p>Every backup requires this same passphrase. Mnemo cannot recover it if lost.</p>
+              <strong data-i18n="vault.backupWarningTitle">Keep your master passphrase safe</strong>
+              <p data-i18n="vault.backupWarningBody">Every backup requires this same passphrase. Mnemo cannot recover it if lost.</p>
             </div>
-            <button id="dismiss-backup-warning" class="backup-warning-dismiss" type="button" aria-label="Dismiss this warning" title="Dismiss this warning">
+            <button id="dismiss-backup-warning" class="backup-warning-dismiss" type="button" aria-label="Dismiss this warning" data-i18n-aria-label="vault.dismissWarning" title="Dismiss this warning" data-i18n-title="vault.dismissWarning">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
             </button>
           </div>
           <div class="vault-browser">
-            <aside class="entry-browser" aria-label="Vault logins">
+            <aside class="entry-browser" aria-label="Vault logins" data-i18n-aria-label="vault.listAria">
               <div class="search-box">
                 <span aria-hidden="true">⌕</span>
-                <label class="visually-hidden" for="entry-search">Search logins</label>
-                <input id="entry-search" type="search" placeholder="Search vault" />
+                <label class="visually-hidden" for="entry-search" data-i18n="vault.searchLabel">Search logins</label>
+                <input id="entry-search" type="search" placeholder="Search vault" data-i18n-placeholder="vault.searchPlaceholder" />
                 <kbd>⌘ K</kbd>
               </div>
               <div class="entry-list-heading">
-                <span>ALL LOGINS</span>
+                <span data-i18n="vault.allLogins">ALL LOGINS</span>
                 <span id="entry-count">0</span>
               </div>
               <div id="entry-list" class="entry-list" role="list"></div>
               <div id="empty-list" class="empty-list" hidden>
-                <p>No logins yet</p>
-                <button id="empty-create-button" type="button" class="text-button">
+                <p data-i18n="vault.emptyList">No logins yet</p>
+                <button id="empty-create-button" type="button" class="text-button" data-i18n="vault.addFirst">
                   Add your first login
                 </button>
               </div>
-              <p id="no-search-results" class="no-results" hidden>
+              <p id="no-search-results" class="no-results" hidden data-i18n="vault.noResults">
                 No logins match your search.
               </p>
             </aside>
@@ -304,15 +388,15 @@
             <div class="entry-detail-area">
               <section id="entry-detail" class="entry-detail" hidden>
                 <div class="detail-toolbar">
-                  <span class="detail-kind">LOGIN</span>
+                  <span class="detail-kind" data-i18n="detail.kind">LOGIN</span>
                   <div>
-                    <button id="fetch-site-icon-button" type="button" class="detail-action">
+                    <button id="fetch-site-icon-button" type="button" class="detail-action" data-i18n="detail.loadIcon">
                       Load site icon
                     </button>
-                    <button id="edit-entry-button" type="button" class="detail-action">
+                    <button id="edit-entry-button" type="button" class="detail-action" data-i18n="detail.edit">
                       Edit
                     </button>
-                    <button id="delete-entry-button" type="button" class="detail-action danger-action">
+                    <button id="delete-entry-button" type="button" class="detail-action danger-action" data-i18n="common.delete">
                       Delete
                     </button>
                   </div>
@@ -324,36 +408,36 @@
                 </div>
                 <div class="detail-fields">
                   <div class="detail-field">
-                    <label>USERNAME</label>
+                    <label data-i18n="detail.username">USERNAME</label>
                     <div class="detail-value-row">
                       <span id="detail-username" class="detail-value"></span>
-                      <button id="copy-username-button" type="button" class="copy-button password-copy-toggle" aria-label="Copy username" title="Copy username">
+                      <button id="copy-username-button" type="button" class="copy-button password-copy-toggle" aria-label="Copy username" data-i18n-aria-label="detail.copyUsername" title="Copy username" data-i18n-title="detail.copyUsername">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
                       </button>
                     </div>
                   </div>
                   <div class="detail-field">
-                    <label>PASSWORD</label>
+                    <label data-i18n="detail.password">PASSWORD</label>
                     <div class="detail-value-row">
                       <span id="detail-password" class="detail-value secret-value">••••••••••••</span>
-                      <button id="toggle-password-button" type="button" class="copy-button password-visibility-toggle" aria-label="Show password in a separate window" aria-haspopup="dialog" title="Show password">
+                      <button id="toggle-password-button" type="button" class="copy-button password-visibility-toggle" aria-label="Show password in a separate window" data-i18n-aria-label="detail.showPasswordAria" aria-haspopup="dialog" title="Show password" data-i18n-title="common.showPassword">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
                       </button>
-                      <button id="copy-password-button" type="button" class="copy-button password-copy-toggle" aria-label="Copy password" title="Copy password">
+                      <button id="copy-password-button" type="button" class="copy-button password-copy-toggle" aria-label="Copy password" data-i18n-aria-label="detail.copyPassword" title="Copy password" data-i18n-title="detail.copyPassword">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
                       </button>
                     </div>
                   </div>
                   <div id="detail-notes-field" class="detail-field" hidden>
-                    <label>NOTES</label>
+                    <label data-i18n="detail.notes">NOTES</label>
                     <p id="detail-notes" class="detail-notes"></p>
                   </div>
                 </div>
               </section>
               <section id="detail-empty" class="detail-empty">
                 <div class="detail-empty-mark" aria-hidden="true">＋</div>
-                <p>Select a login to view its details</p>
-                <span>Your vault is encrypted and stays on this Mac.</span>
+                <p data-i18n="detail.emptyTitle">Select a login to view its details</p>
+                <span data-i18n="detail.emptyBody">Your vault is encrypted and stays on this Mac.</span>
               </section>
             </div>
           </div>
@@ -362,35 +446,35 @@
             <form id="entry-form" class="entry-form">
               <div class="dialog-heading">
                 <div>
-                  <p class="eyebrow section-label">LOGIN DETAILS</p>
-                  <h3 id="entry-dialog-title">New login</h3>
+                  <p class="eyebrow section-label" data-i18n="editor.eyebrow">LOGIN DETAILS</p>
+                  <h3 id="entry-dialog-title" data-i18n="editor.titleNew">New login</h3>
                 </div>
-                <button id="close-entry-dialog" type="button" class="dialog-close" aria-label="Close dialog">×</button>
+                <button id="close-entry-dialog" type="button" class="dialog-close" aria-label="Close dialog" data-i18n-aria-label="common.closeDialog">×</button>
               </div>
               <input id="entry-id" type="hidden" />
-              <label for="entry-name">Name</label>
+              <label for="entry-name" data-i18n="editor.name">Name</label>
               <input id="entry-name" type="text" maxlength="200" autocomplete="off" required />
-              <label for="entry-url">Website</label>
+              <label for="entry-url" data-i18n="editor.website">Website</label>
               <input id="entry-url" type="text" maxlength="2048" inputmode="url" placeholder="https://example.com" autocomplete="url" />
-              <label for="entry-username">Username</label>
+              <label for="entry-username" data-i18n="editor.username">Username</label>
               <input id="entry-username" type="text" maxlength="1024" autocomplete="username" />
-              <label for="entry-password">Password</label>
+              <label for="entry-password" data-i18n="editor.password">Password</label>
               <div class="password-input-row">
                 <input id="entry-password" type="password" maxlength="4096" autocomplete="new-password" required />
-                <button type="button" class="password-visibility-toggle" data-password-visibility-for="entry-password" aria-label="Show password" aria-controls="entry-password" aria-pressed="false" title="Show password">
+                <button type="button" class="password-visibility-toggle" data-password-visibility-for="entry-password" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="entry-password" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
                 </button>
               </div>
               <div id="password-strength" class="password-strength" data-strength="empty">
                 <div class="password-strength-heading">
-                  <span>Password strength</span>
-                  <span id="password-strength-label" aria-live="polite">Enter a password</span>
+                  <span data-i18n="strength.title">Password strength</span>
+                  <span id="password-strength-label" aria-live="polite" data-i18n="strength.empty">Enter a password</span>
                 </div>
                 <div
                   id="password-strength-meter"
                   class="password-strength-track"
                   role="meter"
-                  aria-label="Entered password strength"
+                  aria-label="Entered password strength" data-i18n-aria-label="strength.meterAria"
                   aria-valuemin="0"
                   aria-valuemax="3"
                   aria-valuenow="0"
@@ -398,37 +482,37 @@
                   <span></span>
                 </div>
               </div>
-              <p class="password-strength-note">This is a rough estimate, not a guarantee that a password is safe.</p>
-              <section class="password-tools" aria-label="Password tools">
+              <p class="password-strength-note" data-i18n="strength.note">This is a rough estimate, not a guarantee that a password is safe.</p>
+              <section class="password-tools" aria-label="Password tools" data-i18n-aria-label="generator.aria">
                 <div class="password-tools-heading">
                   <div>
-                    <h4>Password generator</h4>
-                    <p>Generate a unique password on this device.</p>
+                    <h4 data-i18n="generator.title">Password generator</h4>
+                    <p data-i18n="generator.description">Generate a unique password on this device.</p>
                   </div>
-                  <button id="generate-password-button" type="button" class="generate-password-button">
+                  <button id="generate-password-button" type="button" class="generate-password-button" data-i18n="generator.generate">
                     Generate
                   </button>
                 </div>
                 <div class="password-length-heading">
-                  <label for="password-length">Length</label>
+                  <label for="password-length" data-i18n="generator.length">Length</label>
                   <output id="password-length-value" for="password-length">20</output>
                 </div>
                 <input id="password-length" class="password-length-slider" type="range" min="8" max="64" value="20" />
-                <div class="password-generator-options" role="group" aria-label="Password character options">
-                  <label><input id="password-uppercase" type="checkbox" checked /> Uppercase</label>
-                  <label><input id="password-numbers" type="checkbox" checked /> Numbers</label>
-                  <label><input id="password-symbols" type="checkbox" checked /> Symbols</label>
+                <div class="password-generator-options" role="group" aria-label="Password character options" data-i18n-aria-label="generator.optionsAria">
+                  <label><input id="password-uppercase" type="checkbox" checked /> <span data-i18n="generator.uppercase">Uppercase</span></label>
+                  <label><input id="password-numbers" type="checkbox" checked /> <span data-i18n="generator.numbers">Numbers</span></label>
+                  <label><input id="password-symbols" type="checkbox" checked /> <span data-i18n="generator.symbols">Symbols</span></label>
                 </div>
                 <div id="generated-password-strength" class="password-strength" data-strength="empty">
                   <div class="password-strength-heading">
-                    <span>Estimated generated strength</span>
-                    <span id="generated-password-strength-label" aria-live="polite">Calculating…</span>
+                    <span data-i18n="generator.estimatedTitle">Estimated generated strength</span>
+                    <span id="generated-password-strength-label" aria-live="polite" data-i18n="generator.calculating">Calculating…</span>
                   </div>
                   <div
                     id="generated-password-strength-meter"
                     class="password-strength-track"
                     role="meter"
-                    aria-label="Estimated generated password strength"
+                    aria-label="Estimated generated password strength" data-i18n-aria-label="generator.meterAria"
                     aria-valuemin="0"
                     aria-valuemax="3"
                     aria-valuenow="0"
@@ -436,53 +520,51 @@
                     <span></span>
                   </div>
                 </div>
-                <p class="password-tools-note">Estimate uses the selected length and character types. Nothing is sent anywhere.</p>
+                <p class="password-tools-note" data-i18n="generator.note">Estimate uses the selected length and character types. Nothing is sent anywhere.</p>
               </section>
-              <label for="entry-notes">Notes</label>
+              <label for="entry-notes" data-i18n="editor.notes">Notes</label>
               <textarea id="entry-notes" maxlength="16384" rows="3"></textarea>
               <p id="entry-form-error" class="form-error" role="alert" hidden></p>
               <div class="dialog-actions">
-                <button id="cancel-entry-button" type="button" class="quiet-button">Cancel</button>
-                <button type="submit" class="dialog-save-button">Save login</button>
+                <button id="cancel-entry-button" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
+                <button type="submit" class="dialog-save-button" data-i18n="editor.save">Save login</button>
               </div>
             </form>
           </dialog>
 
           <dialog id="delete-dialog" class="app-dialog confirm-dialog">
             <div class="confirm-content">
-              <p class="eyebrow section-label">DELETE LOGIN</p>
-              <h3>Delete this login?</h3>
-              <p>This action cannot be undone.</p>
+              <p class="eyebrow section-label" data-i18n="deleteLogin.eyebrow">DELETE LOGIN</p>
+              <h3 data-i18n="deleteLogin.title">Delete this login?</h3>
+              <p data-i18n="deleteLogin.body">This action cannot be undone.</p>
               <div class="dialog-actions">
-                <button id="cancel-delete-button" type="button" class="quiet-button">Cancel</button>
-                <button id="confirm-delete-button" type="button" class="delete-confirm-button">Delete</button>
+                <button id="cancel-delete-button" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
+                <button id="confirm-delete-button" type="button" class="delete-confirm-button" data-i18n="common.delete">Delete</button>
               </div>
             </div>
           </dialog>
         </section>
 
         <section id="fatal-panel" class="vault-panel" hidden>
-          <p class="eyebrow section-label">COULD NOT OPEN</p>
-          <h2>Check your vault</h2>
-          <p id="fatal-message" class="description">
+          <p class="eyebrow section-label" data-i18n="fatal.eyebrow">COULD NOT OPEN</p>
+          <h2 data-i18n="fatal.title">Check your vault</h2>
+          <p id="fatal-message" class="description" data-i18n="errors.readStatus">
             Could not read the vault status.
           </p>
-          <button id="retry-button" type="button" class="secondary-button">
+          <button id="retry-button" type="button" class="secondary-button" data-i18n="fatal.retry">
             Try again
           </button>
         </section>
 
         <dialog id="delete-profile-dialog" class="app-dialog confirm-dialog" aria-labelledby="delete-profile-title">
           <div class="confirm-content">
-            <p class="eyebrow section-label">DELETE VAULT</p>
-            <h3 id="delete-profile-title">Delete this vault?</h3>
-            <p>
-              This removes the vault and its encrypted file from this app's local
-              storage. Backup files are not affected, and you cannot undo this
-              in the app.
+            <p class="eyebrow section-label" data-i18n="deleteProfile.eyebrow">DELETE VAULT</p>
+            <h3 id="delete-profile-title" data-i18n="deleteProfile.title">Delete this vault?</h3>
+            <p data-i18n="deleteProfile.body">
+              This removes the vault and its encrypted file from this app's local storage. Backup files are not affected, and you cannot undo this in the app.
             </p>
             <label for="delete-profile-confirm-input">
-              Type <strong id="delete-profile-name-confirm"></strong> to confirm
+              <span data-i18n="deleteProfile.typeBefore">Type</span> <strong id="delete-profile-name-confirm"></strong> <span data-i18n="deleteProfile.typeAfter">to confirm</span>
             </label>
             <input
               id="delete-profile-confirm-input"
@@ -494,22 +576,22 @@
             />
             <p id="delete-profile-error" class="form-error" role="alert" hidden></p>
             <div class="dialog-actions">
-              <button id="cancel-profile-delete-button" type="button" class="quiet-button">
+              <button id="cancel-profile-delete-button" type="button" class="quiet-button" data-i18n="common.cancel">
                 Cancel
               </button>
-              <button id="confirm-profile-delete-button" type="button" class="danger-confirm-button" disabled>
+              <button id="confirm-profile-delete-button" type="button" class="danger-confirm-button" disabled data-i18n="deleteProfile.submit">
                 Delete vault
               </button>
             </div>
           </div>
         </dialog>
 
-        <p class="version">App version <span id="app-version">…</span></p>
+        <p class="version"><span data-i18n="footer.version">App version</span> <span id="app-version">…</span></p>
         </section>
 
         <footer class="workspace-footer">
-          <span>NO SYNC OR TELEMETRY</span>
-          <span>PROTOTYPE · NOT FOR REAL PASSWORDS</span>
+          <span data-i18n="footer.noSync">NO SYNC OR TELEMETRY</span>
+          <span data-i18n="footer.prototype">PROTOTYPE · NOT FOR REAL PASSWORDS</span>
         </footer>
       </section>
     </main>
@@ -517,15 +599,183 @@
       <div class="settings-dialog-content">
         <div class="dialog-heading">
           <div>
-            <p class="eyebrow section-label">APPLICATION</p>
-            <h3 id="settings-dialog-title">Settings</h3>
+            <p class="eyebrow section-label" data-i18n="settings.eyebrow">APPLICATION</p>
+            <h3 id="settings-dialog-title" data-i18n="settings.title">Settings</h3>
           </div>
-          <button id="close-settings-dialog" type="button" class="dialog-close" aria-label="Close settings">×</button>
+          <button id="close-settings-dialog" type="button" class="dialog-close" aria-label="Close settings" data-i18n-aria-label="settings.close">×</button>
+        </div>
+        <div class="settings-field">
+          <label for="settings-language" data-i18n="settings.language">Language</label>
+          <select id="settings-language" class="settings-select" aria-describedby="settings-language-hint"></select>
+          <p id="settings-language-hint" class="settings-hint" data-i18n="settings.languageHint">Applies to the whole app, including system dialogs.</p>
+          <p id="settings-error" class="form-error" role="alert" hidden></p>
+        </div>
+        <p id="settings-vault-locked" class="settings-hint settings-vault-locked" data-i18n="settings.vaultLocked">Open a vault to manage its recovery key, backups, import, or deletion. Each vault has its own settings.</p>
+        <div id="settings-vault" class="settings-vault" hidden>
+          <section class="settings-field settings-section" aria-labelledby="settings-recovery-title">
+            <h4 id="settings-recovery-title" class="settings-section-title" data-i18n="settings.recoveryTitle">Recovery key</h4>
+            <p id="settings-recovery-status" class="settings-hint"></p>
+            <div class="settings-actions">
+              <button id="settings-recovery-button" type="button" class="secondary-button" data-settings-action="recovery"></button>
+            </div>
+          </section>
+          <section class="settings-field settings-section" aria-labelledby="settings-backup-title">
+            <h4 id="settings-backup-title" class="settings-section-title" data-i18n="settings.backupTitle">Backups and import</h4>
+            <p class="settings-hint" data-i18n="settings.backupHint">A backup opens with your master passphrase or recovery key. Import adds logins from Bitwarden, 1Password, or another Mnemo backup to this vault.</p>
+            <div class="settings-actions">
+              <button id="settings-export-button" type="button" class="secondary-button" data-settings-action="export" data-i18n="settings.exportButton">Export backup…</button>
+              <button id="settings-import-button" type="button" class="secondary-button" data-i18n="settings.importButton">Import…</button>
+            </div>
+          </section>
+          <section class="settings-field settings-section" aria-labelledby="settings-delete-title">
+            <h4 id="settings-delete-title" class="settings-section-title" data-i18n="settings.deleteTitle">Delete vault</h4>
+            <p class="settings-hint" data-i18n="settings.deleteHint">Removes this vault and its encrypted file from this Mac. Backups you saved are not affected.</p>
+            <div class="settings-actions">
+              <button id="settings-delete-button" type="button" class="secondary-button settings-danger-button" data-settings-action="delete" data-i18n="settings.deleteButton">Delete this vault…</button>
+            </div>
+          </section>
+          <form id="settings-confirm-form" class="settings-confirm-form" hidden>
+            <p id="settings-confirm-prompt" class="settings-hint"></p>
+            <label for="settings-confirm-passphrase" data-i18n="settings.confirmPassphrase">Current master passphrase</label>
+            <div class="secret-input-row">
+              <input
+                id="settings-confirm-passphrase"
+                type="password"
+                autocomplete="current-password"
+                maxlength="1024"
+                required
+              />
+              <button type="button" class="password-visibility-toggle" data-password-visibility-for="settings-confirm-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="settings-confirm-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+              </button>
+            </div>
+            <p id="settings-confirm-error" class="form-error" role="alert" hidden></p>
+            <div class="dialog-actions">
+              <button id="settings-confirm-cancel" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
+              <button id="settings-confirm-submit" type="submit" class="dialog-save-button"></button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </dialog>
+    <dialog id="import-dialog" class="app-dialog import-dialog" aria-labelledby="import-title">
+      <div class="import-content">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow section-label" data-i18n="import.eyebrow">IMPORT</p>
+            <h3 id="import-title" data-i18n="import.title">Import logins</h3>
+          </div>
+          <button id="close-import-dialog" type="button" class="dialog-close" aria-label="Close dialog" data-i18n-aria-label="common.closeDialog">×</button>
+        </div>
+
+        <form id="import-choose-step" class="import-step">
+          <fieldset class="import-sources">
+            <legend class="settings-section-title" data-i18n="import.sourceLabel">Import from</legend>
+            <label class="import-source">
+              <input type="radio" name="import-source" value="bitwarden" />
+              <span class="import-source-name" data-i18n="import.sourceBitwarden">Bitwarden</span>
+              <span class="import-source-hint" data-i18n="import.sourceBitwardenHint"></span>
+            </label>
+            <label class="import-source">
+              <input type="radio" name="import-source" value="onepassword" />
+              <span class="import-source-name" data-i18n="import.sourceOnePassword">1Password</span>
+              <span class="import-source-hint" data-i18n="import.sourceOnePasswordHint"></span>
+            </label>
+            <label class="import-source">
+              <input type="radio" name="import-source" value="mnemo" />
+              <span class="import-source-name" data-i18n="import.sourceMnemo">Mnemo backup</span>
+              <span class="import-source-hint" data-i18n="import.sourceMnemoHint"></span>
+            </label>
+          </fieldset>
+          <p id="import-instructions" class="settings-hint import-instructions"></p>
+          <div id="import-mnemo-fields" class="import-mnemo-fields" hidden>
+            <div id="import-passphrase-field">
+              <label for="import-passphrase" data-i18n="restore.passphraseLabel">Backup master passphrase</label>
+              <div class="secret-input-row">
+                <input id="import-passphrase" type="password" autocomplete="off" maxlength="1024" />
+                <button type="button" class="password-visibility-toggle" data-password-visibility-for="import-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="import-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                </button>
+              </div>
+            </div>
+            <div id="import-key-field" hidden>
+              <label for="import-recovery-key" data-i18n="recover.keyLabel">Recovery key</label>
+              <input id="import-recovery-key" class="recovery-key-input import-text-input" type="text" autocomplete="off" spellcheck="false" maxlength="200" placeholder="XXXX-XXXX-XXXX-…" />
+            </div>
+            <button id="import-mnemo-mode" type="button" class="text-button" data-i18n="import.useRecoveryKey">Use the recovery key instead</button>
+          </div>
+          <p id="import-error" class="form-error" role="alert" hidden></p>
+          <div class="dialog-actions">
+            <button id="import-cancel" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
+            <button id="import-choose" type="submit" class="dialog-save-button" disabled data-i18n="import.chooseFile">Choose file…</button>
+          </div>
+        </form>
+
+        <div id="import-review-step" class="import-step" hidden>
+          <p id="import-file-name" class="import-file-name"></p>
+          <p id="import-summary" class="import-summary"></p>
+          <ul id="import-skipped" class="import-skipped"></ul>
+          <div class="dialog-actions">
+            <button id="import-back" type="button" class="quiet-button" data-i18n="common.back">Back</button>
+            <button id="import-commit" type="button" class="dialog-save-button"></button>
+          </div>
+        </div>
+
+        <div id="import-done-step" class="import-step" hidden>
+          <p id="import-result" class="import-summary"></p>
+          <div id="import-trash-note" class="recovery-warning" role="note" hidden>
+            <span class="recovery-warning-mark" aria-hidden="true">!</span>
+            <div>
+              <strong data-i18n="import.plainFileTitle">The export file is not encrypted</strong>
+              <p data-i18n="import.plainFileBody">It contains your passwords in plain text. Move it to the Trash and empty the Trash when you are done.</p>
+            </div>
+          </div>
+          <div class="dialog-actions">
+            <button id="import-trash" type="button" class="quiet-button" hidden data-i18n="import.trashFile">Move file to Trash</button>
+            <button id="import-done" type="button" class="dialog-save-button" data-i18n="recoveryKey.done">Done</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+    <dialog id="recovery-key-dialog" class="app-dialog recovery-key-dialog" aria-labelledby="recovery-key-title">
+      <div id="recovery-key-step" class="recovery-key-content">
+        <p class="eyebrow section-label" data-i18n="recoveryKey.eyebrow">RECOVERY KEY</p>
+        <h3 id="recovery-key-title" data-i18n="recoveryKey.title">Save your recovery key</h3>
+        <p class="recovery-key-description" data-i18n="recoveryKey.description">If you forget your master passphrase, this key is the only way back into this vault. Mnemo will not show it again.</p>
+        <p id="recovery-key-value" class="recovery-key-value" translate="no" tabindex="-1" autofocus></p>
+        <div class="recovery-key-actions">
+          <button id="recovery-key-copy" type="button" class="secondary-button" data-i18n="recoveryKey.copy">Copy</button>
+          <button id="recovery-key-save" type="button" class="secondary-button" data-i18n="recoveryKey.save">Save as file…</button>
+        </div>
+        <ul class="recovery-key-tips">
+          <li data-i18n="recoveryKey.tipOffline">Write it down or print it, and keep it away from this Mac.</li>
+          <li data-i18n="recoveryKey.tipSecret">Anyone with this key can open your vault.</li>
+          <li data-i18n="recoveryKey.tipFile">If you saved it as a file, move the file to a safe place.</li>
+          <li class="recovery-key-tip-strong" data-i18n="recoveryKey.tipBackup">The key only opens this vault’s file or its backups. If the app and its data are deleted, the key alone cannot bring them back — keep an encrypted backup too.</li>
+        </ul>
+        <label class="recovery-key-confirm">
+          <input id="recovery-key-confirm" type="checkbox" />
+          <span data-i18n="recoveryKey.confirm">I have saved my recovery key somewhere safe</span>
+        </label>
+        <div class="dialog-actions">
+          <button id="recovery-key-done" type="button" class="dialog-save-button" disabled data-i18n="recoveryKey.done">Done</button>
+        </div>
+      </div>
+      <div id="recovery-backup-step" class="recovery-key-content" hidden>
+        <p class="eyebrow section-label" data-i18n="backupOffer.eyebrow">ENCRYPTED BACKUP</p>
+        <h3 data-i18n="backupOffer.title">Save a backup now?</h3>
+        <p class="recovery-key-description" data-i18n="backupOffer.body">A backup made now opens with your master passphrase or with the recovery key you just saved. Keep it somewhere other than this Mac, such as an external drive.</p>
+        <div class="dialog-actions">
+          <button id="recovery-backup-later" type="button" class="quiet-button" data-i18n="backupOffer.later">Later</button>
+          <button id="recovery-backup-save" type="button" class="dialog-save-button" data-i18n="backupOffer.save">Save backup…</button>
         </div>
       </div>
     </dialog>
     <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     <script src="./src/renderer/app/namespace.js"></script>
+    <script src="./src/renderer/shared/i18n/messages.js"></script>
+    <script src="./src/renderer/shared/i18n/translate.js"></script>
+    <script src="./src/renderer/shared/lib/i18n.js"></script>
     <script src="./src/renderer/shared/lib/dom.js"></script>
     <script src="./src/renderer/shared/ui/toast-notifications.js"></script>
     <script src="./src/renderer/shared/lib/password-tools.js"></script>
@@ -542,6 +792,8 @@
     <script src="./src/renderer/features/login-actions/index.js"></script>
     <script src="./src/renderer/features/vault-access/index.js"></script>
     <script src="./src/renderer/features/backup/index.js"></script>
+    <script src="./src/renderer/features/recovery-key/index.js"></script>
+    <script src="./src/renderer/features/import/index.js"></script>
     <script src="./src/renderer/features/settings/index.js"></script>
     <script src="./src/renderer/widgets/vault-browser/index.js"></script>
     <script src="./src/renderer/pages/access/index.js"></script>

@@ -127,6 +127,14 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   );
 
   assert.equal(await invoke("app:get-version"), "0.1.0-test");
+  assert.deepEqual(await invoke("settings:get"), { language: "en" });
+  await assert.rejects(invoke("settings:set-language", "fr"), /\[mnemo:errors\.saveSettings\]/);
+  assert.deepEqual(await invoke("settings:set-language", "de"), { language: "de" });
+  await assert.rejects(
+    invoke("profiles:create", "Primary", "short"),
+    /\[mnemo:errors\.passphraseTooShort\] Die Master-Passphrase muss mindestens 7 Zeichen lang sein\./,
+  );
+  await invoke("settings:set-language", "en");
   await assert.rejects(untrustedInvoke("app:get-version"), /untrusted frame/);
   assert.deepEqual(await invoke("profiles:choose"), []);
   await assert.rejects(invoke("profiles:create", "Primary", "short"), /at least 7 characters/);
@@ -135,6 +143,21 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   const profileId = created.profile.id;
   assert.equal(created.status.unlocked, true);
   assert.equal((await invoke("vault:get-status")).entryCount, 0);
+
+  // The recovery key is returned once and can be copied until dismissed.
+  assert.match(created.recoveryKey, /^([0-9A-Z]{4}-){13}[0-9A-Z]{4}$/);
+  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true });
+  await invoke("recovery:copy");
+  assert.equal(clipboardText, created.recoveryKey);
+  await invoke("recovery:dismiss");
+  await assert.rejects(invoke("recovery:copy"), /\[mnemo:errors\.copyValue\]/);
+  await assert.rejects(
+    invoke("vault:create-recovery-key", "wrong passphrase"),
+    /\[mnemo:errors\.passphraseIncorrect\]/,
+  );
+  const rotated = await invoke("vault:create-recovery-key", "correct horse battery staple");
+  assert.notEqual(rotated.recoveryKey, created.recoveryKey);
+  await invoke("recovery:dismiss");
 
   const saved = await invoke("vault:save-entry", makeLogin());
   assert.equal(Object.hasOwn(saved, "password"), false);
@@ -146,8 +169,10 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal(JSON.stringify(await invoke("vault:get-entry", saved.id)).includes("test-password-value"), false);
   messageResponse = 0;
   assert.deepEqual(await invoke("vault:fetch-site-icon", saved.id), { canceled: true });
-  assert.deepEqual(await invoke("vault:export-backup"), { canceled: true });
+  await assert.rejects(invoke("vault:export-backup", "wrong passphrase"), /\[mnemo:errors\.passphraseIncorrect\]/);
+  assert.deepEqual(await invoke("vault:export-backup", "correct horse battery staple"), { canceled: true });
   assert.deepEqual(await invoke("vault:restore-backup", "correct horse battery staple"), { canceled: true });
+  await assert.rejects(invoke("vault:restore-backup", 42), /\[mnemo:errors\.enterPassphrase\]/);
 
   assert.equal(handlers.has("clipboard:copy-secret"), false);
   assert.deepEqual(await invoke("vault:copy-entry-field", saved.id, "username"), { clearsAfterMs: 30000 });
@@ -185,7 +210,17 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   const selected = await invoke("profiles:select", profileId);
   assert.equal(selected.vaultExists, true);
   assert.equal(selected.unlocked, false);
-  await invoke("vault:unlock", "correct horse battery staple");
+  await assert.rejects(
+    invoke("vault:recover", created.recoveryKey, "new passphrase 123"),
+    /\[mnemo:errors\.recoveryKeyWrong\]/,
+  );
+  const recovered = await invoke("vault:recover", rotated.recoveryKey, "new passphrase 123");
+  assert.equal(recovered.status.unlocked, true);
+  await invoke("recovery:copy");
+  assert.equal(clipboardText, recovered.recoveryKey);
+  assert.equal((await invoke("vault:lock")).unlocked, false);
+  await assert.rejects(invoke("recovery:copy"), /\[mnemo:errors\.copyValue\]/);
+  await invoke("vault:unlock", "new passphrase 123");
   await invoke("vault:delete-entry", saved.id);
   assert.equal((await invoke("vault:list-entries")).length, 0);
   await assert.rejects(invoke("profiles:delete", profileId), /Lock the current vault/);

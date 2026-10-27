@@ -384,7 +384,8 @@ async function resolvePublicIPv4(hostname) {
       if (code === "ENOTFOUND") {
         throw new Error(`DNS could not find ${hostname}. Check the website address, connection, and DNS settings.`);
       }
-      throw new Error(`Could not resolve ${hostname}${code ? ` (${code})` : ""}. Check your connection or DNS settings.`);
+      const codeSuffix = code ? ` (${code})` : "";
+      throw new Error(`Could not resolve ${hostname}${codeSuffix}. Check your connection or DNS settings.`);
     }
   }
 

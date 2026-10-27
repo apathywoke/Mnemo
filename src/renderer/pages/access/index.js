@@ -2,6 +2,7 @@
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
   const { show: showToast } = ns.shared.toast;
+  const { t, errorText } = ns.shared.i18n;
 
   function create(ctx) {
     const state = ctx.state.access;
@@ -26,7 +27,7 @@
         await refreshState();
       } catch (cause) {
         button.disabled = false;
-        $("#fatal-message").textContent = cause.message || "Could not open this vault profile.";
+        $("#fatal-message").textContent = errorText(cause, "errors.openProfile");
         ctx.showPanel("fatal");
       }
     }
@@ -44,7 +45,7 @@
           ctx.showPanel("profiles");
         }
       } catch (cause) {
-        $("#fatal-message").textContent = cause.message || "Could not read the local vault profiles.";
+        $("#fatal-message").textContent = errorText(cause, "errors.readProfiles");
         ctx.showPanel("fatal");
       }
     }
@@ -64,7 +65,7 @@
           ctx.showPanel("profiles");
         }
       } catch (cause) {
-        $("#fatal-message").textContent = cause.message || "Could not switch vault profiles.";
+        $("#fatal-message").textContent = errorText(cause, "errors.switchProfiles");
         ctx.showPanel("fatal");
       }
     }
@@ -88,7 +89,7 @@
         }
       } catch {
         ctx.clearVaultView();
-        $("#fatal-message").textContent = "Could not read the vault status.";
+        $("#fatal-message").textContent = t("errors.readStatus");
         ctx.showPanel("fatal");
       }
     }
@@ -100,7 +101,7 @@
         state.selectedProfileId = null;
         state.selectedProfileName = null;
       } catch (cause) {
-        $("#fatal-message").textContent = cause.message || "Could not open the profile list.";
+        $("#fatal-message").textContent = errorText(cause, "errors.openProfileList");
         ctx.showPanel("fatal");
         return;
       }
@@ -120,7 +121,7 @@
           state.selectedProfileId = null;
           state.selectedProfileName = null;
         } catch (cause) {
-          $("#fatal-message").textContent = cause.message || "Could not open the profile list.";
+          $("#fatal-message").textContent = errorText(cause, "errors.openProfileList");
           ctx.showPanel("fatal");
           return;
         }
@@ -129,11 +130,26 @@
       $("#restore-error").hidden = true;
       $("#restore-profile-name-field").hidden = !state.restoringNewProfile;
       $("#restore-profile-name").required = state.restoringNewProfile;
-      $("#restore-description").textContent = state.restoringNewProfile
-        ? "Choose an encrypted backup and enter its master passphrase. It will be added as a new vault profile."
-        : "Choose an encrypted backup and enter its master passphrase. Restoring replaces the selected vault after you confirm.";
+      const description = $("#restore-description");
+      description.dataset.i18n = state.restoringNewProfile
+        ? "restore.descriptionNew"
+        : "restore.descriptionReplace";
+      description.textContent = t(description.dataset.i18n);
       ctx.showPanel("restore");
       $(state.restoringNewProfile ? "#restore-profile-name" : "#restore-passphrase").focus();
+    }
+
+    function openRecoverPanel() {
+      $("#recover-form").reset();
+      $("#recover-error").hidden = true;
+      ctx.showPanel("recover");
+      $("#recover-key").focus();
+    }
+
+    async function cancelRecover() {
+      ctx.clearSensitiveFields();
+      $("#recover-error").hidden = true;
+      await refreshState();
     }
 
     async function cancelRestore() {
@@ -148,9 +164,9 @@
         await ctx.api.lockVault();
         ctx.clearSensitiveFields();
         await refreshState();
-        showToast("Vault locked.");
+        showToast(t("toast.vaultLocked"));
       } catch (cause) {
-        showToast(cause.message || "Could not lock the vault.", { type: "error" });
+        showToast(errorText(cause, "errors.lockVault"), { type: "error" });
       }
     }
 
@@ -159,16 +175,21 @@
       refreshState,
     });
 
+    ns.shared.i18n.onChange(renderProfiles);
+
     $("#new-profile-button").addEventListener("click", openNewProfile);
     $("#setup-back-button").addEventListener("click", chooseProfiles);
     $("#restore-profile-button").addEventListener("click", openRestorePanel);
     $("#setup-restore-button").addEventListener("click", openRestorePanel);
     $("#unlock-restore-button").addEventListener("click", openRestorePanel);
+    $("#unlock-recover-button").addEventListener("click", openRecoverPanel);
+    $("#recover-cancel-button").addEventListener("click", () => void cancelRecover());
     $("#unlock-profiles-button").addEventListener("click", chooseProfiles);
     $("#switch-profile-button").addEventListener("click", chooseProfiles);
     $("#restore-cancel-button").addEventListener("click", () => void cancelRestore());
 
     return {
+      cancelRecover,
       cancelRestore,
       chooseProfiles,
       closeProfileDeleteDialog: profileManagement.close,

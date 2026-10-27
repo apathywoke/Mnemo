@@ -2,9 +2,10 @@
   const ns = window.mnemoRenderer;
 
   function setToggleButton(button, visible) {
+    const label = ns.shared.i18n.t(visible ? "common.hidePassword" : "common.showPassword");
     button.setAttribute("aria-pressed", String(visible));
-    button.setAttribute("aria-label", visible ? "Hide password" : "Show password");
-    button.title = visible ? "Hide password" : "Show password";
+    button.setAttribute("aria-label", label);
+    button.title = label;
   }
 
   function setInputVisibility(input, button, visible) {
@@ -29,6 +30,12 @@
       });
     }
   }
+
+  ns.shared.i18n.onChange(() => {
+    for (const button of document.querySelectorAll("[data-password-visibility-for]")) {
+      setToggleButton(button, button.getAttribute("aria-pressed") === "true");
+    }
+  });
 
   ns.shared.passwordVisibility = { conceal, bindAll, setInputVisibility, setToggleButton };
 })();

@@ -1,6 +1,14 @@
 (() => {
   const ns = window.mnemoRenderer;
   const { $ } = ns.shared.dom;
+  const { t } = ns.shared.i18n;
+  // password-tools.js stays language-neutral; map its levels to UI text here.
+  const STRENGTH_KEYS = {
+    empty: "strength.empty",
+    weak: "strength.weak",
+    fair: "strength.fair",
+    strong: "strength.strong",
+  };
 
   function init(ctx) {
     const passwordInput = $("#entry-password");
@@ -27,7 +35,7 @@
     function updatePasswordStrength() {
       const result = window.passwordTools.estimatePasswordStrength(passwordInput.value);
       strength.dataset.strength = result.level;
-      strengthLabel.textContent = result.label;
+      strengthLabel.textContent = t(STRENGTH_KEYS[result.level]);
       strengthMeter.setAttribute("aria-valuenow", String(result.value));
     }
 
@@ -37,7 +45,7 @@
         getOptions(),
       );
       generatedStrength.dataset.strength = result.level;
-      generatedLabel.textContent = result.label;
+      generatedLabel.textContent = t(STRENGTH_KEYS[result.level]);
       generatedMeter.setAttribute("aria-valuenow", String(result.value));
     }
 
@@ -60,12 +68,16 @@
         updatePasswordStrength();
         passwordInput.focus();
       } catch (cause) {
-        ctx.setError(error, cause.message || "Could not generate a secure password.");
+        ctx.setError(error, t("errors.generatePassword"));
       }
     });
 
     lengthValue.value = lengthInput.value;
     updateGeneratedPasswordStrength();
+    ns.shared.i18n.onChange(() => {
+      updatePasswordStrength();
+      updateGeneratedPasswordStrength();
+    });
     return { updatePasswordStrength, updateGeneratedPasswordStrength };
   }
 
