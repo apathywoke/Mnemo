@@ -18,6 +18,7 @@ const fsp = require("node:fs/promises");
 const https = require("node:https");
 const os = require("node:os");
 const path = require("node:path");
+const { Transform, pipeline } = require("node:stream");
 
 const UPDATE_REPOSITORY = "apathywoke/Mnemo";
 const MANIFEST_NAME = "update-manifest.json";
@@ -151,11 +152,61 @@ function assertAllowedUrl(value) {
   return url;
 }
 
-// GETs a URL into a buffer or a file, following redirects only to allowed
-// hosts. Resolves with { buffer } or { sha512, size }.
-function httpsGet(value, { maxBytes, accept = "*/*", userAgent, toFile = null, onProgress = null }, redirects = 0) {
-  const url = assertAllowedUrl(value);
+// Streams a response into a new file (flag "wx": never an existing one),
+// with backpressure, a size limit, SHA-512, and progress. Any failure of the
+// response or the file ends both and rejects; a partial file this call
+// created is removed.
+function downloadToFile(response, { toFile, maxBytes, declared, onProgress }) {
   return new Promise((resolve, reject) => {
+    let received = 0;
+    let created = false;
+    const hash = createHash("sha512");
+    const meter = new Transform({
+      transform(chunk, _encoding, callback) {
+        received += chunk.length;
+        if (received > maxBytes) {
+          callback(new Error("The update is too large."));
+          return;
+        }
+        hash.update(chunk);
+        onProgress?.(received, declared);
+        callback(null, chunk);
+      },
+    });
+    const file = fs.createWriteStream(toFile, { mode: 0o600, flags: "wx" });
+    file.once("open", () => {
+      created = true;
+    });
+    pipeline(response, meter, file, (error) => {
+      if (!error) {
+        resolve({ sha512: hash.digest("base64"), size: received });
+        return;
+      }
+      if (created) fs.unlink(toFile, () => {});
+      reject(error.message === "The update is too large." ? error : new Error("Could not download the update."));
+    });
+  });
+}
+
+// GETs a URL into a buffer or a file, following redirects only to allowed
+// hosts. Resolves with { buffer } or { sha512, size }. The promise settles
+// once, whichever of the request, the response, or the file fails first.
+function httpsGet(value, { maxBytes, accept = "*/*", userAgent, toFile = null, onProgress = null }, redirects = 0) {
+  return new Promise((resolveOnce, rejectOnce) => {
+    // Inside the promise, so a disallowed redirect target rejects instead of
+    // throwing out of the response callback.
+    const url = assertAllowedUrl(value);
+    let settled = false;
+    const resolve = (result) => {
+      if (settled) return;
+      settled = true;
+      resolveOnce(result);
+    };
+    const reject = (error) => {
+      if (settled) return;
+      settled = true;
+      rejectOnce(error);
+    };
     const request = https.get(url, {
       headers: { Accept: accept, "User-Agent": userAgent },
       timeout: REQUEST_TIMEOUT_MS,
@@ -188,35 +239,24 @@ function httpsGet(value, { maxBytes, accept = "*/*", userAgent, toFile = null, o
         return;
       }
 
+      if (toFile) {
+        downloadToFile(response, { toFile, maxBytes, declared, onProgress }).then(resolve, reject);
+        return;
+      }
       let received = 0;
       const chunks = [];
-      const hash = createHash("sha512");
-      const file = toFile ? fs.createWriteStream(toFile, { mode: 0o600, flags: "wx" }) : null;
       response.on("data", (chunk) => {
         received += chunk.length;
         if (received > maxBytes) {
           response.destroy(new Error("The update is too large."));
           return;
         }
-        if (file) {
-          hash.update(chunk);
-          file.write(chunk);
-          onProgress?.(received, declared);
-        } else {
-          chunks.push(chunk);
-        }
+        chunks.push(chunk);
       });
       response.on("error", (error) => {
-        file?.destroy();
         reject(error.message === "The update is too large." ? error : new Error("Could not download the update."));
       });
-      response.on("end", () => {
-        if (!file) {
-          resolve({ buffer: Buffer.concat(chunks) });
-          return;
-        }
-        file.end(() => resolve({ sha512: hash.digest("base64"), size: received }));
-      });
+      response.on("end", () => resolve({ buffer: Buffer.concat(chunks) }));
     });
     request.on("timeout", () => request.destroy(new Error("Could not reach the update server.")));
     request.on("error", (error) => reject(
