@@ -384,6 +384,29 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal((await invoke("vault:lock")).unlocked, false);
   await assert.rejects(invoke("recovery:copy"), /\[mnemo:errors\.copyValue\]/);
   await invoke("vault:unlock", "new passphrase 123");
+
+  // Changing the passphrase needs the current one and a strong new one,
+  // replaces the vault key, turns Touch ID off, and shows a new recovery key.
+  await invoke("biometric:enable", "new passphrase 123");
+  assert.equal((await invoke("biometric:status")).enabled, true);
+  await assert.rejects(
+    invoke("vault:change-passphrase", "not the passphrase 1", "a brand new long passphrase 4"),
+    /\[mnemo:errors\.passphraseIncorrect\]/,
+  );
+  await assert.rejects(
+    invoke("vault:change-passphrase", "new passphrase 123", "password password"),
+    /\[mnemo:errors\.passphraseWeak\]/,
+  );
+  assert.equal((await invoke("biometric:status")).enabled, true);
+  const changed = await invoke("vault:change-passphrase", "new passphrase 123", "a brand new long passphrase 4");
+  assert.match(changed.recoveryKey, /^[0-9A-Z]{4}(-[0-9A-Z]{4})+$/);
+  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false });
+  await invoke("recovery:copy");
+  assert.equal(clipboardText, changed.recoveryKey);
+  await invoke("recovery:dismiss");
+  assert.equal((await invoke("vault:lock")).unlocked, false);
+  await assert.rejects(invoke("vault:unlock", "new passphrase 123"), /\[mnemo:errors\.unlockFailed\]|Could not open the vault/);
+  await invoke("vault:unlock", "a brand new long passphrase 4");
   await invoke("vault:delete-entry", saved.id);
   // Deleted items wait in the trash; emptying it needs a native confirmation.
   assert.ok((await invoke("vault:list-entries")).every((entry) => entry.deletedAt));

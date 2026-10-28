@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld("vaultApp", {
   restoreNewProfile: (name, credentials) =>
     ipcRenderer.invoke("profiles:restore-new", name, credentials),
   getVaultStatus: () => ipcRenderer.invoke("vault:get-status"),
+  changePassphrase: (currentPassphrase, newPassphrase) =>
+    ipcRenderer.invoke("vault:change-passphrase", currentPassphrase, newPassphrase),
   listEntries: () => ipcRenderer.invoke("vault:list-entries"),
   getEntry: (id) => ipcRenderer.invoke("vault:get-entry", id),
   getTotpCode: (id) => ipcRenderer.invoke("vault:get-totp", id),

@@ -10,6 +10,12 @@
   // Actions that need the master passphrase again. Each names its prompt,
   // confirm label, fallback error, and what to do once the passphrase is in.
   const PASSPHRASE_ACTIONS = Object.freeze({
+    // Also asks for the new passphrase twice (see the confirm form).
+    passphrase: {
+      prompt: "settings.passphrasePrompt",
+      confirm: "settings.passphraseConfirm",
+      error: "errors.changePassphrase",
+    },
     recovery: {
       prompt: "settings.recoveryPrompt",
       confirm: "settings.recoveryConfirm",
@@ -134,6 +140,9 @@
     const confirmPassphrase = $("#settings-confirm-passphrase");
     const confirmSubmit = $("#settings-confirm-submit");
     const confirmError = $("#settings-confirm-error");
+    const newPassphraseFields = $("#settings-new-passphrase-fields");
+    const newPassphrase = $("#settings-new-passphrase");
+    const confirmNewPassphrase = $("#settings-confirm-new-passphrase");
     const touchIdStatus = $("#settings-touchid-status");
     const touchIdEnable = $("#settings-touchid-enable");
     const touchIdDisable = $("#settings-touchid-disable");
@@ -168,7 +177,9 @@
       confirmForm.hidden = true;
       confirmError.hidden = true;
       confirmSubmit.classList.remove("danger-confirm-button");
+      showNewPassphrase(false);
       ns.shared.passwordVisibility.conceal(confirmForm);
+      ns.shared.passphraseStrength.refreshAll();
       for (const button of actionButtons) button.disabled = false;
     };
 
@@ -199,13 +210,20 @@
       }
     }
 
+    function showNewPassphrase(show) {
+      newPassphraseFields.hidden = !show;
+      newPassphrase.required = show;
+      confirmNewPassphrase.required = show;
+    }
+
     function askPassphrase(action, button) {
       resetVaultActions();
       pendingAction = action;
       confirmSubmit.classList.toggle("danger-confirm-button", action === "delete");
+      showNewPassphrase(action === "passphrase");
       renderVault();
       // The form sits under the section of the action it confirms.
-      button.closest(".settings-pane-body").append(confirmForm);
+      button.closest(".settings-section").after(confirmForm);
       for (const other of actionButtons) {
         other.disabled = other.dataset.settingsAction !== action;
       }
@@ -214,7 +232,14 @@
     }
 
     async function runAction(action, passphrase) {
-      if (action === "recovery") {
+      if (action === "passphrase") {
+        const { recoveryKey } = await ctx.api.changePassphrase(passphrase, newPassphrase.value);
+        resetVaultActions();
+        dialog.close();
+        // The vault key changed, so Touch ID was turned off in main.
+        await ctx.recoveryKey.show(recoveryKey);
+        showToast(i18n.t("toast.passphraseChanged"));
+      } else if (action === "recovery") {
         const { recoveryKey } = await ctx.api.createRecoveryKey(passphrase);
         resetVaultActions();
         dialog.close();
@@ -262,13 +287,23 @@
       const action = pendingAction;
       if (!action) return;
       confirmError.hidden = true;
+      if (action === "passphrase" && newPassphrase.value !== confirmNewPassphrase.value) {
+        ctx.setError(confirmError, i18n.t("errors.passphrasesMismatch"));
+        confirmNewPassphrase.focus();
+        return;
+      }
       confirmSubmit.disabled = true;
       try {
         await runAction(action, confirmPassphrase.value);
       } catch (cause) {
-        confirmPassphrase.value = "";
         ctx.setError(confirmError, i18n.errorText(cause, PASSPHRASE_ACTIONS[action].error));
-        confirmPassphrase.focus();
+        // A refused new passphrase keeps the current one typed in.
+        if (["errors.passphraseWeak", "errors.passphraseTooShort"].includes(i18n.errorKey(cause))) {
+          newPassphrase.focus();
+        } else {
+          confirmPassphrase.value = "";
+          confirmPassphrase.focus();
+        }
       } finally {
         confirmSubmit.disabled = false;
       }

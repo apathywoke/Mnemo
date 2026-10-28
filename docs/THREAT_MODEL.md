@@ -98,6 +98,7 @@ again whenever a trigger at the end of this document applies. Updated
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
 | Brute-force the recovery key | 256 random bits; the 24-bit checksum only detects typos and reveals nothing about the key | None known. |
+| Use a vault key learned once (an old recovery key with an old copy of the file, or the Touch ID file with Keychain access) to read later versions | Every change of credentials replaces the vault key: all sealed values and attachments are encrypted again under new keys, and the Touch ID file is removed | Old backups and copies keep their old key and open with the credentials they had; rotation cannot reach them. Changing credentials is not automatic: the user has to do it after a suspected leak. |
 | Strip or replace the recovery wrap to plant a key the attacker knows | The recovery salt is in the AES-GCM associated data of the key wraps and the vault data; a missing or different recovery wrap cannot unwrap the real vault key, and the strict format check rejects the file | An attacker with write access can delete the recovery wrap together with the file (denial of service only). |
 | Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM; a passphrase being set must be at least 12 characters and rated Strong by the built-in estimate, checked in main | The estimate is a heuristic without a dictionary, so a long but predictable phrase can pass. Vaults from before this rule may still have a 7-character passphrase until it is changed through recovery. |
 | Tamper with a vault or backup to plant data or downgrade parameters | AES-GCM with the header (format, version, KDF parameters, salt) as AAD; strict schema and size validation before and after decryption; fixed KDF parameters | None known. |
@@ -159,7 +160,8 @@ auto-lock limits how long secrets stay in memory.
 | --- | --- | --- |
 | Unattended unlocked app | Auto-lock after 5 minutes without input, on screen lock, sleep, window close, and quit | Up to 5 minutes of exposure. |
 | Shoulder surfing | Passwords masked; reveal is an explicit action in a separate dialog | The dialog shows the password until dismissed. |
-| Recovery key found on paper or in a saved file | The user is told to keep it offline and to move or delete the file; a new key can be issued from Settings, which invalidates the old one for the current file | Old backups still open with the key that was valid when they were made, including through the restore screen. Replacing a key does not protect backups made before the replacement. |
+| Recovery key found on paper or in a saved file | The user is told to keep it offline and to move or delete the file; a new key can be issued from Settings, which invalidates the old one for the current file and replaces the vault key | Old backups still open with the key that was valid when they were made, including through the restore screen. Replacing a key does not protect backups made before the replacement. |
+| Master passphrase seen while typed (shoulder surfing, screen recording) | The passphrase can be changed in Settings with the current one; the change replaces the vault key and the recovery key and removes the Touch ID key | Old backups and copies of the file still open with the old passphrase. |
 
 ### A7, distribution
 

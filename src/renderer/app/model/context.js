@@ -61,6 +61,8 @@
           "recover-passphrase",
           "recover-confirm-passphrase",
           "settings-confirm-passphrase",
+          "settings-new-passphrase",
+          "settings-confirm-new-passphrase",
           "import-passphrase",
           "import-recovery-key",
           "profile-name",

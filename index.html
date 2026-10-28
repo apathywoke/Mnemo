@@ -911,6 +911,13 @@
                     <button id="settings-touchid-disable" type="button" class="secondary-button" data-i18n="touchId.disable" hidden>Turn off Touch ID</button>
                   </div>
                 </section>
+                <section class="settings-field settings-section" aria-labelledby="settings-passphrase-title">
+                  <h4 id="settings-passphrase-title" class="settings-section-title" data-i18n="settings.passphraseTitle">Master passphrase</h4>
+                  <p class="settings-hint" data-i18n="settings.passphraseHint">Changing it also replaces the vault key and the recovery key, and turns Touch ID off. Backups you saved earlier still open with the old passphrase.</p>
+                  <div class="settings-actions">
+                    <button id="settings-passphrase-button" type="button" class="secondary-button" data-settings-action="passphrase" data-i18n="settings.passphraseChange">Change passphrase…</button>
+                  </div>
+                </section>
                 <section class="settings-field settings-section" aria-labelledby="settings-recovery-title">
                   <h4 id="settings-recovery-title" class="settings-section-title" data-i18n="settings.recoveryTitle">Recovery key</h4>
                   <p id="settings-recovery-status" class="settings-hint"></p>
@@ -963,6 +970,30 @@
                 <button type="button" class="password-visibility-toggle" data-password-visibility-for="settings-confirm-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="settings-confirm-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
                 </button>
+              </div>
+              <div id="settings-new-passphrase-fields" class="settings-new-passphrase" hidden>
+                <label for="settings-new-passphrase" data-i18n="recover.newPassphrase">New master passphrase</label>
+                <div class="secret-input-row">
+                  <input id="settings-new-passphrase" type="password" autocomplete="new-password" minlength="12" maxlength="1024" />
+                  <button type="button" class="password-visibility-toggle" data-password-visibility-for="settings-new-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="settings-new-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                  </button>
+                </div>
+                <div class="password-strength passphrase-strength" data-strength-for="settings-new-passphrase" data-strength="empty">
+                  <div class="password-strength-heading">
+                    <span data-i18n="strength.passphraseTitle">Passphrase strength</span>
+                    <span class="password-strength-label" aria-live="polite" data-i18n="strength.empty">Enter a password</span>
+                  </div>
+                  <div class="password-strength-track" role="meter" aria-label="Master passphrase strength" data-i18n-aria-label="strength.passphraseMeterAria" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0"><span></span></div>
+                  <p class="password-strength-note" data-i18n="strength.passphraseHint">At least 12 characters and rated Strong. A phrase of several unrelated words is long and easy to remember.</p>
+                </div>
+                <label for="settings-confirm-new-passphrase" data-i18n="recover.confirmPassphrase">Confirm new master passphrase</label>
+                <div class="secret-input-row">
+                  <input id="settings-confirm-new-passphrase" type="password" autocomplete="new-password" minlength="12" maxlength="1024" />
+                  <button type="button" class="password-visibility-toggle" data-password-visibility-for="settings-confirm-new-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="settings-confirm-new-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                  </button>
+                </div>
               </div>
               <p id="settings-confirm-error" class="form-error" role="alert" hidden></p>
               <div class="dialog-actions">

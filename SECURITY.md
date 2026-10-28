@@ -131,6 +131,25 @@ passwords until the design has received independent security review.
   that was valid when they were made. Creating a new key from Settings needs
   the current master passphrase. Vaults in format 1 keep working and get a
   key when the user creates one.
+- The master passphrase can be changed in Settings with the current one;
+  the new one must meet the same rule as for a new vault.
+- Every change of credentials — a new passphrase, a new recovery key,
+  recovery with the recovery key, restoring a backup with the recovery key —
+  replaces the vault key itself, not only its wrapping. Every sealed value
+  (passwords, one-time code settings, secret fields, including those in the
+  history) is sealed again under the new key with the same associated data;
+  each distinct sealed record once, so values that were the same stay the
+  same and the history shows no changes that did not happen. Attachments
+  are encrypted again under new file keys and new IDs, one file at a time.
+  New files are written first, the vault file is replaced in one rename, and
+  the old files are deleted afterwards; if anything fails before the rename,
+  the new files are removed and the old vault keeps working. A new recovery
+  key is issued and the Touch ID key file is removed, since it holds the old
+  vault key. Someone who once obtained the old vault key (an old recovery
+  key with an old copy of the file, or the Touch ID file with Keychain
+  access) cannot read anything saved afterwards. Old backups and copies of
+  the file are not changed and still open with the credentials they had.
+  Restoring a backup with its passphrase keeps the backup's key.
 - The recovery key is shown in the app window once and can be copied (cleared
   from the clipboard after 30 seconds) or saved as a text file with mode
   `0600`. Anyone who holds it can open the vault; it is a second secret of the
@@ -191,8 +210,9 @@ passwords until the design has received independent security review.
   is a convenience trade-off: Touch ID is enforced by the app rather than by
   the Keychain item, and someone who can unlock your macOS login keychain
   (for example, with your Mac login password) could recover the vault key
-  without the master passphrase. Restoring a backup into the vault or
-  deleting the vault removes the stored key.
+  without the master passphrase. Restoring a backup into the vault, deleting
+  the vault, or any change of credentials (which replaces the vault key)
+  removes the stored key.
 - Items can be organized in folders (one per item) and marked as favorites.
   Both are stored inside the encrypted vault data; changing them does not
   change an item's date or history.
