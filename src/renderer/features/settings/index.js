@@ -204,8 +204,9 @@
       pendingAction = action;
       confirmSubmit.classList.toggle("danger-confirm-button", action === "delete");
       renderVault();
-      // The form sits under the section of the action it confirms.
-      button.closest(".settings-pane-body").append(confirmForm);
+      // The form sits under the section of the action it confirms, not at
+      // the end of the pane (which put it below unrelated sections).
+      button.closest(".settings-section").after(confirmForm);
       for (const other of actionButtons) {
         other.disabled = other.dataset.settingsAction !== action;
       }
