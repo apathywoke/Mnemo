@@ -591,10 +591,19 @@ if (launchedWithRemoteDebugging) {
       }
       return status;
     });
+    // Every change of credentials replaces the vault key (VaultStore
+    // rekeyNow), so a Touch ID file holds a key that no longer opens the
+    // vault: it is removed, and Touch ID is turned on again by the user.
+    async function forgetTouchIdKey(profileId) {
+      if (profileId !== null) await biometricUnlock.disable(profileId).catch(() => {});
+    }
     registerHandler("vault:recover", async (recoveryKey, newPassphrase) => {
       const recoveryEpoch = lockEpoch;
       const store = vaultStore;
+      const profileId = activeProfileId;
       const result = await store.recoverWithKey(recoveryKey, newPassphrase);
+      // The new key is on disk even if the vault locked meanwhile.
+      await forgetTouchIdKey(profileId);
       if (store !== vaultStore || lockEpoch !== recoveryEpoch) {
         store.lock();
         throw new Error("Recovery was interrupted because the vault was locked.");
@@ -609,7 +618,20 @@ if (launchedWithRemoteDebugging) {
       enabled: vaultStore.hasRecoveryKey(),
     }));
     registerHandler("vault:create-recovery-key", async (passphrase) => {
+      const profileId = activeProfileId;
       const recoveryKey = await vaultStore.createRecoveryKey(passphrase);
+      await forgetTouchIdKey(profileId);
+      pendingRecoveryKey = { key: recoveryKey, profileName: await activeProfileName() };
+      return { recoveryKey };
+    });
+    // A new master passphrase comes with a new recovery key, shown and
+    // offered for backup like one created from Settings.
+    registerHandler("vault:change-passphrase", async (currentPassphrase, newPassphrase) => {
+      const store = vaultStore;
+      const profileId = activeProfileId;
+      const recoveryKey = await store.changePassphrase(currentPassphrase, newPassphrase);
+      await forgetTouchIdKey(profileId);
+      if (store !== vaultStore) throw new Error("Unlock the vault first.");
       pendingRecoveryKey = { key: recoveryKey, profileName: await activeProfileName() };
       return { recoveryKey };
     });

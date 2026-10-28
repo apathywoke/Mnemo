@@ -4372,3 +4372,13 @@ h2 {
 .passphrase-strength {
   margin: 8px 0 4px;
 }
+
+.settings-new-passphrase {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-new-passphrase[hidden] {
+  display: none;
+}
