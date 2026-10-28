@@ -48,7 +48,29 @@ contextBridge.exposeInMainWorld("vaultApp", {
   revealField: (id, field) => ipcRenderer.invoke("vault:reveal-field", id, field),
   fetchSiteIcon: (entryId) =>
     ipcRenderer.invoke("vault:fetch-site-icon", entryId),
+  // Moves the item to the trash.
   deleteEntry: (id) => ipcRenderer.invoke("vault:delete-entry", id),
+  restoreEntry: (id) => ipcRenderer.invoke("vault:restore-entry", id),
+  // Both ask for confirmation in a native dialog.
+  deleteForever: (id) => ipcRenderer.invoke("vault:delete-forever", id),
+  emptyTrash: () => ipcRenderer.invoke("vault:empty-trash"),
+  listFolders: () => ipcRenderer.invoke("vault:list-folders"),
+  createFolder: (name) => ipcRenderer.invoke("vault:create-folder", name),
+  renameFolder: (id, name) => ipcRenderer.invoke("vault:rename-folder", id, name),
+  deleteFolder: (id) => ipcRenderer.invoke("vault:delete-folder", id),
+  // `folderId` is a folder ID or null.
+  setFolder: (id, folderId) => ipcRenderer.invoke("vault:set-folder", id, folderId),
+  setFavorite: (id, favorite) => ipcRenderer.invoke("vault:set-favorite", id, favorite),
+  getHistory: (id) => ipcRenderer.invoke("vault:get-history", id),
+  restoreVersion: (id, versionId) => ipcRenderer.invoke("vault:restore-version", id, versionId),
+  copyVersionField: (id, versionId, field) =>
+    ipcRenderer.invoke("vault:copy-version-field", id, versionId, field),
+  revealVersionField: (id, versionId, field) =>
+    ipcRenderer.invoke("vault:reveal-version-field", id, versionId, field),
+  // Files are chosen and saved through native dialogs in the main process.
+  addAttachments: (id) => ipcRenderer.invoke("vault:add-attachments", id),
+  saveAttachment: (id, attachmentId) => ipcRenderer.invoke("vault:save-attachment", id, attachmentId),
+  deleteAttachment: (id, attachmentId) => ipcRenderer.invoke("vault:delete-attachment", id, attachmentId),
   // Secrets are copied or shown by the main process; the renderer only names
   // the entry and field.
   copyEntryField: (id, field) =>

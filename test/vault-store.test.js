@@ -42,7 +42,8 @@ test("vault lifecycle, encrypted entries, validation, icon storage, and locking"
   copiedEntry.name = "mutated copy";
   assert.equal(store.listEntries()[0].name, "Example account");
   assert.deepEqual(Object.keys(copiedEntry).sort(), [
-    "createdAt", "favicon", "hasTotp", "id", "name", "type", "updatedAt", "url", "username",
+    "attachmentCount", "createdAt", "deletedAt", "favicon", "favorite", "folderId", "hasTotp", "id", "name",
+    "type", "updatedAt", "url", "username",
   ]);
   assert.equal(store.getEntry(login.id).notes, "local test data");
   assert.equal(Object.hasOwn(store.getEntry(login.id), "password"), false);
@@ -91,7 +92,11 @@ test("vault lifecycle, encrypted entries, validation, icon storage, and locking"
   await store.saveEntry({ ...makeLogin({ id: login.id, name: "Kept password" }), password: "" });
   assert.equal(store.revealPassword(login.id), "updated-password");
 
-  await store.deleteEntry(login.id);
+  // Deleting moves to the trash; deleting for good needs the trash first.
+  await assert.rejects(store.deletePermanently(login.id), /Move this item to the trash first/);
+  assert.equal(typeof (await store.deleteEntry(login.id)).deletedAt, "number");
+  assert.equal(store.listEntries().length, 1);
+  await store.deletePermanently(login.id);
   assert.deepEqual(store.listEntries(), []);
   await assert.rejects(store.deleteEntry(login.id), /no longer exists/);
   await assert.rejects(store.deleteEntry("not-an-id"), /Invalid login entry/);
@@ -120,7 +125,7 @@ test("backup export and restore reject tampering and wrong passphrases", async (
   await source.saveEntry(makeLogin());
 
   const backupPath = path.join(directory, "backup.vault");
-  assert.deepEqual(await source.exportBackup(backupPath), { exported: true });
+  assert.deepEqual(await source.exportBackup(backupPath), { exported: true, attachments: 0 });
   await assert.rejects(source.exportBackup(source.filePath), /different location/);
 
   const originalBytes = await fs.readFile(backupPath, "utf8");
@@ -188,14 +193,14 @@ test("schema 1 vaults with plain password fields are upgraded to sealed password
   store.lock();
 
   await store.unlock(PASSPHRASE);
-  assert.equal(store.vaultData.schemaVersion, 2);
+  assert.equal(store.vaultData.schemaVersion, 3);
   assert.equal(typeof store.vaultData.entries[0].password, "object");
   assert.equal(store.revealPassword(id), "test-password-value");
 
   await store.saveEntry(makeLogin({ id, name: "Upgraded", password: "" }));
   store.lock();
   await store.unlock(PASSPHRASE);
-  assert.equal(store.vaultData.schemaVersion, 2);
+  assert.equal(store.vaultData.schemaVersion, 3);
   assert.equal(store.revealPassword(id), "test-password-value");
 });
 
@@ -402,8 +407,8 @@ test("imported logins are sealed, deduplicated, and validated", async (t) => {
   const recoveryKey = store.takeIssuedRecoveryKey();
   const backupPath = path.join(directory, "import-backup.vault");
   await store.exportBackup(backupPath);
-  const byPassphrase = await VaultStore.readBackupLogins(backupPath, PASSPHRASE);
-  const byKey = await VaultStore.readBackupLogins(backupPath, { recoveryKey });
+  const { logins: byPassphrase } = await VaultStore.readBackupLogins(backupPath, PASSPHRASE);
+  const { logins: byKey } = await VaultStore.readBackupLogins(backupPath, { recoveryKey });
   assert.deepEqual(byKey, byPassphrase);
   assert.equal(byKey.find((login) => login.name === "New").password, "new-pw");
   await assert.rejects(VaultStore.readBackupLogins(backupPath, "wrong passphrase"), /Could not open the vault/);
@@ -468,7 +473,7 @@ test("one-time code settings are sealed per entry and produce RFC 6238 codes", a
   // Backups carry the code settings into imports.
   const backupPath = path.join(directory, "totp-backup.vault");
   await store.exportBackup(backupPath);
-  const logins = await VaultStore.readBackupLogins(backupPath, PASSPHRASE);
+  const { logins } = await VaultStore.readBackupLogins(backupPath, PASSPHRASE);
   assert.match(logins.find((login) => login.name === "Example account").totp, /^otpauth:\/\/totp\/.*secret=GEZDGNBVGY3TQOJQ/);
 
   await store.saveEntry({ ...makeLogin({ id: saved.id, password: "" }), totp: "", removeTotp: true });
@@ -564,12 +569,12 @@ test("cards, notes, identities, and SSH keys store secrets sealed per field", as
   await store.exportBackup(backupPath);
   const target = new VaultStore(path.join(directory, "items-target.vault"));
   await target.create(PASSPHRASE);
-  const result = await target.importLogins(await VaultStore.readBackupLogins(backupPath, PASSPHRASE));
+  const result = await target.importLogins((await VaultStore.readBackupLogins(backupPath, PASSPHRASE)).logins);
   assert.deepEqual(result, { imported: 4, duplicates: 0, invalid: 0, totpSkipped: 0 });
   const importedCard = target.listEntries().find((entry) => entry.type === "card");
   assert.equal(target.revealItemSecret(importedCard.id, "number"), "4242424242424242");
   assert.deepEqual(
-    await target.importLogins(await VaultStore.readBackupLogins(backupPath, PASSPHRASE)),
+    await target.importLogins((await VaultStore.readBackupLogins(backupPath, PASSPHRASE)).logins),
     { imported: 0, duplicates: 4, invalid: 0, totpSkipped: 0 },
   );
 });

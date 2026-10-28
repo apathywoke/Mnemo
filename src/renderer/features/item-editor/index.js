@@ -95,7 +95,10 @@
         for (const input of fieldsContainer.querySelectorAll("[data-field-key]")) {
           fields[input.dataset.fieldKey] = input.value;
         }
+        // A new item made while a folder is open goes into that folder.
+        const folderId = current.id ? null : ctx.organize?.newItemFolderId();
         const saved = await ctx.api.saveItem({
+          ...(folderId ? { folderId } : {}),
           id: current.id,
           type: current.type,
           name: $("#item-name").value,

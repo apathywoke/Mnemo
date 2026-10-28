@@ -20,11 +20,22 @@
     return ns.shared.i18n.t("login.fallbackLabel");
   }
 
+  // Where the list is looking: { kind: "all" | "favorites" | "folder" |
+  // "trash", folderId }. Items in the trash appear only in the trash.
+  function inScope(entry, scope = { kind: "all" }) {
+    if (scope.kind === "trash") return Boolean(entry.deletedAt);
+    if (entry.deletedAt) return false;
+    if (scope.kind === "favorites") return entry.favorite === true;
+    if (scope.kind === "folder") return entry.folderId === scope.folderId;
+    return true;
+  }
+
   // `type` is "all" or one item type; search covers name and the visible
   // secondary text (username, website, card ending, fingerprint).
-  function filter(entries, query, type = "all") {
+  function filter(entries, query, type = "all", scope = { kind: "all" }) {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return entries.filter((entry) =>
+      inScope(entry, scope) &&
       (type === "all" || (entry.type ?? "login") === type) &&
       [entry.name, entry.username, entry.url, entry.subtitle]
         .filter(Boolean)
@@ -44,5 +55,5 @@
     container.append(glyph);
   }
 
-  ns.entities.login = { getById, secondaryLabel, filter, setItemIcon };
+  ns.entities.login = { getById, secondaryLabel, filter, inScope, setItemIcon };
 })();

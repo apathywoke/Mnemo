@@ -20,6 +20,9 @@
           selectedEntryId: null,
           selectedEntryNotes: "",
           typeFilter: "all",
+          // { kind: "all" | "favorites" | "folder" | "trash", folderId }
+          scope: { kind: "all" },
+          folders: [],
           fetchingFaviconForId: null,
         },
         ui: {
@@ -88,7 +91,7 @@
         $("#detail-notes").textContent = "";
         $("#detail-notes-field").hidden = true;
         ns.entities.login.setSiteIcon($("#detail-icon"), "", "");
-        for (const id of ["entry-dialog", "delete-dialog"]) {
+        for (const id of ["entry-dialog", "history-dialog", "folders-dialog"]) {
           const dialog = $(`#${id}`);
           if (dialog.open) dialog.close();
         }

@@ -16,6 +16,7 @@
     noPassword: "import.skippedNoPassword",
     archived: "import.skippedArchived",
     totpNotImported: "import.skippedTotp",
+    attachmentsNotImported: "import.skippedAttachments",
   });
 
   // Import in three steps: choose the source and file (parsed in main), review

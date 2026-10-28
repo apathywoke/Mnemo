@@ -95,8 +95,11 @@
       button.disabled = true;
       button.textContent = t("common.saving");
       const wasEditing = Boolean($("#entry-id").value);
+      // A new login made while a folder is open goes into that folder.
+      const folderId = wasEditing ? null : ctx.organize?.newItemFolderId();
       try {
         const savedEntry = await ctx.api.saveEntry({
+          ...(folderId ? { folderId } : {}),
           id: $("#entry-id").value,
           name: $("#entry-name").value,
           username: $("#entry-username").value,

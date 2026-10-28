@@ -399,9 +399,13 @@
                 <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="identity" data-i18n="vault.filterIdentity">Identities</button>
                 <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="ssh" data-i18n="vault.filterSsh">SSH keys</button>
               </div>
-              <div class="entry-list-heading">
-                <span id="entry-list-title" data-i18n="vault.allLogins">ALL LOGINS</span>
+              <div class="entry-list-heading scope-picker">
+                <button id="scope-button" type="button" class="scope-button" aria-haspopup="menu" aria-expanded="false" aria-controls="scope-menu">
+                  <span id="entry-list-title" data-i18n="vault.allItems">ALL ITEMS</span>
+                  <svg class="scope-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3"/></svg>
+                </button>
                 <span id="entry-count">0</span>
+                <div id="scope-menu" class="new-item-menu scope-menu" role="menu" aria-labelledby="scope-button" hidden></div>
               </div>
               <div id="entry-list" class="entry-list" role="list"></div>
               <div id="empty-list" class="empty-list" hidden>
@@ -414,6 +418,7 @@
                 No logins match your search.
               </p>
               <div class="new-item new-item-dock">
+                <button id="empty-trash-button" type="button" class="new-entry-button empty-trash-button" hidden data-i18n="trash.empty">Empty trash</button>
                 <button id="create-entry-button" type="button" class="new-entry-button" aria-haspopup="menu" aria-expanded="false" aria-controls="new-item-menu">
                   <span aria-hidden="true">+</span> <span data-i18n="vault.newItem">New item</span>
                 </button>
@@ -541,6 +546,45 @@
                   <div id="report-weak-list" class="report-list"></div>
                 </section>
               </section>
+              <!-- Shared by the login and item details: moved into whichever is shown. -->
+              <div id="detail-shared" hidden>
+                <div id="trash-banner" class="trash-banner" role="note">
+                  <div class="trash-banner-text">
+                    <strong data-i18n="trash.bannerTitle">In the trash</strong>
+                    <span id="trash-banner-detail"></span>
+                  </div>
+                  <div class="trash-banner-actions">
+                    <button id="restore-entry-button" type="button" class="detail-action" data-i18n="trash.restore">Restore</button>
+                    <button id="delete-forever-button" type="button" class="detail-action danger-action" data-i18n="trash.deleteForever">Delete forever</button>
+                  </div>
+                </div>
+                <div id="detail-organize" class="detail-organize">
+                  <button id="favorite-button" type="button" class="organize-chip favorite-toggle" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z"/></svg>
+                    <span data-i18n="organize.favorite">Favorite</span>
+                  </button>
+                  <label class="organize-chip folder-chip">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2h9A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5Z"/></svg>
+                    <span class="visually-hidden" data-i18n="organize.folder">Folder</span>
+                    <select id="entry-folder-select" class="folder-select"></select>
+                  </label>
+                  <button id="history-button" type="button" class="organize-chip" aria-haspopup="dialog" hidden>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+                    <span id="history-button-label"></span>
+                  </button>
+                </div>
+                <section id="detail-attachments" class="detail-attachments" aria-labelledby="attachments-title">
+                  <div class="detail-attachments-heading">
+                    <span id="attachments-title" class="detail-section-label" data-i18n="attachments.title">ATTACHMENTS</span>
+                    <button id="add-attachment-button" type="button" class="detail-action add-attachment-button">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.4 3.4 0 0 1 4.8 4.8l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg>
+                      <span data-i18n="attachments.add">Add file…</span>
+                    </button>
+                  </div>
+                  <ul id="attachment-list" class="attachment-list"></ul>
+                  <p id="attachments-empty" class="attachments-empty" data-i18n="attachments.empty">No files attached. Files are encrypted and stored with this vault.</p>
+                </section>
+              </div>
               <section id="detail-empty" class="detail-empty">
                 <div class="detail-empty-mark" aria-hidden="true">＋</div>
                 <p data-i18n="detail.emptyTitle">Select a login to view its details</p>
@@ -668,15 +712,37 @@
             </form>
           </dialog>
 
-          <dialog id="delete-dialog" class="app-dialog confirm-dialog">
-            <div class="confirm-content">
-              <p class="eyebrow section-label" data-i18n="deleteLogin.eyebrow">DELETE LOGIN</p>
-              <h3 data-i18n="deleteLogin.title">Delete this login?</h3>
-              <p data-i18n="deleteLogin.body">This action cannot be undone.</p>
-              <div class="dialog-actions">
-                <button id="cancel-delete-button" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
-                <button id="confirm-delete-button" type="button" class="delete-confirm-button" data-i18n="common.delete">Delete</button>
+          <dialog id="history-dialog" class="app-dialog history-dialog" aria-labelledby="history-title">
+            <div class="settings-dialog-content">
+              <div class="dialog-heading">
+                <div>
+                  <p class="eyebrow section-label" data-i18n="history.eyebrow">HISTORY</p>
+                  <h3 id="history-title"></h3>
+                </div>
+                <button id="close-history-dialog" type="button" class="dialog-close" aria-label="Close" data-i18n-aria-label="history.close">×</button>
               </div>
+              <p class="settings-hint" data-i18n="history.hint">Mnemo keeps the last 20 versions of each item. Restoring a version keeps the current one here, so it can be undone.</p>
+              <ol id="history-list" class="history-list"></ol>
+            </div>
+          </dialog>
+
+          <dialog id="folders-dialog" class="app-dialog folders-dialog" aria-labelledby="folders-title">
+            <div class="settings-dialog-content">
+              <div class="dialog-heading">
+                <div>
+                  <p class="eyebrow section-label" data-i18n="folders.eyebrow">ORGANIZE</p>
+                  <h3 id="folders-title" data-i18n="folders.title">Folders</h3>
+                </div>
+                <button id="close-folders-dialog" type="button" class="dialog-close" aria-label="Close" data-i18n-aria-label="history.close">×</button>
+              </div>
+              <form id="folder-create-form" class="folder-create">
+                <label class="visually-hidden" for="folder-name-input" data-i18n="folders.newLabel">New folder name</label>
+                <input id="folder-name-input" type="text" maxlength="100" autocomplete="off" spellcheck="false" placeholder="New folder" data-i18n-placeholder="folders.newPlaceholder" />
+                <button type="submit" class="secondary-button" data-i18n="folders.create">Create</button>
+              </form>
+              <p id="folders-error" class="form-error" role="alert" hidden></p>
+              <ul id="folder-list" class="folder-list"></ul>
+              <p id="folders-empty" class="settings-hint" data-i18n="folders.empty">No folders yet. Items can be in one folder each; deleting a folder keeps its items.</p>
             </div>
           </dialog>
         </section>
@@ -1029,6 +1095,9 @@
     <script src="./src/renderer/features/touch-id/index.js"></script>
     <script src="./src/renderer/features/updates/index.js"></script>
     <script src="./src/renderer/features/password-health/index.js"></script>
+    <script src="./src/renderer/features/organize/index.js"></script>
+    <script src="./src/renderer/features/attachments/index.js"></script>
+    <script src="./src/renderer/features/history/index.js"></script>
     <script src="./src/renderer/features/settings/index.js"></script>
     <script src="./src/renderer/widgets/vault-browser/index.js"></script>
     <script src="./src/renderer/pages/access/index.js"></script>

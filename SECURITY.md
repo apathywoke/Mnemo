@@ -55,6 +55,14 @@ passwords until the design has received independent security review.
   written to the backup. A backup uses the same master passphrase as the local
   vault. Restore verifies the file and passphrase before replacing the local
   vault, and asks for confirmation first when a local vault already exists.
+  When the vault has attachments, the backup is a container (`MNEMOBK1`) with
+  the envelope and the attachment files exactly as they are stored, still
+  encrypted (see `backup-file.js`). Export decrypts every attachment once
+  first and refuses, naming the file, if one is missing or damaged. Restore
+  checks that every attachment the vault refers to is present and decrypts;
+  only then does it copy the files and replace the vault file in one rename.
+  A damaged or truncated backup leaves the current vault and its files as
+  they were.
 - The in-memory vault locks after five minutes without keyboard or pointer
   activity, when macOS reports screen lock or suspend, when the window closes,
   and when the app exits.
@@ -177,9 +185,37 @@ passwords until the design has received independent security review.
   (for example, with your Mac login password) could recover the vault key
   without the master passphrase. Restoring a backup into the vault or
   deleting the vault removes the stored key.
-- Deleting a profile unlinks its encrypted vault file. It does not guarantee
-  secure erasure from APFS snapshots, Time Machine backups, SSD remapping, or
-  other copies of that file.
+- Items can be organized in folders (one per item) and marked as favorites.
+  Both are stored inside the encrypted vault data; changing them does not
+  change an item's date or history.
+- Deleting an item moves it to the trash, unchanged and restorable, with its
+  history and attachments. Items are removed for good after 30 days (checked
+  when the vault opens) or when the user deletes them forever or empties the
+  trash; both ask for confirmation in a native dialog in the main process.
+  Items in the trash cannot be edited and are left out of reports.
+- Each item keeps its last 20 earlier versions. Sealed values (passwords,
+  one-time code settings, secret fields) are kept sealed as they were, bound
+  to the same item, and are copied or shown only by the main process. Saving
+  without a change adds no version; restoring a version keeps the replaced
+  content as the newest version. If the vault would grow past its size
+  limit, the oldest versions are dropped first. Old passwords stay in the
+  history until they are pushed out or the item is deleted for good.
+- Attachments (up to 50 MB each, 20 per item, 1 GB per vault) are stored as
+  separate files in `<vault>.attachments/` (folder `0700`, files `0600`).
+  Each file is encrypted with AES-256-GCM under its own random key, with the
+  attachment ID as associated data; that key is sealed under the vault key,
+  bound to the item and attachment IDs, inside the encrypted vault data. A
+  file alone reveals only its size. Files are picked and saved through
+  native dialogs in the main process; contents and paths never reach the
+  renderer. A new file is written before the vault refers to it, and a
+  deleted one is removed after the vault stops referring to it, so the vault
+  never points at a missing file; files left by an interruption are removed
+  when the vault opens. Saving an attachment writes a plain copy where the
+  user chooses; that copy is outside Mnemo's protection.
+- Deleting a profile unlinks its encrypted vault file and removes its
+  attachment folder. It does not guarantee secure erasure from APFS
+  snapshots, Time Machine backups, SSD remapping, or other copies of those
+  files.
 
 ## Before storing real credentials
 

@@ -6,7 +6,6 @@
 
   function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetail, updateSiteIconButton }) {
     const state = ctx.state.vault;
-    const deleteDialog = $("#delete-dialog");
 
     async function copyField(entryId, field) {
       try {
@@ -16,28 +15,6 @@
         showToast(errorText(cause, "errors.copyValue"), { type: "error" });
       }
     }
-
-    $("#delete-entry-button").addEventListener("click", () => {
-      if (getEntry(state.selectedEntryId)) deleteDialog.showModal();
-    });
-    $("#cancel-delete-button").addEventListener("click", () => deleteDialog.close());
-    $("#confirm-delete-button").addEventListener("click", async (event) => {
-      const button = event.currentTarget;
-      const deletedId = state.selectedEntryId;
-      button.disabled = true;
-      try {
-        await ctx.api.deleteEntry(deletedId);
-        deleteDialog.close();
-        state.selectedEntryId = null;
-        await refreshEntries(null, true);
-        showToast(t("toast.loginDeleted"));
-      } catch (cause) {
-        deleteDialog.close();
-        showToast(errorText(cause, "errors.deleteLogin"), { type: "error" });
-      } finally {
-        button.disabled = false;
-      }
-    });
 
     // The main process shows the password in a native dialog; it is not
     // returned to this renderer.

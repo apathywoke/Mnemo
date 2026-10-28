@@ -11,7 +11,9 @@
     window.setTimeout(() => notification.remove(), 180);
   }
 
-  function show(message, { type = "success" } = {}) {
+  // `action` ({ label, onClick }) adds a button, such as Undo, and keeps the
+  // notification up a little longer.
+  function show(message, { type = "success", action = null } = {}) {
     const host = document.getElementById("toast-region");
     if (!host || typeof message !== "string" || !message.trim()) return;
 
@@ -21,7 +23,7 @@
     host.setAttribute("aria-live", safeType === "error" ? "assertive" : "polite");
 
     const notification = document.createElement("div");
-    notification.className = `toast-notification toast-${safeType}`;
+    notification.className = `toast-notification toast-${safeType}${action ? " has-action" : ""}`;
 
     const icon = document.createElement("span");
     icon.className = "toast-icon";
@@ -40,10 +42,22 @@
     close.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
     close.addEventListener("click", () => dismiss(notification));
 
-    notification.append(icon, text, close);
+    notification.append(icon, text);
+    if (action) {
+      const button = document.createElement("button");
+      button.className = "toast-action";
+      button.type = "button";
+      button.textContent = action.label;
+      button.addEventListener("click", () => {
+        dismiss(notification);
+        action.onClick();
+      });
+      notification.append(button);
+    }
+    notification.append(close);
     host.append(notification);
     window.requestAnimationFrame(() => notification.classList.add("is-visible"));
-    dismissalTimer = window.setTimeout(() => dismiss(notification), 2500);
+    dismissalTimer = window.setTimeout(() => dismiss(notification), action ? 6000 : 2500);
   }
 
   ns.shared.toast = { show };

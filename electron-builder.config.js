@@ -44,6 +44,7 @@ module.exports = {
     "ssh-keys.js",
     "updater.js",
     "password-health.js",
+    "backup-file.js",
     "build/update-keys/*.pem",
     "favicon-fetcher.js",
     "index.html",
