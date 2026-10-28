@@ -4,7 +4,8 @@ There are two ways to ship:
 
 - **GitHub releases with in-app updates** (what the project uses today, no
   Apple account): push a version tag and GitHub Actions builds, signs the
-  update manifest, and publishes. The app is ad-hoc signed. See
+  update manifest, and publishes. The app is ad-hoc signed with the hardened
+  runtime and is not notarized. See
   [Publishing a release](#publishing-a-release).
 - **Developer ID builds** (`npm run dist:mac`), signed and notarized by Apple,
   described next. The release workflow does not use them yet.
@@ -87,8 +88,23 @@ no ticket is stapled.
 ## Verifying an artifact by hand
 
 ```sh
-npm run verify:mac -- release/mac-arm64/Mnemo.app
+npm run verify:mac -- release/mac-arm64/Mnemo.app                       # Developer ID
+npm run verify:mac -- release/mac-arm64/Mnemo.app --mode=adhoc-release  # GitHub build
 ```
+
+`scripts/verify-mac-release.js` has three modes (`--mode=` or
+`MNEMO_VERIFY_MODE`):
+
+| Check | `release` | `adhoc-release` | `local` |
+| --- | --- | --- | --- |
+| Fuses, asar integrity, `codesign --verify --deep --strict` | yes | yes | yes |
+| Hardened runtime on every executable (app, helpers, crashpad) | yes | yes | no |
+| Signature | Developer ID Application | ad-hoc | any |
+| Entitlements allowed | `allow-jit` | `allow-jit`, `disable-library-validation` | `allow-jit` |
+| Stapled ticket and Gatekeeper | yes | no | no |
+
+No mode allows `allow-dyld-environment-variables` or `get-task-allow`.
+`MNEMO_LOCAL_TEST_BUILD=1` and `--local` still select `local`.
 
 Useful manual checks:
 
@@ -100,13 +116,17 @@ xcrun stapler validate release/mac-arm64/Mnemo.app
 spctl --assess --type execute --verbose=2 release/mac-arm64/Mnemo.app
 ```
 
-## Local test builds
+## Local builds
 
-`npm run pack:mac:local` builds an unpacked `release/mac-*/Mnemo.app` with the
-same fuses and asar integrity, but with an ad-hoc signature, no hardened
-runtime, and no notarization. The verification hook runs in "local" mode and
-still checks fuses, asar integrity, `codesign --verify`, and entitlements. Do
-not distribute these builds.
+`npm run dist:mac:local` runs `npm run dist:mac:adhoc`, the command the
+release workflow uses: `.dmg` and `.zip` for `arm64` and `x64`, ad-hoc signed
+with the hardened runtime and `build/entitlements.adhoc.plist`, verified in
+`adhoc-release` mode. It is the way to check a release build before tagging.
+
+`npm run pack:mac:local` builds an unpacked `release/mac-*/Mnemo.app` for
+debugging: same fuses and asar integrity, ad-hoc signature, but no hardened
+runtime, so `DYLD_*` variables and debuggers work on it. The verification
+hook runs in `local` mode. Do not distribute these builds.
 
 A packaged build uses the same per-user data directory as `npm start`
 (`~/Library/Application Support/local-vault-prototype`). Pass
@@ -118,9 +138,10 @@ real vaults.
 `.github/workflows/release.yml` runs on every pushed tag that starts with `v`.
 
 1. **build** (macOS, no secrets): checks that the tag equals `v` + the
-   `package.json` version, runs `npm ci` and `npm test`, and builds ad-hoc
-   signed `Mnemo-<version>-mac-<arch>.dmg` and `.zip` for `arm64` and `x64`.
-   The `afterSign` hook still verifies fuses and asar integrity.
+   `package.json` version, runs `npm ci` and `npm test`, and builds
+   `Mnemo-<version>-mac-<arch>.dmg` and `.zip` for `arm64` and `x64` with
+   `npm run dist:mac:adhoc` (see [Ad-hoc release builds](#ad-hoc-release-builds)).
+   The `afterSign` hook verifies them in `adhoc-release` mode.
 2. **publish** (Linux, environment `release`): takes the release notes from
    the tag message, runs `scripts/make-update-manifest.js` with the
    `MNEMO_UPDATE_PRIVATE_KEY` secret, and creates the GitHub release with the
@@ -140,6 +161,39 @@ git push origin main v0.2.0
 The tag message becomes the GitHub release notes and the app's "What's new"
 (at most 8000 characters). A tag with a hyphen (`v0.3.0-beta.1`) becomes a
 GitHub prerelease, which the in-app updater never offers.
+
+**Build without releasing.** Actions → Release → **Run workflow** runs only
+the build job on the chosen branch and uploads the `.dmg` and `.zip` files as
+the `mac-builds` artifact (kept 7 days). The publish job is skipped, so the
+update key is never used and nothing is released. The tag check is skipped
+too, so the version is whatever `package.json` says. GitHub shows the
+button only once this workflow, with `workflow_dispatch`, is on the default
+branch.
+
+### Ad-hoc release builds
+
+Without a Developer ID, the workflow signs ad hoc (`identity=-`), still with
+the hardened runtime on the app, every helper, and the crashpad handler, and
+skips notarization. They use `build/entitlements.adhoc.plist`:
+
+- `com.apple.security.cs.allow-jit`, as in Developer ID builds;
+- `com.apple.security.cs.disable-library-validation`, only here. An ad-hoc
+  signature has no Team ID, and library validation compares Team IDs, so
+  without it the app cannot load its own `Electron Framework` and dyld
+  aborts at launch ("mapping process and mapped file (non-platform) have
+  different Team IDs").
+
+The hardened runtime still makes the process ignore `DYLD_*` environment
+variables and, without `get-task-allow`, refuse debuggers. The `DYLD_*` part
+was checked on macOS 27 (arm64): a test library passed in
+`DYLD_INSERT_LIBRARIES` is loaded into the main process, the helpers, and the
+renderer of a `pack:mac:local` build, and into none of them in a
+`dist:mac:local` build. `codesign -dv` shows `flags=0x10002(adhoc,runtime)`.
+
+What these builds lack compared to Developer ID: notarization (Gatekeeper
+warns on first open), an author macOS can identify, library validation, and
+a Keychain identity that survives updates. See `docs/THREAT_MODEL.md` (A4,
+A5, A7).
 
 ### One-time setup
 
@@ -210,6 +264,14 @@ signed with it, and announce it; copies that miss it stay exposed until
 they update manually.
 
 ### Testing the updater locally
+
+The updater checks a downloaded app with `codesign --verify --deep --strict`,
+which accepts ad-hoc signatures with or without the hardened runtime, so
+copies built before the hardened runtime update to builds with it. This was
+checked by running `Updater` (real `ditto`, `codesign`, and bundle swap; a
+local fake GitHub) from an installed build without the runtime to a
+`dist:mac:local` zip; the swapped-in app started and passed
+`--mode=adhoc-release`.
 
 `test/updater.test.js` builds small ad-hoc-signed app bundles, zips them with
 `ditto`, signs a manifest with a throwaway key, and runs check, download, and

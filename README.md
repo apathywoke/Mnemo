@@ -22,14 +22,16 @@ security updates current.
 `npm run dist:mac` produces signed, notarized `.dmg` and `.zip` builds with
 hardened Electron fuses and asar integrity checks. It needs a Developer ID
 certificate and App Store Connect API key; see `docs/RELEASING.md`.
-`npm run pack:mac:local` makes an ad-hoc-signed local test build, and
-`npm run dist:mac:local` an ad-hoc-signed `.dmg` installer for this Mac in
-`release/`. The app icon is drawn in `build/icon.svg`; `npm run icon`
+`npm run dist:mac:local` builds exactly what the release workflow publishes
+(ad-hoc signed, hardened runtime, `.dmg` and `.zip`) in `release/`;
+`npm run pack:mac:local` makes an unpacked debug build without the hardened
+runtime. The app icon is drawn in `build/icon.svg`; `npm run icon`
 regenerates `build/icon.png` and `build/icon.icns` from it.
 
 Pushing a version tag (`v0.2.0`) runs `.github/workflows/release.yml`, which
-tests, builds ad-hoc-signed `.dmg` and `.zip` files, signs an update manifest
-with the project's Ed25519 key, and publishes a GitHub release. Installed
+tests, builds ad-hoc-signed `.dmg` and `.zip` files with the hardened
+runtime, signs an update manifest with the project's Ed25519 key, and
+publishes a GitHub release. Installed
 copies find it through the in-app updater; see `docs/RELEASING.md`.
 
 ## Renderer architecture

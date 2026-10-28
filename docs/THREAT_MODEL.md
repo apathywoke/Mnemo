@@ -40,7 +40,7 @@ again whenever a trigger at the end of this document applies. Updated
  │    ── HTTPS (scheduled, can be off) ─ GitHub releases (updates)     │  B6
  │    ── native dialogs ──────────────── reveal password, file pickers │
  └─────────────────────────────────────────────────────────────────────┘
-   B5: GitHub Actions build → ad-hoc signature → GitHub release → user's Mac
+   B5: GitHub Actions build → ad-hoc signature, hardened runtime → GitHub release → user's Mac
        (or: build machine → Developer ID signature → notarization)
 ```
 
@@ -57,9 +57,10 @@ again whenever a trigger at the end of this document applies. Updated
   on click), and the update check (B6). Renderer network access is blocked by CSP and by
   `webRequest`.
 - **B5, supply chain.** Fuses and asar integrity make tampering with app code
-  inside an installed copy detectable by Electron. A Developer ID build adds
-  notarization and Gatekeeper; the ad-hoc builds published on GitHub do not
-  identify their author to macOS.
+  inside an installed copy detectable by Electron. Every published build has
+  the hardened runtime. A Developer ID build adds library validation,
+  notarization, and Gatekeeper; the ad-hoc builds published on GitHub do not
+  identify their author to macOS and run without library validation.
 - **B6, main → GitHub releases.** The main process reads the latest release
   of `apathywoke/Mnemo`, its signed manifest, and the archive for this Mac.
   Trust rests on the Ed25519 signature checked against keys bundled in the
@@ -140,7 +141,9 @@ again whenever a trigger at the end of this document applies. Updated
 | Run the signed binary as Node (`ELECTRON_RUN_AS_NODE`) to inherit its identity | `RunAsNode` fuse off | None known. |
 | Inject code with `NODE_OPTIONS`, `--inspect`, or `--inspect-brk` | `EnableNodeOptionsEnvironmentVariable` and `EnableNodeCliInspectArguments` fuses off | None known. |
 | Launch with `--remote-debugging-port` or `--remote-debugging-pipe` and drive the renderer | Packaged builds exit at startup when either switch is present | Other Chromium switches (`--js-flags`, `--disable-web-security`, and so on) are not filtered. They cannot reach Node.js and do not change the main-process checks, but should be reviewed. |
-| Modify `app.asar` or plant `Resources/app/` to backdoor the app | `EnableEmbeddedAsarIntegrityValidation` and `OnlyLoadAppFromAsar` fuses on; the asar hash is inside the signed `Info.plist`; hardened runtime with library validation (no `disable-library-validation` entitlement) | An attacker who can rewrite the whole bundle and re-sign it ad hoc produces an app that Gatekeeper does not trust; a quarantined download fails assessment, but a local unquarantined copy may still launch. Install in `/Applications` and keep it owned by an admin. |
+| Modify `app.asar` or plant `Resources/app/` to backdoor the app | `EnableEmbeddedAsarIntegrityValidation` and `OnlyLoadAppFromAsar` fuses on; the asar hash is inside the signed `Info.plist`; Developer ID builds add library validation | An attacker who can rewrite the whole bundle and re-sign it ad hoc produces an app that Gatekeeper does not trust; a quarantined download fails assessment, but a local unquarantined copy may still launch. Install in `/Applications` and keep it owned by an admin. |
+| Load a foreign library: `DYLD_INSERT_LIBRARIES` or another `DYLD_*` variable | Hardened runtime on the app and every helper, without `allow-dyld-environment-variables`; checked with an injected test library (`docs/RELEASING.md`) | None known for injection through the environment. |
+| Load a foreign library by replacing one inside the bundle (for example `Electron Framework`) | Developer ID builds: library validation refuses code from another Team ID | GitHub builds have `disable-library-validation` (an ad-hoc signature has no Team ID to compare), so a replaced, re-signed framework loads. This needs write access to the bundle, which already allows the re-signing attack in the row above. |
 | Replace the vault file or `profiles.json` | AES-GCM authentication; schema validation; registry validation | The attacker can delete or roll back vaults (old encrypted copy). Rollback is not detected. |
 | Read the Touch ID key file and ask the Keychain for its key | The Keychain item belongs to the signed app; another app gets a macOS Keychain prompt. The file is `0600` and bound to its profile ID | A user who clicks "Always Allow", or an attacker who knows the login password and has the disk, can decrypt the vault key without Touch ID or the master passphrase. Touch ID is checked by the app, not by the Keychain item. |
 | Read clipboard leftovers | Copied values are cleared after 30 s, and on lock, if unchanged | Clipboard managers and Universal Clipboard may keep copies. |
@@ -151,8 +154,10 @@ Out of scope beyond best effort. A same-user process with debugger,
 Accessibility, or screen-recording rights can read the main process's memory,
 watch the screen, or log keystrokes. The hardened runtime (no
 `get-task-allow`, no `allow-dyld-environment-variables`) blocks casual
-debugger attachment and `DYLD_*` injection into the signed release build, and
-auto-lock limits how long secrets stay in memory.
+debugger attachment and `DYLD_*` injection into every published build,
+Developer ID and ad hoc alike, and auto-lock limits how long secrets stay in
+memory. Builds from `npm run pack:mac:local` have no hardened runtime and
+must not be used with real vaults on a shared machine.
 
 ### A6, physical or visual access
 
@@ -167,8 +172,8 @@ auto-lock limits how long secrets stay in memory.
 
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
-| Trojanized download | Developer ID builds: signature, hardened runtime, notarization with a stapled ticket, Gatekeeper | GitHub releases are ad-hoc signed, so the first install asks the user to override Gatekeeper and cannot tell a genuine download from a re-signed one. Compare against the release page; the in-app updater (A8) protects later versions. |
-| Shipping an unsigned or misconfigured build | `forceCodeSigning`; the `afterSign` hook verifies fuses, asar integrity, the signature, entitlements, the ticket, and Gatekeeper; tests pin the fuse and entitlement configuration | Build-machine compromise is out of scope. Signing keys must be protected; prefer App Store Connect API keys stored in a secrets manager. |
+| Trojanized download | Developer ID builds: signature, hardened runtime, notarization with a stapled ticket, Gatekeeper | GitHub releases are ad-hoc signed (with the hardened runtime), so the first install asks the user to override Gatekeeper and cannot tell a genuine download from a re-signed one. Compare against the release page; the in-app updater (A8) protects later versions. |
+| Shipping an unsigned or misconfigured build | `forceCodeSigning`; the `afterSign` hook verifies fuses, asar integrity, the signature, entitlements, the ticket, and Gatekeeper (`release` mode), or everything except the Developer ID and the ticket (`adhoc-release` mode, used by the release workflow); the hardened runtime is required on every executable in both; tests pin the fuse and entitlement configuration and that the workflow does not turn the hardened runtime off | Build-machine compromise is out of scope. Signing keys must be protected; prefer App Store Connect API keys stored in a secrets manager. |
 | Compromised npm dependency | No runtime dependencies; build tools pinned to exact versions with a lockfile; `npm audit` clean at the time of writing | Build-time dependencies (electron-builder) run with developer privileges. |
 
 ### A8, update channel
@@ -225,8 +230,10 @@ auto-lock limits how long secrets stay in memory.
    to change the passphrase without the recovery key so old 7-character
    vaults can be upgraded, and raising scrypt cost or moving to Argon2id.
 9. **Developer ID.** GitHub releases are ad-hoc signed. With a Developer ID,
-   sign and notarize in the release workflow, check the new app's Team ID in
-   the updater, and the Gatekeeper and Keychain prompts go away.
+   sign and notarize in the release workflow, drop
+   `build/entitlements.adhoc.plist` so library validation is back, check the
+   new app's Team ID in the updater, and the Gatekeeper and Keychain prompts
+   go away.
 10. **Update freshness.** Reject manifests older than a set age, or show the
     date of the newest known release, to make freeze attacks visible.
 11. **Attachments in memory.** Adding, saving, and verifying an attachment

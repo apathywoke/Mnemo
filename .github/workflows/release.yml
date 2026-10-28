@@ -1,6 +1,9 @@
 # Builds Mnemo, signs the update manifest, and publishes a GitHub release
 # when a version tag (v1.2.3) is pushed. See docs/RELEASING.md.
 #
+# Run by hand (workflow_dispatch), it only builds and uploads the artifact:
+# no publish job, so no update key and no release.
+#
 # The update key never meets npm packages: the build job installs and runs
 # dependencies but has no secrets; the publish job holds the key (environment
 # "release") and runs only Node built-ins, git, and gh. Third-party actions are
@@ -10,6 +13,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions: {}
 
@@ -33,6 +37,7 @@ jobs:
           cache: npm
 
       - name: Check the tag matches package.json
+        if: github.event_name == 'push'
         env:
           TAG: ${{ github.ref_name }}
         run: |
@@ -46,14 +51,12 @@ jobs:
 
       - run: npm test
 
-      # Ad-hoc signed: there is no Developer ID. Fuses and asar integrity are
-      # still checked by scripts/verify-mac-release.js (afterSign).
+      # Ad-hoc signed with the hardened runtime: there is no Developer ID, so
+      # no notarization. scripts/verify-mac-release.js checks the result in
+      # adhoc-release mode (afterSign). Same command as `npm run
+      # dist:mac:local`.
       - name: Build
-        env:
-          MNEMO_LOCAL_TEST_BUILD: "1"
-        run: >-
-          npx electron-builder --mac --config electron-builder.config.js --publish never
-          -c.forceCodeSigning=false -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false
+        run: npm run dist:mac:adhoc
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -66,6 +69,7 @@ jobs:
 
   publish:
     needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     environment: release
     permissions:
