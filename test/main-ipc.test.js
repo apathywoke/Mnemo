@@ -28,7 +28,10 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   const app = Object.assign(appEvents, {
     requestSingleInstanceLock: () => true,
     whenReady: () => Promise.resolve(),
-    getPath: () => directory,
+    // Paths behave like Electron's: setPath() changes what getPath() returns.
+    paths: { appData: directory },
+    setPath(name, value) { this.paths[name] = value; },
+    getPath(name) { return this.paths[name] ?? directory; },
     getVersion: () => "0.1.0-test",
     quit() {},
   });
