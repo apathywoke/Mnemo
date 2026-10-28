@@ -206,3 +206,67 @@ test("restoring a backup with the recovery key gives the restored vault a new ke
     throw new Error("empty");
   }), /empty|ENOENT/);
 });
+
+// Locking (which changes sessionEpoch) while a rotation runs must stop it
+// before the vault file is replaced, remove the files it already wrote, and
+// say why.
+test("locking during a rotation stops it and leaves the old vault whole", async (t) => {
+  const vault = await makeVault(t);
+  const { store } = vault;
+  const before = await snapshot(store, vault);
+  const oldFiles = await attachmentFiles(store);
+  const writeBytes = store.writeBytesAtomically;
+  const writeEnvelope = store.writeEnvelope;
+  let envelopeWrites = 0;
+  store.writeEnvelope = async (...args) => {
+    envelopeWrites += 1;
+    return writeEnvelope.apply(store, args);
+  };
+
+  // 1. After the first of two new attachment files.
+  let writes = 0;
+  store.writeBytesAtomically = async (...args) => {
+    await writeBytes.apply(store, args);
+    writes += 1;
+    if (writes === 1) store.lock();
+  };
+  await assert.rejects(store.changePassphrase(OLD, NEW), /^Error: The vault was locked while saving\. Unlock it again\.$/);
+  store.writeBytesAtomically = writeBytes;
+  assert.equal(writes, 1);
+  assert.equal(envelopeWrites, 0);
+  assert.equal(store.isUnlocked(), false);
+  assert.deepEqual(await attachmentFiles(store), oldFiles);
+  await store.unlock(OLD);
+  assert.deepEqual(await snapshot(store, vault), before);
+
+  // 2. After all new files, while the new envelope is being derived
+  //    (scrypt takes far longer than this timer).
+  writes = 0;
+  store.writeBytesAtomically = async (...args) => {
+    await writeBytes.apply(store, args);
+    writes += 1;
+    if (writes === oldFiles.length) setTimeout(() => store.lock(), 10);
+  };
+  await assert.rejects(store.createRecoveryKey(OLD), /^Error: The vault was locked while saving\. Unlock it again\.$/);
+  store.writeBytesAtomically = writeBytes;
+  assert.equal(writes, oldFiles.length);
+  assert.equal(envelopeWrites, 0);
+  assert.deepEqual(await attachmentFiles(store), oldFiles);
+  await store.unlock(OLD);
+  assert.deepEqual(await snapshot(store, vault), before);
+
+  // 3. Recovery from the lock screen says it was interrupted.
+  store.lock();
+  writes = 0;
+  store.writeBytesAtomically = async (...args) => {
+    await writeBytes.apply(store, args);
+    writes += 1;
+    if (writes === 1) store.lock();
+  };
+  await assert.rejects(store.recoverWithKey(vault.recoveryKey, NEW), /^Error: Recovery was interrupted because the vault was locked\.$/);
+  store.writeBytesAtomically = writeBytes;
+  assert.equal(envelopeWrites, 0);
+  assert.deepEqual(await attachmentFiles(store), oldFiles);
+  await store.unlock(OLD);
+  assert.deepEqual(await snapshot(store, vault), before);
+});
