@@ -217,3 +217,47 @@ install against a temporary `Applications` folder with a fake GitHub. It
 also covers tampered archives, foreign bundle IDs, and version mismatches.
 `test/make-update-manifest.test.js` runs the signing script against a test
 key pair.
+
+## App name, data folder, and the Keychain
+
+**Data folder.** `main.js` pins the data folder (vaults, `profiles.json`,
+`settings.json`, `biometric/`) to
+`~/Library/Application Support/local-vault-prototype` (`USER_DATA_FOLDER`).
+It no longer follows `name` or `productName` in `package.json`, so renaming
+the package cannot point the app at an empty folder. `--user-data-dir`
+still overrides it, for test builds.
+
+**Keychain.** Touch ID unlock stores each vault key encrypted with
+`safeStorage`, whose key lives in the login Keychain as the generic
+password **"<app name> Safe Storage"** (account "<app name>"). In
+Electron 45 the app name is `app.getName()`: the value of `app.setName()`
+if called, otherwise `productName`, otherwise `name` from the packaged
+`package.json`. Electron reads it once per launch, in
+`ElectronBrowserMainParts::PostCreateMainMessageLoop`
+(`shell/browser/electron_browser_main_parts.cc`). The top level of
+`main.js` runs earlier (`PostEarlyInitialization` → `LoadEnvironment`). Today
+the item is **"local-vault-prototype Safe Storage"**; `productName: "Mnemo"`
+in `electron-builder.config.js` only names the bundle and does not change it.
+
+Changing `name` in `package.json` or adding `productName` there therefore
+changes the Keychain item. Electron then creates a new key, the existing
+`biometric/<profile>.key` files no longer decrypt, and Touch ID unlock stops
+("Touch ID can no longer unlock this vault…"). Vaults, backups, and
+passphrases are not affected.
+
+**Renaming safely.** Keep the internal name and change only what users see:
+
+1. In the same change as the rename, call
+   `app.setName("local-vault-prototype")` at the top of `main.js`, before
+   anything else runs. The Keychain item and every other name-derived value
+   stay as they are.
+2. Set the visible name separately: the bundle name already comes from
+   `productName` in `electron-builder.config.js`; the About panel can use
+   `app.setAboutPanelOptions({ applicationName: "Mnemo" })`.
+3. Before releasing, test on a Mac with Touch ID turned on: install the
+   previous release, turn on Touch ID, update, and unlock with Touch ID.
+
+If the internal name must change after all, there is no way to read the old
+item with `safeStorage` once the name has changed (it is read once per
+launch). Users then turn Touch ID on again with their master passphrase; the
+old Keychain item is left behind and can be deleted in Keychain Access.

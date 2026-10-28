@@ -41,6 +41,16 @@ const REMOTE_DEBUGGING_SWITCHES = ["remote-debugging-port", "remote-debugging-pi
 const launchedWithRemoteDebugging =
   app.isPackaged === true &&
   REMOTE_DEBUGGING_SWITCHES.some((name) => app.commandLine.hasSwitch(name));
+// The data folder (vaults, settings, Touch ID files) is fixed instead of
+// following package.json "name"/"productName", so renaming the package
+// cannot strand existing vaults. Set before the single-instance lock, which
+// lives in this folder. --user-data-dir (used for test builds) still wins.
+// The Keychain item of safeStorage still follows the app name; see
+// docs/RELEASING.md before renaming.
+const USER_DATA_FOLDER = "local-vault-prototype";
+if (!app.commandLine?.hasSwitch("user-data-dir")) {
+  app.setPath("userData", path.join(app.getPath("appData"), USER_DATA_FOLDER));
+}
 const hasSingleInstanceLock =
   !launchedWithRemoteDebugging && app.requestSingleInstanceLock();
 const translator = createTranslator(i18nCatalog);
