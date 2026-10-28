@@ -258,7 +258,18 @@ connection and must not add telemetry by default.
 
 ## Reporting a vulnerability
 
-Before making this repository public, configure a private reporting route (for
-example, GitHub private vulnerability reporting) and link it here. Until then,
-report security issues to the project maintainer privately rather than opening
-a public issue with exploit details.
+Report security issues privately through GitHub:
+<https://github.com/apathywoke/Mnemo/security/advisories/new>. Please do not
+open a public issue, pull request, or discussion with details of a
+vulnerability.
+
+Only the latest release is supported; check whether the issue still exists
+there before reporting.
+
+What counts as in scope is described in `docs/THREAT_MODEL.md`: the assets,
+trust boundaries, and adversaries it lists. Issues it names as out of scope
+or as known residual risks are still welcome as reports, but may be handled
+as improvements rather than vulnerabilities.
+
+Reports are read and answered, but there is no promised response time; this
+is a small project maintained in spare time.
