@@ -146,6 +146,20 @@ passwords until the design has received independent security review.
   are protected by the vault encryption and shown in the interface like
   login notes. SSH fingerprints are computed from the public key, which is
   derived from OpenSSH and unencrypted PEM private keys when not provided.
+- **Reports** (Vault → Reports) list breached, reused, and weak login
+  passwords. The main process reads each password once per report to
+  compute a strength estimate, a keyed HMAC-SHA-256 fingerprint (the key is
+  random per unlock and erased on lock), and a SHA-1 hash; the strings are
+  then dropped. The renderer receives entry IDs and counts only. Reuse and
+  strength are computed locally. The breach check runs only when the user
+  clicks it: for each distinct password, the first 5 hex characters of its
+  SHA-1 go to `api.pwnedpasswords.com/range/` (Have I Been Pwned's
+  k-anonymity API, with `Add-Padding` so response sizes reveal nothing), and
+  the full hash is compared locally. HTTPS to that host only, no redirects,
+  1 MiB and 15 s limits per response. Have I Been Pwned sees the device's IP
+  address and the prefixes; each prefix matches hundreds of unrelated
+  hashes. Results stay in memory, keyed by fingerprint, until the vault
+  locks; a changed password shows as not yet checked.
 - One-time codes (TOTP, RFC 6238) are stored per login like passwords:
   sealed with AES-256-GCM under the vault key, bound to the entry ID with a
   separate purpose label. The secret never reaches the renderer; the main

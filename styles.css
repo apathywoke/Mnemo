@@ -3663,3 +3663,168 @@ h2 {
 .update-notes-link[hidden] {
   display: none;
 }
+
+/* Vault → Reports (password health) */
+.reports-heading {
+  margin-top: 26px;
+}
+
+.reports-heading h3 {
+  margin: 0;
+}
+
+.reports-heading .detail-url {
+  margin-top: 6px;
+}
+
+.report-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.report-tile {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+  transition: border-color 140ms ease;
+}
+
+.report-tile:hover {
+  border-color: var(--c-4b4b4b);
+}
+
+.report-tile:focus-visible {
+  outline: 1px solid var(--white);
+  outline-offset: 2px;
+}
+
+.report-tile strong {
+  color: var(--c-f2f2f2);
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.report-tile[data-state="clear"] strong {
+  color: var(--c-70c58b);
+}
+
+.report-tile[data-state="issues"] strong {
+  color: var(--c-d6c58f);
+}
+
+.report-tile[data-report-tile="breached"][data-state="issues"] {
+  border-color: var(--c-6b3434);
+}
+
+.report-tile[data-report-tile="breached"][data-state="issues"] strong {
+  color: var(--c-f0b4b4);
+}
+
+.report-section {
+  display: grid;
+  gap: 8px;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 12px;
+}
+
+.report-section .settings-section-title {
+  margin: 0;
+}
+
+.report-breach-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-top: 4px;
+}
+
+.report-breach-actions .secondary-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.report-status {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.report-list {
+  display: grid;
+}
+
+.report-list:empty {
+  display: none;
+}
+
+.report-row {
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+}
+
+.report-badge {
+  padding: 3px 8px;
+  border: 1px solid var(--c-554721);
+  border-radius: 999px;
+  background: var(--c-17140d);
+  color: var(--c-d6c58f);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.report-badge[data-tone="danger"] {
+  border-color: var(--c-6b3434);
+  background: var(--c-241414);
+  color: var(--c-f0b4b4);
+}
+
+.report-group + .report-group {
+  margin-top: 10px;
+}
+
+.report-group-title {
+  margin: 6px 0 2px;
+  color: var(--c-d6c58f);
+  font-size: 12px;
+}
+
+.report-empty {
+  margin: 2px 0 0;
+  color: var(--c-70c58b);
+  font-size: 12px;
+}
+
+.reports-view.is-empty .report-tiles,
+.reports-view.is-empty .report-section {
+  display: none;
+}
+
+.dashboard-actions [aria-expanded="true"] {
+  border-color: var(--c-4b4b4b);
+  color: var(--c-f2f2f2);
+}
+
+@media (max-width: 720px) {
+  .report-tiles {
+    gap: 6px;
+  }
+
+  .report-tile {
+    padding: 10px 12px;
+  }
+
+  .report-tile strong {
+    font-size: 20px;
+  }
+}

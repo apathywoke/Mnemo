@@ -107,6 +107,7 @@
     }
 
     function renderEntryDetail(id) {
+      reports.hide();
       const entry = getEntry(id);
       if (!entry) {
         state.selectedEntryId = null;
@@ -161,11 +162,12 @@
         state.selectedEntryNotes = "";
         detailUi.detail.hidden = true;
         itemUi.detail.hidden = true;
-        detailUi.empty.hidden = false;
+        detailUi.empty.hidden = reports.isOpen();
       }
     }
 
     function clear() {
+      reports.clear();
       totpCode.stop();
       itemUi.detail.hidden = true;
       itemUi.fields.replaceChildren();
@@ -194,6 +196,16 @@
       updateSiteIconButton,
     });
     const itemEditor = ns.features.itemEditor.init(ctx, { refreshEntries });
+    const reports = ns.features.passwordHealth.init(ctx, {
+      getEntry,
+      openEntry: renderEntryDetail,
+      deselect() {
+        state.selectedEntryId = null;
+        state.selectedEntryNotes = "";
+        totpCode.stop();
+        renderEntryList();
+      },
+    });
 
     // "+ New item" opens a menu of item types.
     const newItemButton = $("#create-entry-button");

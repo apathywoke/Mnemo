@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld("vaultApp", {
   listEntries: () => ipcRenderer.invoke("vault:list-entries"),
   getEntry: (id) => ipcRenderer.invoke("vault:get-entry", id),
   getTotpCode: (id) => ipcRenderer.invoke("vault:get-totp", id),
+  getPasswordHealth: () => ipcRenderer.invoke("vault:password-health"),
+  checkBreaches: () => ipcRenderer.invoke("vault:check-breaches"),
   saveEntry: (entry) => ipcRenderer.invoke("vault:save-entry", entry),
   saveItem: (item) => ipcRenderer.invoke("vault:save-item", item),
   revealField: (id, field) => ipcRenderer.invoke("vault:reveal-field", id, field),

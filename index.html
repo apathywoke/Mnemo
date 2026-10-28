@@ -361,6 +361,9 @@
               <h2 data-i18n="vault.title">Items</h2>
             </div>
             <div class="dashboard-actions">
+              <button id="reports-button" type="button" class="quiet-button" aria-controls="reports-view" aria-expanded="false" data-i18n="vault.reports">
+                Reports
+              </button>
               <button id="switch-profile-button" type="button" class="quiet-button" data-i18n="vault.switch">
                 Switch vault
               </button>
@@ -500,6 +503,43 @@
                   <p id="item-detail-subtitle" class="detail-url"></p>
                 </div>
                 <div id="item-detail-fields" class="detail-fields"></div>
+              </section>
+              <section id="reports-view" class="entry-detail reports-view" aria-labelledby="reports-title" hidden>
+                <div class="detail-toolbar">
+                  <span class="detail-kind" data-i18n="reports.kind">REPORTS</span>
+                  <div>
+                    <button id="reports-refresh" type="button" class="detail-action" data-i18n="reports.refresh">Refresh</button>
+                    <button id="reports-close" type="button" class="detail-action" data-i18n="reports.close">Close</button>
+                  </div>
+                </div>
+                <div class="reports-heading">
+                  <h3 id="reports-title" data-i18n="reports.title">Password health</h3>
+                  <p id="reports-summary" class="detail-url"></p>
+                </div>
+                <div class="report-tiles">
+                  <a class="report-tile" href="#report-breached" data-report-tile="breached"><strong id="report-breached-count">–</strong><span data-i18n="reports.breached">Breached</span></a>
+                  <a class="report-tile" href="#report-reused" data-report-tile="reused"><strong id="report-reused-count">–</strong><span data-i18n="reports.reused">Reused</span></a>
+                  <a class="report-tile" href="#report-weak" data-report-tile="weak"><strong id="report-weak-count">–</strong><span data-i18n="reports.weak">Weak</span></a>
+                </div>
+                <section id="report-breached" class="report-section" aria-labelledby="report-breached-title">
+                  <h4 id="report-breached-title" class="settings-section-title" data-i18n="reports.breachedTitle">Breached passwords</h4>
+                  <p class="settings-hint" data-i18n="reports.breachedHint">Checks your passwords against Have I Been Pwned without sending them: only the first 5 characters of each password's SHA-1 hash leave this Mac, and the match is made here. Have I Been Pwned sees your IP address.</p>
+                  <div class="report-breach-actions">
+                    <button id="reports-check-breaches" type="button" class="secondary-button" data-i18n="reports.breachCheck">Check with Have I Been Pwned</button>
+                    <span id="report-breach-status" class="report-status" role="status" aria-live="polite"></span>
+                  </div>
+                  <div id="report-breached-list" class="report-list"></div>
+                </section>
+                <section id="report-reused" class="report-section" aria-labelledby="report-reused-title">
+                  <h4 id="report-reused-title" class="settings-section-title" data-i18n="reports.reusedTitle">Reused passwords</h4>
+                  <p class="settings-hint" data-i18n="reports.reusedHint">When one site leaks, the same password opens the others. Give every site its own password.</p>
+                  <div id="report-reused-list" class="report-list"></div>
+                </section>
+                <section id="report-weak" class="report-section" aria-labelledby="report-weak-title">
+                  <h4 id="report-weak-title" class="settings-section-title" data-i18n="reports.weakTitle">Weak passwords</h4>
+                  <p class="settings-hint" data-i18n="reports.weakHint">Short, common, or predictable passwords are guessed quickly. Replace them with generated ones.</p>
+                  <div id="report-weak-list" class="report-list"></div>
+                </section>
               </section>
               <section id="detail-empty" class="detail-empty">
                 <div class="detail-empty-mark" aria-hidden="true">＋</div>
@@ -988,6 +1028,7 @@
     <script src="./src/renderer/features/import/index.js"></script>
     <script src="./src/renderer/features/touch-id/index.js"></script>
     <script src="./src/renderer/features/updates/index.js"></script>
+    <script src="./src/renderer/features/password-health/index.js"></script>
     <script src="./src/renderer/features/settings/index.js"></script>
     <script src="./src/renderer/widgets/vault-browser/index.js"></script>
     <script src="./src/renderer/pages/access/index.js"></script>

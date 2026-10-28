@@ -25,6 +25,8 @@ const i18nCatalog = require("./src/renderer/shared/i18n/messages");
 const { createTranslator, encodeIpcError } = require("./src/renderer/shared/i18n/translate");
 const VaultStore = require("./vault-store");
 const { fetchSiteFavicon, getFaviconHost } = require("./favicon-fetcher");
+const { randomBytes } = require("node:crypto");
+const { buildReport, checkPwnedHashes, collectPasswords } = require("./password-health");
 
 const APP_PAGE = path.join(__dirname, "index.html");
 const AUTO_LOCK_MS = 5 * 60 * 1000;
@@ -67,6 +69,12 @@ let vaultStore = null;
 let profileManager = null;
 let activeProfileId = null;
 let lockEpoch = 0;
+// Password health: a per-unlock key for password fingerprints, and breach
+// counts from the last Have I Been Pwned check, by fingerprint. Memory only;
+// cleared on lock.
+let passwordHealthKey = null;
+let breachResults = null;
+let breachCheckedAt = null;
 let autoLockTimer = null;
 let clipboardClearTimer = null;
 let ownedClipboardText = null;
@@ -278,6 +286,10 @@ function lockVault(notifyRenderer = false) {
   for (const controller of openVaultDialogs) controller.abort();
   pendingRecoveryKey = null;
   pendingImport = null;
+  passwordHealthKey?.fill(0);
+  passwordHealthKey = null;
+  breachResults = null;
+  breachCheckedAt = null;
   openVaultDialogs.clear();
   clearTemporaryClipboard();
   vaultStore?.lock();
@@ -732,6 +744,26 @@ if (launchedWithRemoteDebugging) {
       };
     });
     registerHandler("vault:delete-entry", (id) => vaultStore.deleteEntry(id));
+
+    // Reports: weak and reused passwords are found locally on every request;
+    // breaches only when the user asks, through k-anonymity range queries.
+    function readPasswordsForReport() {
+      if (!vaultStore?.isUnlocked()) throw new Error("Unlock the vault first.");
+      passwordHealthKey ??= randomBytes(32);
+      return collectPasswords(vaultStore, passwordHealthKey);
+    }
+    registerHandler("vault:password-health", () =>
+      buildReport(readPasswordsForReport(), { breaches: breachResults, checkedAt: breachCheckedAt }));
+    registerHandler("vault:check-breaches", async () => {
+      const store = vaultStore;
+      const epoch = lockEpoch;
+      const passwords = readPasswordsForReport();
+      const counts = await checkPwnedHashes(passwords.map((password) => password.sha1));
+      if (store !== vaultStore || lockEpoch !== epoch) throw new Error("Unlock the vault first.");
+      breachResults = new Map(passwords.map((password) => [password.fingerprint, counts.get(password.sha1)]));
+      breachCheckedAt = Date.now();
+      return buildReport(passwords, { breaches: breachResults, checkedAt: breachCheckedAt });
+    });
     // Item fields a user may copy: schema fields marked `copy` and the SSH
     // fingerprint. Secret fields are read here and never returned.
     function copyableItemValue(entry, field) {

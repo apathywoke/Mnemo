@@ -43,6 +43,7 @@ module.exports = {
     "totp.js",
     "ssh-keys.js",
     "updater.js",
+    "password-health.js",
     "build/update-keys/*.pem",
     "favicon-fetcher.js",
     "index.html",

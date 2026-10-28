@@ -64,8 +64,10 @@ separate Electron processes.
   arbitrary IPC or filesystem access to the renderer.
 - IPC requests are accepted only from the app's main frame.
 - Renderer-originated remote HTTP(S) and WebSocket requests are blocked;
-  renderer `connect-src` is also set to `none`. The main process makes two
-  kinds of requests: the explicit site-icon request described below, and the
+  renderer `connect-src` is also set to `none`. The main process makes three
+  kinds of requests: the explicit site-icon request described below, the
+  breach check in Reports (only when you click it; it sends the first 5
+  characters of each password's SHA-1 hash to Have I Been Pwned), and the
   update check against this project's GitHub releases (on demand and on a
   schedule chosen in Settings → Updates: every 30 minutes, hour, 6 hours, or
   day, or never; daily by default).

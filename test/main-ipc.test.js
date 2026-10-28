@@ -237,6 +237,18 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   await invoke("vault:copy-entry-field", saved.id, "totp");
   assert.match(clipboardText, /^\d{6}$/);
 
+  // Reports: weak and reused passwords by entry ID, no secrets.
+  const twin = await invoke("vault:save-entry", makeLogin({ name: "Twin" }));
+  const weak = await invoke("vault:save-entry", makeLogin({ name: "Weak", password: "password1" }));
+  const health = await invoke("vault:password-health");
+  assert.equal(health.total, 3);
+  assert.deepEqual(health.reused.map((group) => group.slice().sort()), [[saved.id, twin.id].sort()]);
+  assert.ok(health.weak.includes(weak.id));
+  assert.equal(health.breached, null);
+  assert.equal(/test-password-value|password1/.test(JSON.stringify(health)), false);
+  await invoke("vault:delete-entry", twin.id);
+  await invoke("vault:delete-entry", weak.id);
+
   // Items: secrets are copied or shown by main, never returned.
   const card = await invoke("vault:save-item", {
     id: "", type: "card", name: "Visa", notes: "",

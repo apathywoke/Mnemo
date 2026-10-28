@@ -34,7 +34,7 @@ again whenever a trigger at the end of this document applies. Updated
  │    holds: data key, decrypted vault index, sealed passwords         │
  │    ── fs (0700 dir / 0600 files) ──── vault files, profiles.json    │  B2
  │    ── clipboard ───────────────────── other apps, Universal Clip.   │  B3
- │    ── HTTPS (user-initiated only) ─── website for its favicon       │  B4
+ │    ── HTTPS (user-initiated only) ─── favicon; HIBP password ranges │  B4
  │    ── HTTPS (scheduled, can be off) ─ GitHub releases (updates)     │  B6
  │    ── native dialogs ──────────────── reveal password, file pickers │
  └─────────────────────────────────────────────────────────────────────┘
@@ -50,8 +50,9 @@ again whenever a trigger at the end of this document applies. Updated
 - **B2, main → disk.** Everything secret is encrypted before it is written.
   Writes are atomic (temp file plus rename) with restrictive permissions.
 - **B3, main → clipboard.** Leaves the app's control once written.
-- **B4, main → network.** Only the explicit "Load site icon" action and the
-  update check (B6). Renderer network access is blocked by CSP and by
+- **B4, main → network.** Only the explicit "Load site icon" action, the
+  breach check in Reports (5-character SHA-1 prefixes to Have I Been Pwned,
+  on click), and the update check (B6). Renderer network access is blocked by CSP and by
   `webRequest`.
 - **B5, supply chain.** Fuses and asar integrity make tampering with app code
   inside an installed copy detectable by Electron. A Developer ID build adds
@@ -121,6 +122,8 @@ again whenever a trigger at the end of this document applies. Updated
 | Exfiltrate what it can read (metadata, notes, passphrase) | CSP `connect-src 'none'`; `webRequest` cancels HTTP(S) and WebSocket; WebRTC removed from the page, UDP restricted, and the session proxied to a closed port; DevTools disabled in packaged builds | DNS prefetch or other Chromium side channels not covered here. |
 | Escape to Node.js or the filesystem | `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`; narrow preload; no `webview`; window opening and navigation denied; strict CSP (`script-src 'self'`, `connect-src 'none'`); remote requests cancelled | Depends on Chromium's sandbox. |
 | Spoof IPC from another frame | Handlers accept only the main frame whose URL is the packaged `index.html` | None known. |
+| Use Reports to learn about passwords | Main returns entry IDs, breach counts, and weak/reused flags only; fingerprints use a per-unlock HMAC key and never leave main | The renderer learns which entries share a password, which are weak, and (after a check) which are breached. It can start a breach check without a click, which sends 5-character SHA-1 prefixes to Have I Been Pwned. |
+| Learn passwords from the breach check (network observer or Have I Been Pwned) | Only the first 5 hex characters of each SHA-1 are sent, over HTTPS, with padded responses; matching is local | The prefixes and the number of distinct passwords are visible to Have I Been Pwned. A prefix narrows a password's SHA-1 to one of about a million hashes, which matters only for a password already in a guess list. |
 
 ### A4, local process while locked
 
