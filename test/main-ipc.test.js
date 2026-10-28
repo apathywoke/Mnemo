@@ -116,6 +116,16 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
       });
     }
   }
+  // Touch ID is macOS-only by design (BiometricUnlock checks the platform,
+  // since safeStorage elsewhere may use a weak backend). The stub Electron
+  // offers Touch ID, so the test runs as on a Mac on any host, without
+  // changing process.platform for the rest of main.
+  const RealBiometricUnlock = require("../biometric-unlock");
+  class MacBiometricUnlock extends RealBiometricUnlock {
+    constructor(directory, options) {
+      super(directory, { ...options, platform: "darwin" });
+    }
+  }
   // Update state messages can arrive at any time; checks of what else was
   // sent to the renderer leave them out.
   const vaultEvents = () => sentToRenderer.splice(0).filter(([channel]) => channel !== "updates:state");
@@ -125,6 +135,9 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
     if (request === "electron") return electronStub;
     if (request === "./updater" && parent?.filename?.endsWith(`${path.sep}main.js`)) {
       return { Updater: OfflineUpdater };
+    }
+    if (request === "./biometric-unlock" && parent?.filename?.endsWith(`${path.sep}main.js`)) {
+      return MacBiometricUnlock;
     }
     return originalLoad.call(this, request, parent, isMain);
   };
@@ -137,6 +150,9 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
     Module._load = originalLoad;
   }
   t.after(() => { delete require.cache[mainPath]; });
+  // Quitting locks the vault and clears its timers (auto-lock, clipboard),
+  // so a failed assertion cannot keep the run alive for minutes.
+  t.after(() => app.emit("before-quit"));
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.ok(browserWindow);

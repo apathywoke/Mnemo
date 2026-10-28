@@ -6,7 +6,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test",
+    "test": "node --test --test-timeout=120000",
     "dist:mac": "electron-builder --mac --config electron-builder.config.js",
     "pack:mac:local": "MNEMO_LOCAL_TEST_BUILD=1 electron-builder --mac dir --config electron-builder.config.js -c.forceCodeSigning=false -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false",
     "verify:mac": "node scripts/verify-mac-release.js",
