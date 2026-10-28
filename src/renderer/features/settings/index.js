@@ -223,7 +223,7 @@
       showNewPassphrase(action === "passphrase");
       renderVault();
       // The form sits under the section of the action it confirms.
-      button.closest(".settings-section").after(confirmForm);
+      button.closest(".settings-pane-body").append(confirmForm);
       for (const other of actionButtons) {
         other.disabled = other.dataset.settingsAction !== action;
       }
