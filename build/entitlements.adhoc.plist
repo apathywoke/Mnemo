@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- Ad-hoc release builds only (the GitHub workflow and
+         `npm run dist:mac:local`); Developer ID builds use
+         entitlements.mac.plist.
+
+         An ad-hoc signature has no Team ID, so library validation refuses
+         the app's own Electron Framework ("different Team IDs") and the app
+         cannot start under the hardened runtime. The hardened runtime still
+         ignores DYLD_* variables and refuses debuggers. Never add
+         allow-dyld-environment-variables or get-task-allow here. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+  </dict>
+</plist>

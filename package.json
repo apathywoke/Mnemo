@@ -11,7 +11,8 @@
     "pack:mac:local": "MNEMO_LOCAL_TEST_BUILD=1 electron-builder --mac dir --config electron-builder.config.js -c.forceCodeSigning=false -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false",
     "verify:mac": "node scripts/verify-mac-release.js",
     "icon": "electron scripts/make-icon.js",
-    "dist:mac:local": "MNEMO_LOCAL_TEST_BUILD=1 electron-builder --mac dmg --config electron-builder.config.js --publish never -c.forceCodeSigning=false -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false"
+    "dist:mac:adhoc": "MNEMO_VERIFY_MODE=adhoc-release electron-builder --mac --config electron-builder.config.js --publish never -c.forceCodeSigning=false -c.mac.identity=- -c.mac.notarize=false -c.mac.entitlements=build/entitlements.adhoc.plist -c.mac.entitlementsInherit=build/entitlements.adhoc.plist",
+    "dist:mac:local": "npm run dist:mac:adhoc"
   },
   "devDependencies": {
     "@electron/fuses": "2.1.3",

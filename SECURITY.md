@@ -95,9 +95,13 @@ passwords until the design has received independent security review.
   Packaged builds refuse to start with Chromium remote-debugging switches.
   `npm run dist:mac` signs with a Developer ID certificate and the hardened
   runtime and notarizes. Releases published on GitHub are currently
-  **ad-hoc signed** (no Developer ID, no notarization): macOS asks the user to
-  allow the first launch, and the signature proves only that the bundle is
-  intact, not who made it. See `docs/RELEASING.md`.
+  **ad-hoc signed with the hardened runtime** (no Developer ID, no
+  notarization): the app ignores `DYLD_*` environment variables and refuses
+  debuggers, but macOS asks the user to allow the first launch, and the
+  signature proves only that the bundle is intact, not who made it. Because
+  an ad-hoc signature has no Team ID, these builds also carry
+  `disable-library-validation`; without it they cannot load their own
+  Electron framework. See `docs/RELEASING.md`.
 - Updates come from this project's GitHub releases. About 20 seconds after
   launch and then on the schedule chosen in Settings → Updates (every 30
   minutes, hour, 6 hours, or day; daily by default; or never), and when the
