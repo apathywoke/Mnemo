@@ -22,7 +22,7 @@ test("profiles create, list, restore, mark opened, and delete", async (t) => {
   assert.throws(() => manager.getVaultPath("../outside"), /valid vault profile/);
 
   await assert.rejects(manager.createProfile("   ", PASSPHRASE), /Vault names must/);
-  await assert.rejects(manager.createProfile("Personal", "short"), /at least 7 characters/);
+  await assert.rejects(manager.createProfile("Personal", "short"), /at least 12 characters/);
 
   const created = await manager.createProfile("  Personal  ", PASSPHRASE);
   assert.equal(created.profile.name, "Personal");

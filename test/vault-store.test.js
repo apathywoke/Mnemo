@@ -17,7 +17,7 @@ test("vault lifecycle, encrypted entries, validation, icon storage, and locking"
     unlocked: false,
     entryCount: 0,
   });
-  await assert.rejects(store.create("short"), /at least 7 characters/);
+  await assert.rejects(store.create("short"), /at least 12 characters/);
 
   const created = await store.create(PASSPHRASE);
   assert.deepEqual(created, { vaultExists: true, unlocked: true, entryCount: 0 });
@@ -236,7 +236,7 @@ test("recovery key opens the vault, resets the passphrase, and is replaced", asy
   // Typos are caught by the checksum before any decryption.
   const typo = recoveryKey.slice(0, -1) + (recoveryKey.endsWith("0") ? "1" : "0");
   await assert.rejects(store.recoverWithKey(typo, "new passphrase 123"), /recovery key is not valid/);
-  await assert.rejects(store.recoverWithKey(recoveryKey, "short"), /at least 7 characters/);
+  await assert.rejects(store.recoverWithKey(recoveryKey, "short"), /at least 12 characters/);
 
   // Lowercase, spaces, and look-alike letters are accepted.
   const typed = recoveryKey.toLowerCase().replaceAll("-", " ").replaceAll("0", "o");
@@ -247,7 +247,7 @@ test("recovery key opens the vault, resets the passphrase, and is replaced", asy
   store.lock();
 
   await assert.rejects(store.unlock(PASSPHRASE), /Could not open the vault/);
-  await assert.rejects(store.recoverWithKey(recoveryKey, "another passphrase"), /with this recovery key/);
+  await assert.rejects(store.recoverWithKey(recoveryKey, "another passphrase 456"), /with this recovery key/);
   await store.unlock("new passphrase 123");
   assert.equal(store.revealPassword(id), "test-password-value");
   store.lock();
@@ -357,7 +357,7 @@ test("a backup opens with its recovery key and gets a new passphrase and key", a
   const target = new VaultStore(path.join(directory, "target.vault"));
   await assert.rejects(
     target.restoreBackup(backupPath, { recoveryKey, newPassphrase: "short" }),
-    /at least 7 characters/,
+    /at least 12 characters/,
   );
   await assert.rejects(
     target.restoreBackup(backupPath, { recoveryKey, newPassphrase: "new passphrase 123", extra: 1 }),

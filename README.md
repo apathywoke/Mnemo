@@ -77,8 +77,10 @@ separate Electron processes.
   contents remain encrypted.
 - The master passphrase is not stored; scrypt derives a wrapping key for a
   randomly generated vault key, and AES-256-GCM encrypts the vault contents.
-  The app accepts a minimum of seven characters, but a longer unique
-  passphrase is much safer against offline guessing.
+  A new master passphrase must be at least 12 characters and rated Strong
+  by the built-in estimate (shown while typing); a phrase of several
+  unrelated words works well. Vaults created earlier with a shorter
+  passphrase still open.
 - Login data is encrypted before it is written to disk. While the vault is
   unlocked, the main process holds the decrypted vault index; each password
   stays sealed until it is copied or shown. The renderer receives entry

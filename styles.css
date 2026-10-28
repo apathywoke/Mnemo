@@ -4367,3 +4367,8 @@ h2 {
   min-width: 0;
   padding: 4px 0;
 }
+
+/* Strength of a master passphrase being set (create, recovery). */
+.passphrase-strength {
+  margin: 8px 0 4px;
+}
