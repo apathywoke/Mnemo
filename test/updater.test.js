@@ -267,6 +267,59 @@ test("download refuses archives that do not match the signed manifest", { skip: 
   assert.deepEqual((await fs.readdir(applications)).sort(), ["Mnemo.app"]);
 });
 
+// A minimal valid asar archive holding one file. Inside Electron, `fs` sees it
+// as a folder.
+function asarArchive() {
+  const json = Buffer.from(JSON.stringify({ files: { "main.js": { size: 1, offset: "0" } } }));
+  const padded = Math.ceil(json.length / 4) * 4;
+  const header = Buffer.alloc(8 + padded);
+  header.writeUInt32LE(4 + padded, 0);
+  header.writeUInt32LE(json.length, 4);
+  json.copy(header, 8);
+  const size = Buffer.alloc(8);
+  size.writeUInt32LE(4, 0);
+  size.writeUInt32LE(header.length, 4);
+  return Buffer.concat([size, header, Buffer.from(";")]);
+}
+
+// The Electron binary, or null when it was not downloaded
+// (ELECTRON_SKIP_BINARY_DOWNLOAD).
+function electronBinary() {
+  try {
+    return require("electron");
+  } catch {
+    return null;
+  }
+}
+
+test("leftovers holding an app.asar are removed under Electron", { skip: !electronBinary() && "Electron is not installed" }, async (t) => {
+  const applications = await makeTempDirectory(t, "mnemo-update-asar-");
+  const installed = path.join(applications, "Mnemo.app");
+  await fs.mkdir(installed);
+  // A previous app that is already only partly deleted, and an unpacked
+  // download that was rejected.
+  for (const resources of [
+    path.join(applications, ".Mnemo-previous-0123456789abcdef.app", "Contents", "Resources"),
+    path.join(applications, ".Mnemo-update-fedcba9876543210", "Mnemo.app", "Contents", "Resources"),
+  ]) {
+    await fs.mkdir(resources, { recursive: true });
+    await fs.writeFile(path.join(resources, "app.asar"), asarArchive());
+  }
+
+  const script = `
+    const [updaterPath, execPath] = process.argv.slice(1);
+    const { Updater } = require(updaterPath);
+    new Updater({ currentVersion: "0.1.0", execPath, isPackaged: true, platform: "darwin" })
+      .cleanUpLeftovers()
+      .catch((error) => { console.error(error); process.exitCode = 1; });
+  `;
+  execFileSync(electronBinary(), ["-e", script, require.resolve("../updater"), path.join(installed, "Contents", "MacOS", "Mnemo")], {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+    stdio: "pipe",
+  });
+  assert.deepEqual(await fs.readdir(applications), ["Mnemo.app"]);
+});
+
 test("a private key in the update keys folder is refused", async (t) => {
   const directory = await makeTempDirectory(t, "mnemo-update-keys-");
   const { privateKey } = generateKeyPairSync("ed25519");
