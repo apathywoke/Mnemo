@@ -87,9 +87,13 @@ separate Electron processes.
   30 seconds if its plain-text contents still match the copied value. If
   another app replaces that text, the app leaves the new clipboard contents
   alone.
-- Backup files contain the same encrypted vault envelope, not plaintext. They
-  require the same master passphrase; forgetting it means the data cannot be
-  recovered.
+- Backup files contain the same encrypted vault envelope, not plaintext, plus
+  the encrypted attachment files when there are any. They require the same
+  master passphrase; forgetting it means the data cannot be recovered.
+- Items can be sorted into folders and favorites. Deleted items wait in the
+  trash for 30 days. Each item keeps its last 20 versions, including earlier
+  passwords, which can be restored. Attachments are encrypted files stored
+  next to the vault.
 - The vault locks after five minutes without keyboard or pointer activity, when
   the Mac locks or sleeps, when the app window closes, or when the app exits.
 - This prototype has no telemetry or crash-reporting SDK. Site icons are only

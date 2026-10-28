@@ -228,17 +228,31 @@ class ProfileManager {
 
       const vaultPath = this.getVaultPath(profile.id);
       const stagedPath = `${vaultPath}.${process.pid}.${randomBytes(8).toString("hex")}.deleting`;
+      // Attachments live in a folder next to the vault file and go with it.
+      const attachmentPath = VaultStore.attachmentDirectoryFor(vaultPath);
+      const stagedAttachmentPath = `${stagedPath}.attachments`;
       const profiles = await this.readRegistry();
       const remainingProfiles = profiles.filter((item) => item.id !== profile.id);
       let registryUpdated = false;
       let vaultStaged = false;
+      let attachmentsStaged = false;
 
       try {
         await fs.rename(vaultPath, stagedPath);
         vaultStaged = true;
+        try {
+          await fs.rename(attachmentPath, stagedAttachmentPath);
+          attachmentsStaged = true;
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+        }
         await this.writeRegistry(remainingProfiles);
         registryUpdated = true;
         await fs.unlink(stagedPath);
+        vaultStaged = false;
+        if (attachmentsStaged) {
+          await fs.rm(stagedAttachmentPath, { recursive: true, force: true }).catch(() => {});
+        }
       } catch {
         let rollbackFailed = false;
         if (registryUpdated) {
@@ -253,6 +267,13 @@ class ProfileManager {
             await fs.rename(stagedPath, vaultPath);
           } catch {
             rollbackFailed = true;
+          }
+          if (attachmentsStaged) {
+            try {
+              await fs.rename(stagedAttachmentPath, attachmentPath);
+            } catch {
+              rollbackFailed = true;
+            }
           }
         }
         if (rollbackFailed) {
@@ -300,7 +321,10 @@ class ProfileManager {
       return { profile, vaultStore: store };
     } catch (error) {
       store.lock();
-      if (ownsVaultPath) await fs.unlink(vaultPath).catch(() => {});
+      if (ownsVaultPath) {
+        await fs.unlink(vaultPath).catch(() => {});
+        await fs.rm(VaultStore.attachmentDirectoryFor(vaultPath), { recursive: true, force: true }).catch(() => {});
+      }
       throw error;
     }
   }

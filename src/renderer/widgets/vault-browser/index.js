@@ -32,6 +32,10 @@
 
     const getEntry = (id) => ns.entities.login.getById(state.entries, id);
     const totpCode = ns.features.totpCode.init(ctx);
+    // Set up below, once the functions they call exist.
+    let organize = null;
+    let attachments = null;
+    let history = null;
 
     function renderEntryList() {
       ns.entities.login.renderList({
@@ -43,11 +47,33 @@
         empty: $("#empty-list"),
         noResults: $("#no-search-results"),
         typeFilter: state.typeFilter,
+        scope: state.scope,
+        scopeEmptyText: organize?.scopeEmptyText() ?? "",
         onSelect: renderEntryDetail,
       });
-      $("#entry-list-title").textContent = t(
+      const typeTitle = t(
         state.typeFilter === "all" ? "vault.allItems" : `vault.filter${state.typeFilter[0].toUpperCase()}${state.typeFilter.slice(1)}`,
-      ).toLocaleUpperCase();
+      );
+      $("#entry-list-title").textContent = (organize?.scopeTitle() ?? typeTitle).toLocaleUpperCase();
+      organize?.updateDock();
+    }
+
+    // Folder, favorite, trash, attachments, and history for the shown item.
+    function showSharedDetail(section, entry, details = null) {
+      organize.attachDetail(section, entry);
+      if (details) {
+        attachments.render(section, details);
+        history.render(details);
+      }
+    }
+
+    // A summary changed by an action in the detail (favorite, folder).
+    function applySummary(summary) {
+      state.entries = state.entries.map((entry) => (entry.id === summary.id ? summary : entry));
+      renderEntryList();
+      if (state.selectedEntryId === summary.id) {
+        organize.attachDetail(summary.type === "login" ? detailUi.detail : itemUi.detail, summary);
+      }
     }
 
     // Cards, notes, identities, and SSH keys: details (without secrets) are
@@ -60,6 +86,7 @@
           onCopy: (field) => void copyItemField(id, field),
           onReveal: (field) => void revealItemField(id, field),
         });
+        showSharedDetail(itemUi.detail, getEntry(id) ?? details, details);
       } catch {
         // The vault may have locked meanwhile.
       }
@@ -101,6 +128,7 @@
           notes: details.notes,
           updateSiteIconButton,
         });
+        showSharedDetail(detailUi.detail, getEntry(id), details);
       } catch {
         // The list stays usable; the vault may have locked meanwhile.
       }
@@ -109,6 +137,11 @@
     function renderEntryDetail(id) {
       reports.hide();
       const entry = getEntry(id);
+      if (!entry || entry.id !== state.selectedEntryId) {
+        // Attachments and history load with the item's details.
+        attachments.hide();
+        history.hide();
+      }
       if (!entry) {
         state.selectedEntryId = null;
         state.selectedEntryNotes = "";
@@ -132,29 +165,35 @@
       }
       itemUi.detail.hidden = true;
       const notes = state.selectedEntryId === entry.id ? state.selectedEntryNotes : "";
-      const needsNotes = state.selectedEntryId !== entry.id;
       state.selectedEntryId = entry.id;
       state.selectedEntryNotes = notes;
       ns.entities.login.renderDetail(entry, detailUi, { notes, updateSiteIconButton });
+      organize.attachDetail(detailUi.detail, entry);
       totpCode.follow(entry);
       renderEntryList();
-      if (needsNotes) void loadSelectedNotes(entry.id);
+      // Notes, attachments, and history come with the details.
+      void loadSelectedNotes(entry.id);
     }
 
     async function refreshEntries(preferredId = null, selectFirst = false) {
-      state.entries = await ctx.api.listEntries();
+      const [entries, folders] = await Promise.all([ctx.api.listEntries(), ctx.api.listFolders()]);
+      state.entries = entries;
+      state.folders = folders;
+      organize.checkScope();
       // The entry may have a new or removed one-time code; start over.
       totpCode.stop();
       const previousId = state.selectedEntryId;
       // Saved entries may have changed notes; clearing the selection makes
       // renderEntryDetail fetch them again.
       state.selectedEntryId = null;
+      if (preferredId) organize.revealEntry(getEntry(preferredId));
+      const visible = () => ns.entities.login.filter(state.entries, $("#entry-search").value, state.typeFilter, state.scope);
       const nextId = preferredId && getEntry(preferredId)
         ? preferredId
         : previousId && getEntry(previousId)
           ? previousId
           : selectFirst
-            ? state.entries[0]?.id ?? null
+            ? visible()[0]?.id ?? null
             : null;
       renderEntryList();
       if (nextId) renderEntryDetail(nextId);
@@ -168,6 +207,9 @@
 
     function clear() {
       reports.clear();
+      organize.clear();
+      attachments.hide();
+      history.hide();
       totpCode.stop();
       itemUi.detail.hidden = true;
       itemUi.fields.replaceChildren();
@@ -196,6 +238,16 @@
       updateSiteIconButton,
     });
     const itemEditor = ns.features.itemEditor.init(ctx, { refreshEntries });
+    organize = ns.features.organize.init(ctx, {
+      getEntry,
+      refreshEntries,
+      renderEntryList,
+      renderEntryDetail,
+      applySummary,
+    });
+    ctx.organize = organize;
+    attachments = ns.features.attachments.init(ctx, { refreshEntries });
+    history = ns.features.history.init(ctx, { refreshEntries });
     const reports = ns.features.passwordHealth.init(ctx, {
       getEntry,
       openEntry: renderEntryDetail,
@@ -255,9 +307,6 @@
       } catch (cause) {
         showToast(errorText(cause, "errors.openLogin"), { type: "error" });
       }
-    });
-    $("#delete-item-button").addEventListener("click", () => {
-      if (getEntry(state.selectedEntryId)) $("#delete-dialog").showModal();
     });
 
     $("#entry-search").addEventListener("input", renderEntryList);

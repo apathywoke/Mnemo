@@ -16,6 +16,7 @@ const { generateTotp, parseTotpInput, toOtpauthUri } = require("./totp");
 const { ITEM_TYPES } = require("./src/renderer/shared/item-types");
 const { describeSshKey, isPrivateKey } = require("./ssh-keys");
 const cardTools = require("./src/renderer/shared/lib/card-tools");
+const { openVaultSource, readContainerFile, writeContainer } = require("./backup-file");
 
 const scryptAsync = promisify(scrypt);
 const FORMAT = "local-vault";
@@ -34,8 +35,15 @@ const RECOVERY_GROUP_SIZE = 4;
 // Schema 1 stored passwords as plain strings inside the encrypted vault data.
 // Schema 2 additionally seals each password under the vault key, bound to its
 // entry ID, so unlocking does not decrypt every password at once.
-const VAULT_SCHEMA_VERSION = 2;
+// Schema 3 adds folders, favorites, the trash, version history, and
+// attachments. Older schemas are upgraded in memory on unlock and written as
+// schema 3 on the next save.
+const VAULT_SCHEMA_VERSION = 3;
+const SEALED_SCHEMA_VERSION = 2;
 const LEGACY_VAULT_SCHEMA_VERSION = 1;
+// Sealed values keep the label of the schema that introduced them, so a new
+// schema never changes what an existing sealed value is bound to.
+const SEALED_AAD_VERSION = 2;
 const KDF = Object.freeze({ name: "scrypt", N: 2 ** 17, r: 8, p: 1 });
 const KEY_BYTES = 32;
 const SALT_BYTES = 16;
@@ -61,6 +69,19 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 const MAX_PASSPHRASE_BYTES = 1024;
 const MIN_PASSPHRASE_CHARACTERS = 7;
 const MAX_SCRYPT_MEMORY_BYTES = 256 * 1024 * 1024;
+// Organization (schema 3).
+const MAX_FOLDERS = 500;
+const MAX_FOLDER_NAME = 100;
+const HISTORY_LIMIT = 20;
+const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+const MAX_ATTACHMENTS_PER_ENTRY = 20;
+const MAX_TOTAL_ATTACHMENT_BYTES = 1024 * 1024 * 1024;
+const MAX_ATTACHMENT_NAME = 255;
+// Optional keys on every entry, stored only when they differ from the
+// default: no folder, not a favorite, not in the trash, no attachments, no
+// earlier versions.
+const META_KEYS = Object.freeze(["folderId", "favorite", "deletedAt", "attachments", "history"]);
 
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -214,7 +235,7 @@ function decryptGcm(record, key, aad, exactCiphertextLength = null) {
 // label so a sealed password and a sealed TOTP secret cannot be swapped.
 function getTotpAad(entryId) {
   return Buffer.from(
-    `local-vault:entry-totp:v${VAULT_SCHEMA_VERSION}:${entryId}`,
+    `local-vault:entry-totp:v${SEALED_AAD_VERSION}:${entryId}`,
     "utf8",
   );
 }
@@ -240,7 +261,7 @@ function openTotp(record, dataKey, entryId) {
 
 function getPasswordAad(entryId) {
   return Buffer.from(
-    `local-vault:entry-password:v${VAULT_SCHEMA_VERSION}:${entryId}`,
+    `local-vault:entry-password:v${SEALED_AAD_VERSION}:${entryId}`,
     "utf8",
   );
 }
@@ -397,16 +418,30 @@ function parseEnvelope(envelope) {
 }
 
 function validateVaultData(value) {
+  const version = value?.schemaVersion;
+  const isCurrent = version === VAULT_SCHEMA_VERSION;
+  if (
+    !hasExactKeys(value, isCurrent ? ["schemaVersion", "entries", "folders"] : ["schemaVersion", "entries"]) ||
+    ![VAULT_SCHEMA_VERSION, SEALED_SCHEMA_VERSION, LEGACY_VAULT_SCHEMA_VERSION].includes(version) ||
+    !Array.isArray(value.entries) ||
+    value.entries.length > MAX_ENTRIES ||
+    (isCurrent && !isValidFolderList(value.folders))
+  ) {
+    return false;
+  }
+  const context = {
+    folderIds: new Set(isCurrent ? value.folders.map((folder) => folder.id) : []),
+    attachmentIds: new Set(),
+  };
   return (
-    hasExactKeys(value, ["schemaVersion", "entries"]) &&
-    (value.schemaVersion === VAULT_SCHEMA_VERSION ||
-      value.schemaVersion === LEGACY_VAULT_SCHEMA_VERSION) &&
-    Array.isArray(value.entries) &&
-    value.entries.length <= MAX_ENTRIES &&
-    value.entries.every((entry) =>
-      entry?.type === "login"
-        ? isValidLoginEntry(entry, value.schemaVersion)
-        : value.schemaVersion === VAULT_SCHEMA_VERSION && isValidItemEntry(entry)) &&
+    value.entries.every((entry) => {
+      const parts = splitEntry(entry);
+      if (!parts || (!isCurrent && Object.keys(parts.meta).length > 0)) return false;
+      const contentValid = parts.core.type === "login"
+        ? isValidLoginEntry(parts.core, version)
+        : version !== LEGACY_VAULT_SCHEMA_VERSION && isValidItemEntry(parts.core);
+      return contentValid && isValidEntryMeta(parts.meta, parts.core, context);
+    }) &&
     new Set(value.entries.map((entry) => entry.id)).size === value.entries.length
   );
 }
@@ -461,7 +496,7 @@ function isValidItemEntry(entry) {
 
 function getItemSecretAad(entryId, field) {
   return Buffer.from(
-    `local-vault:item-secret:v${VAULT_SCHEMA_VERSION}:${entryId}:${field}`,
+    `local-vault:item-secret:v${SEALED_AAD_VERSION}:${entryId}:${field}`,
     "utf8",
   );
 }
@@ -482,6 +517,384 @@ function openItemSecret(record, dataKey, entryId, field) {
   } finally {
     plaintext.fill(0);
   }
+}
+
+// --- Attachments ----------------------------------------------------------------
+//
+// Each attachment is a file next to the vault (<vault>.attachments/<id>.bin),
+// encrypted with its own random key. That key is sealed under the vault key,
+// bound to the entry and attachment IDs, and kept with the attachment's name
+// and size inside the encrypted vault data. A file on its own reveals only
+// its size. Files never change after they are written.
+const ATTACHMENT_MAGIC = Buffer.from("MNEMOAT1", "ascii");
+const ATTACHMENT_OVERHEAD = ATTACHMENT_MAGIC.length + NONCE_BYTES + TAG_BYTES;
+
+function getAttachmentKeyAad(entryId, attachmentId) {
+  return Buffer.from(`local-vault:attachment-key:v1:${entryId}:${attachmentId}`, "utf8");
+}
+
+function getAttachmentFileAad(attachmentId) {
+  return Buffer.from(`local-vault:attachment-file:v1:${attachmentId}`, "utf8");
+}
+
+function sealAttachmentKey(fileKey, dataKey, entryId, attachmentId) {
+  return encryptGcm(fileKey, dataKey, getAttachmentKeyAad(entryId, attachmentId));
+}
+
+function openAttachmentKey(record, dataKey, entryId, attachmentId) {
+  return decryptGcm(record, dataKey, getAttachmentKeyAad(entryId, attachmentId), KEY_BYTES);
+}
+
+// File layout: magic (8) | nonce (12) | tag (16) | ciphertext.
+function encryptAttachment(plaintext, fileKey, attachmentId) {
+  const nonce = randomBytes(NONCE_BYTES);
+  const cipher = createCipheriv("aes-256-gcm", fileKey, nonce);
+  cipher.setAAD(getAttachmentFileAad(attachmentId));
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  return Buffer.concat([ATTACHMENT_MAGIC, nonce, cipher.getAuthTag(), ciphertext]);
+}
+
+function decryptAttachment(fileBytes, fileKey, attachmentId, expectedSize) {
+  if (
+    fileBytes.length !== ATTACHMENT_OVERHEAD + expectedSize ||
+    !fileBytes.subarray(0, ATTACHMENT_MAGIC.length).equals(ATTACHMENT_MAGIC)
+  ) {
+    throw new Error("Invalid attachment");
+  }
+  const nonceStart = ATTACHMENT_MAGIC.length;
+  const tagStart = nonceStart + NONCE_BYTES;
+  const decipher = createDecipheriv("aes-256-gcm", fileKey, fileBytes.subarray(nonceStart, tagStart));
+  decipher.setAAD(getAttachmentFileAad(attachmentId));
+  decipher.setAuthTag(fileBytes.subarray(tagStart, ATTACHMENT_OVERHEAD));
+  return Buffer.concat([decipher.update(fileBytes.subarray(ATTACHMENT_OVERHEAD)), decipher.final()]);
+}
+
+// Shortens to at most `max` UTF-16 units without splitting a surrogate pair.
+function truncateUnits(text, max) {
+  if (text.length <= max) return text;
+  let end = max;
+  const code = text.charCodeAt(end - 1);
+  if (code >= 0xd800 && code <= 0xdbff) end -= 1;
+  return text.slice(0, end);
+}
+
+// A safe display and save-as name taken from the original file name.
+function normalizeAttachmentName(rawName) {
+  let name = String(rawName ?? "").normalize("NFC").replace(/[\u0000-\u001f\u007f/\\:]/g, "_").trim();
+  if (!name || name === "." || name === "..") name = "attachment";
+  if (name.length > MAX_ATTACHMENT_NAME) {
+    const extension = path.extname(name).slice(0, 16);
+    name = `${truncateUnits(name.slice(0, name.length - extension.length), MAX_ATTACHMENT_NAME - extension.length)}${extension}`;
+  }
+  return name;
+}
+
+function isValidSealedKey(record) {
+  if (!isGcmRecord(record)) return false;
+  try {
+    decodeBase64(record.nonce, NONCE_BYTES, NONCE_BYTES);
+    decodeBase64(record.tag, TAG_BYTES, TAG_BYTES);
+    decodeBase64(record.ciphertext, KEY_BYTES, KEY_BYTES);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isValidAttachment(value) {
+  return (
+    hasExactKeys(value, ["id", "name", "size", "key", "createdAt"]) &&
+    typeof value.id === "string" &&
+    UUID_PATTERN.test(value.id) &&
+    typeof value.name === "string" &&
+    normalizeAttachmentName(value.name) === value.name &&
+    Number.isSafeInteger(value.size) &&
+    value.size >= 0 &&
+    value.size <= MAX_ATTACHMENT_BYTES &&
+    isValidSealedKey(value.key) &&
+    Number.isSafeInteger(value.createdAt) &&
+    value.createdAt > 0
+  );
+}
+
+function toAttachmentSummary(attachment) {
+  return { id: attachment.id, name: attachment.name, size: attachment.size, createdAt: attachment.createdAt };
+}
+
+// Every attachment in a vault, with the entry it belongs to.
+function attachmentsOf(vaultData) {
+  return vaultData.entries.flatMap((entry) =>
+    (entry.attachments ?? []).map((attachment) => ({ entryId: entry.id, attachment })));
+}
+
+async function pathExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Reads a whole file, refusing anything larger than `limit` bytes even if it
+// grows while being read.
+async function readFileWithLimit(filePath, limit) {
+  const handle = await fs.open(filePath, "r");
+  const chunk = Buffer.alloc(1024 * 1024);
+  const chunks = [];
+  let total = 0;
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile()) throw new Error("invalid");
+    if (stats.size > limit) throw Object.assign(new Error("invalid"), { tooLarge: true });
+    for (;;) {
+      const { bytesRead } = await handle.read(chunk, 0, chunk.length, null);
+      if (bytesRead === 0) break;
+      total += bytesRead;
+      if (total > limit) throw Object.assign(new Error("invalid"), { tooLarge: true });
+      chunks.push(Buffer.from(chunk.subarray(0, bytesRead)));
+    }
+    return Buffer.concat(chunks, total);
+  } finally {
+    chunk.fill(0);
+    for (const part of chunks) part.fill(0);
+    await handle.close();
+  }
+}
+
+// --- Folders, history, and other per-entry metadata ---------------------------------
+
+function normalizeFolderName(input) {
+  if (typeof input !== "string" || !input.trim()) throw new Error("Enter a folder name.");
+  const name = input.normalize("NFC").trim();
+  if (name.length > MAX_FOLDER_NAME || /[\u0000-\u001f\u007f]/.test(name)) {
+    throw new Error("Folder names must be 1–100 characters long.");
+  }
+  return name;
+}
+
+function isValidFolder(folder) {
+  if (
+    !hasExactKeys(folder, ["id", "name", "createdAt"]) ||
+    typeof folder.id !== "string" ||
+    !UUID_PATTERN.test(folder.id) ||
+    !Number.isSafeInteger(folder.createdAt) ||
+    folder.createdAt <= 0
+  ) {
+    return false;
+  }
+  try {
+    return normalizeFolderName(folder.name) === folder.name;
+  } catch {
+    return false;
+  }
+}
+
+function isValidFolderList(folders) {
+  return (
+    Array.isArray(folders) &&
+    folders.length <= MAX_FOLDERS &&
+    folders.every(isValidFolder) &&
+    new Set(folders.map((folder) => folder.id)).size === folders.length &&
+    new Set(folders.map((folder) => folder.name.toLowerCase())).size === folders.length
+  );
+}
+
+// A version in an entry's history keeps the content fields as they were,
+// with sealed values reused as they are (still bound to the same entry).
+const LOGIN_SNAPSHOT_KEYS = Object.freeze(["id", "savedAt", "updatedAt", "name", "username", "url", "notes", "password"]);
+const ITEM_SNAPSHOT_KEYS = Object.freeze(["id", "savedAt", "updatedAt", "name", "notes", "fields", "secrets"]);
+
+function isValidSnapshot(snapshot, entry) {
+  if (
+    !isPlainObject(snapshot) ||
+    typeof snapshot.id !== "string" ||
+    !UUID_PATTERN.test(snapshot.id) ||
+    !Number.isSafeInteger(snapshot.savedAt) ||
+    !Number.isSafeInteger(snapshot.updatedAt) ||
+    snapshot.savedAt < snapshot.updatedAt
+  ) {
+    return false;
+  }
+  const { id: _versionId, savedAt: _savedAt, ...content } = snapshot;
+  if (entry.type === "login") {
+    const keys = Object.hasOwn(snapshot, "totp") ? [...LOGIN_SNAPSHOT_KEYS, "totp"] : LOGIN_SNAPSHOT_KEYS;
+    return hasExactKeys(snapshot, keys) &&
+      isValidLoginEntry({ ...content, id: entry.id, type: "login", createdAt: entry.createdAt }, SEALED_SCHEMA_VERSION);
+  }
+  return hasExactKeys(snapshot, ITEM_SNAPSHOT_KEYS) &&
+    isValidItemEntry({ ...content, id: entry.id, type: entry.type, createdAt: entry.createdAt });
+}
+
+// Splits a stored entry into its content (validated by type) and metadata.
+function splitEntry(entry) {
+  if (!isPlainObject(entry)) return null;
+  const core = {};
+  const meta = {};
+  for (const [key, value] of Object.entries(entry)) {
+    if (META_KEYS.includes(key)) meta[key] = value;
+    else core[key] = value;
+  }
+  return { core, meta };
+}
+
+// `context` carries the vault's folder IDs and collects attachment IDs, which
+// must be unique across the vault (they name the files).
+function isValidEntryMeta(meta, core, context) {
+  for (const [key, value] of Object.entries(meta)) {
+    if (key === "folderId" && !(typeof value === "string" && context.folderIds.has(value))) return false;
+    if (key === "favorite" && value !== true) return false;
+    if (key === "deletedAt" && !(Number.isSafeInteger(value) && value > 0)) return false;
+    if (key === "attachments") {
+      if (!Array.isArray(value) || value.length === 0 || value.length > MAX_ATTACHMENTS_PER_ENTRY) return false;
+      for (const attachment of value) {
+        if (!isValidAttachment(attachment) || context.attachmentIds.has(attachment.id)) return false;
+        context.attachmentIds.add(attachment.id);
+      }
+    }
+    if (
+      key === "history" &&
+      (!Array.isArray(value) ||
+        value.length === 0 ||
+        value.length > HISTORY_LIMIT ||
+        !value.every((snapshot) => isValidSnapshot(snapshot, core)) ||
+        new Set(value.map((snapshot) => snapshot.id)).size !== value.length)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function metaOf(entry) {
+  const meta = {};
+  for (const key of META_KEYS) {
+    if (entry && Object.hasOwn(entry, key)) meta[key] = entry[key];
+  }
+  return meta;
+}
+
+// Rebuilds `entry` with the metadata of `source`, updated by `changes`.
+// Default values (no folder, false, null, empty lists) are left out.
+function withMeta(entry, source, changes = {}) {
+  const result = { ...entry };
+  for (const key of META_KEYS) delete result[key];
+  const meta = { ...metaOf(source), ...changes };
+  if (meta.folderId) result.folderId = meta.folderId;
+  if (meta.favorite === true) result.favorite = true;
+  if (meta.deletedAt) result.deletedAt = meta.deletedAt;
+  if (meta.attachments?.length) result.attachments = meta.attachments;
+  if (meta.history?.length) result.history = meta.history;
+  return result;
+}
+
+function snapshotOf(entry, now) {
+  const base = {
+    id: randomUUID(),
+    savedAt: Math.max(now, entry.updatedAt),
+    updatedAt: entry.updatedAt,
+    name: entry.name,
+    notes: entry.notes,
+  };
+  if (entry.type === "login") {
+    const snapshot = { ...base, username: entry.username, url: entry.url, password: entry.password };
+    if (entry.totp) snapshot.totp = entry.totp;
+    return snapshot;
+  }
+  return { ...base, fields: { ...entry.fields }, secrets: { ...entry.secrets } };
+}
+
+// The current content goes to the top of the history; the oldest versions
+// beyond the limit are dropped.
+function historyAfterChange(entry, now) {
+  return [snapshotOf(entry, now), ...(entry.history ?? [])].slice(0, HISTORY_LIMIT);
+}
+
+function sameSealed(left, right) {
+  return left === right || (Boolean(left) && Boolean(right) && JSON.stringify(left) === JSON.stringify(right));
+}
+
+function sameRecord(left, right, same) {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) {
+    if (!Object.hasOwn(left, key) || !Object.hasOwn(right, key) || !same(left[key], right[key])) return false;
+  }
+  return true;
+}
+
+// Whether a save changes what the entry contains (not its folder, favorite,
+// icon, or attachments). Unchanged sealed values are reused, so comparing
+// the sealed records is enough.
+function contentChanged(previous, next) {
+  if (previous.name !== next.name || previous.notes !== next.notes) return true;
+  if (previous.type === "login") {
+    return previous.username !== next.username ||
+      previous.url !== next.url ||
+      !sameSealed(previous.password, next.password) ||
+      !sameSealed(previous.totp, next.totp);
+  }
+  return !sameRecord(previous.fields, next.fields, (left, right) => left === right) ||
+    !sameRecord(previous.secrets, next.secrets, sameSealed);
+}
+
+// Which fields differ between an earlier version and the one that replaced it.
+function versionChanges(entry, version, newer) {
+  const changes = ["name", "notes"].filter((key) => version[key] !== newer[key]);
+  if (entry.type === "login") {
+    for (const key of ["username", "url"]) {
+      if (version[key] !== newer[key]) changes.push(key);
+    }
+    if (!sameSealed(version.password, newer.password)) changes.push("password");
+    if (!sameSealed(version.totp, newer.totp)) changes.push("totp");
+    return changes;
+  }
+  for (const field of ITEM_TYPES[entry.type].fields) {
+    const changed = field.kind === "secret"
+      ? !sameSealed(version.secrets[field.key], newer.secrets[field.key])
+      : (version.fields[field.key] ?? "") !== (newer.fields[field.key] ?? "");
+    if (changed) changes.push(field.key);
+  }
+  return changes;
+}
+
+function toVersionSummary(entry, version, newer) {
+  const summary = {
+    id: version.id,
+    savedAt: version.savedAt,
+    updatedAt: version.updatedAt,
+    name: version.name,
+    notes: version.notes,
+    changes: versionChanges(entry, version, newer),
+  };
+  if (entry.type === "login") {
+    return {
+      ...summary,
+      username: version.username,
+      url: version.url,
+      secretFields: ["password"],
+      hasTotp: Boolean(version.totp),
+    };
+  }
+  return { ...summary, fields: { ...version.fields }, secretFields: Object.keys(version.secrets) };
+}
+
+// Old versions go first when the vault would exceed its size limit, oldest
+// first, so a save never fails because of history alone.
+function pruneHistory(vaultData, fraction) {
+  const versions = [];
+  for (const entry of vaultData.entries) {
+    for (const version of entry.history ?? []) versions.push(version);
+  }
+  if (versions.length === 0) return null;
+  versions.sort((left, right) => left.savedAt - right.savedAt);
+  const dropped = new Set(versions.slice(0, Math.max(1, Math.ceil(versions.length * fraction))));
+  return {
+    ...vaultData,
+    entries: vaultData.entries.map((entry) =>
+      entry.history?.some((version) => dropped.has(version))
+        ? withMeta(entry, entry, { history: entry.history.filter((version) => !dropped.has(version)) })
+        : entry),
+  };
 }
 
 // Per-type checks and normalization for values typed into the editor.
@@ -527,8 +940,12 @@ const ITEM_NORMALIZERS = Object.freeze({
 // `fields` holds every editable field as a string. For secret fields an empty
 // string keeps the stored value, so the editor never needs to read secrets.
 function normalizeItemInput(input) {
+  const required = ["id", "type", "name", "notes", "fields"];
   if (
-    !hasExactKeys(input, ["id", "type", "name", "notes", "fields"]) ||
+    !isPlainObject(input) ||
+    !required.every((key) => Object.hasOwn(input, key)) ||
+    !Object.keys(input).every((key) => required.includes(key) || key === "folderId") ||
+    !isFolderIdInput(input.folderId) ||
     !Object.hasOwn(ITEM_TYPES, input.type) ||
     (input.id !== "" && (typeof input.id !== "string" || !UUID_PATTERN.test(input.id))) ||
     typeof input.name !== "string" ||
@@ -559,7 +976,21 @@ function normalizeItemInput(input) {
     if (field.kind === "secret") secrets[field.key] = value;
     else plain[field.key] = value;
   }
-  return { id: input.id, type: input.type, name, notes: input.notes, plain, secrets };
+  return {
+    id: input.id,
+    type: input.type,
+    name,
+    notes: input.notes,
+    plain,
+    secrets,
+    folderId: Object.hasOwn(input, "folderId") ? input.folderId || null : undefined,
+  };
+}
+
+// `folderId` in editor input: absent (keep), null or "" (no folder), or an ID.
+function isFolderIdInput(value) {
+  return value === undefined || value === null || value === "" ||
+    (typeof value === "string" && UUID_PATTERN.test(value));
 }
 
 const REQUIRED_ENTRY_KEYS = Object.freeze([
@@ -627,17 +1058,23 @@ function isValidLoginEntry(entry, schemaVersion) {
 }
 
 function upgradeVaultData(vaultData, dataKey) {
-  if (vaultData.schemaVersion === VAULT_SCHEMA_VERSION) return vaultData;
-  // The legacy password strings already exist in memory after parsing; this
-  // seals them so later reads go through revealPassword(). The next save
-  // writes schema 2.
-  return {
-    schemaVersion: VAULT_SCHEMA_VERSION,
-    entries: vaultData.entries.map((entry) => ({
-      ...entry,
-      password: sealPassword(entry.password, dataKey, entry.id),
-    })),
-  };
+  let upgraded = vaultData;
+  if (upgraded.schemaVersion === LEGACY_VAULT_SCHEMA_VERSION) {
+    // The legacy password strings already exist in memory after parsing;
+    // this seals them so later reads go through revealPassword().
+    upgraded = {
+      schemaVersion: SEALED_SCHEMA_VERSION,
+      entries: upgraded.entries.map((entry) => ({
+        ...entry,
+        password: sealPassword(entry.password, dataKey, entry.id),
+      })),
+    };
+  }
+  if (upgraded.schemaVersion === SEALED_SCHEMA_VERSION) {
+    // Schema 3 only adds optional data; the next save writes it.
+    upgraded = { schemaVersion: VAULT_SCHEMA_VERSION, entries: upgraded.entries, folders: [] };
+  }
+  return upgraded;
 }
 
 function itemSubtitle(entry) {
@@ -650,6 +1087,15 @@ function itemSubtitle(entry) {
   return "";
 }
 
+function organizationSummary(entry) {
+  return {
+    folderId: entry.folderId ?? null,
+    favorite: entry.favorite === true,
+    deletedAt: entry.deletedAt ?? null,
+    attachmentCount: entry.attachments?.length ?? 0,
+  };
+}
+
 function toEntrySummary(entry) {
   if (entry.type !== "login") {
     return {
@@ -659,6 +1105,7 @@ function toEntrySummary(entry) {
       subtitle: itemSubtitle(entry),
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
+      ...organizationSummary(entry),
     };
   }
   return {
@@ -671,19 +1118,25 @@ function toEntrySummary(entry) {
     hasTotp: Boolean(entry.totp),
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
+    ...organizationSummary(entry),
   };
 }
 
 function toEntryDetails(entry) {
+  const shared = {
+    notes: entry.notes,
+    attachments: (entry.attachments ?? []).map(toAttachmentSummary),
+    historyCount: entry.history?.length ?? 0,
+  };
   if (entry.type !== "login") {
     return {
       ...toEntrySummary(entry),
-      notes: entry.notes,
+      ...shared,
       fields: { ...entry.fields },
       secretFields: Object.keys(entry.secrets),
     };
   }
-  return { ...toEntrySummary(entry), notes: entry.notes };
+  return { ...toEntrySummary(entry), ...shared };
 }
 
 function isValidFavicon(value) {
@@ -730,13 +1183,14 @@ function normalizeLoginInput(input) {
   // `totp` (an otpauth link or Base32 secret; empty keeps the current one)
   // and `removeTotp` are optional so older callers keep working.
   const inputKeys = ["id", "name", "username", "password", "url", "notes"];
-  const optionalKeys = ["totp", "removeTotp"];
+  const optionalKeys = ["totp", "removeTotp", "folderId"];
   if (
     !isPlainObject(input) ||
     !inputKeys.every((key) => Object.hasOwn(input, key)) ||
     !Object.keys(input).every((key) => inputKeys.includes(key) || optionalKeys.includes(key)) ||
     (Object.hasOwn(input, "totp") && (typeof input.totp !== "string" || input.totp.length > 2048)) ||
-    (Object.hasOwn(input, "removeTotp") && typeof input.removeTotp !== "boolean")
+    (Object.hasOwn(input, "removeTotp") && typeof input.removeTotp !== "boolean") ||
+    !isFolderIdInput(input.folderId)
   ) {
     throw new Error("Invalid login entry.");
   }
@@ -770,6 +1224,7 @@ function normalizeLoginInput(input) {
     url,
     totp: (input.totp ?? "").trim(),
     removeTotp: input.removeTotp === true,
+    folderId: Object.hasOwn(input, "folderId") ? input.folderId || null : undefined,
   };
 }
 
@@ -823,7 +1278,7 @@ class VaultStore {
     let dataKey = randomBytes(KEY_BYTES);
 
     try {
-      const vaultData = { schemaVersion: VAULT_SCHEMA_VERSION, entries: [] };
+      const vaultData = { schemaVersion: VAULT_SCHEMA_VERSION, entries: [], folders: [] };
       const { envelope, recoveryKey } = await makeEnvelope(vaultData, passphrase, dataKey);
       if (this.sessionEpoch !== sessionEpoch) {
         throw new Error("Creation was interrupted because the vault was locked.");
@@ -865,6 +1320,7 @@ class VaultStore {
     this.dataKey = opened.dataKey;
     this.vaultData = opened.vaultData;
     this.envelope = opened.envelope;
+    await this.enqueueMutation(() => this.maintainNow());
     return this.getStatus();
   }
 
@@ -959,6 +1415,7 @@ class VaultStore {
         this.vaultData = opened.vaultData;
         this.envelope = envelope;
         opened.dataKey = null;
+        await this.maintainNow();
         return { status: await this.getStatus(), recoveryKey };
       } finally {
         opened.dataKey?.fill(0);
@@ -979,6 +1436,7 @@ class VaultStore {
     this.dataKey = opened.dataKey;
     this.vaultData = opened.vaultData;
     this.envelope = opened.envelope;
+    await this.enqueueMutation(() => this.maintainNow());
     return this.getStatus();
   }
 
@@ -1026,7 +1484,17 @@ class VaultStore {
     const plainSecrets = {};
     for (const [key, value] of Object.entries(normalized.secrets)) {
       if (value) {
-        secrets[key] = sealItemSecret(value, this.dataKey, id, key);
+        // Re-entering the same value keeps the sealed record, so the save
+        // does not count as a change.
+        let current = null;
+        if (existing?.secrets[key]) {
+          try {
+            current = openItemSecret(existing.secrets[key], this.dataKey, id, key);
+          } catch {
+            current = null;
+          }
+        }
+        secrets[key] = current === value ? existing.secrets[key] : sealItemSecret(value, this.dataKey, id, key);
         plainSecrets[key] = value;
       } else if (existing?.secrets[key]) {
         secrets[key] = existing.secrets[key];
@@ -1077,14 +1545,19 @@ class VaultStore {
       if (normalized.id && existingIndex === -1) throw new Error("This login no longer exists.");
       const existing = existingIndex >= 0 ? this.vaultData.entries[existingIndex] : null;
       if (existing && existing.type !== normalized.type) throw new Error("Invalid login entry.");
+      if (existing?.deletedAt) throw new Error("Restore this item from the trash first.");
       if (!existing && this.vaultData.entries.length >= MAX_ENTRIES) {
         throw new Error("The vault has reached its entry limit.");
       }
-      const saved = this.buildItemEntry(normalized, existing, existing?.id ?? randomUUID(), Date.now());
+      const folderId = this.folderIdFor(normalized.folderId);
+      const now = Date.now();
+      const content = this.buildItemEntry(normalized, existing, existing?.id ?? randomUUID(), now);
+      const saved = this.withSavedContent(existing, content, folderId, now);
+      if (saved === existing) return toEntryDetails(existing);
       const entries = this.vaultData.entries.slice();
       if (existingIndex >= 0) entries[existingIndex] = saved;
       else entries.push(saved);
-      await this.persistVaultData({ schemaVersion: VAULT_SCHEMA_VERSION, entries });
+      await this.persistVaultData(this.nextVaultData({ entries }));
       return toEntryDetails(saved);
     });
   }
@@ -1133,21 +1606,24 @@ class VaultStore {
       const existing = existingIndex >= 0
         ? this.vaultData.entries[existingIndex]
         : null;
+      if (existing?.deletedAt) throw new Error("Restore this item from the trash first.");
       // An empty password while editing keeps the sealed value, so the editor
       // never needs the current password in the renderer.
       if (!existing && !normalized.password) {
         throw new Error("Enter a password for this login.");
       }
+      const folderId = this.folderIdFor(normalized.folderId);
       const id = existing?.id ?? randomUUID();
       const totpConfig = normalized.totp ? parseTotpInput(normalized.totp) : null;
-      const timestamp = Math.max(Date.now(), existing?.createdAt ?? 0);
-      const savedEntry = {
+      const now = Date.now();
+      const timestamp = Math.max(now, existing?.createdAt ?? 0);
+      const content = {
         id,
         type: "login",
         name: normalized.name,
         username: normalized.username,
         password: normalized.password
-          ? sealPassword(normalized.password, this.dataKey, id)
+          ? this.resealedPassword(existing, id, normalized.password)
           : existing.password,
         url: normalized.url,
         notes: normalized.notes,
@@ -1156,16 +1632,17 @@ class VaultStore {
         updatedAt: timestamp,
       };
       if (totpConfig) {
-        savedEntry.totp = sealTotp(totpConfig, this.dataKey, id);
+        content.totp = this.resealedTotp(existing, id, totpConfig);
       } else if (existing?.totp && !normalized.removeTotp) {
-        savedEntry.totp = existing.totp;
+        content.totp = existing.totp;
       }
+      const savedEntry = this.withSavedContent(existing, content, folderId, now);
+      if (savedEntry === existing) return toEntryDetails(existing);
       const entries = this.vaultData.entries.slice();
       if (existingIndex >= 0) entries[existingIndex] = savedEntry;
       else entries.push(savedEntry);
 
-      const nextVaultData = { schemaVersion: VAULT_SCHEMA_VERSION, entries };
-      await this.persistVaultData(nextVaultData);
+      await this.persistVaultData(this.nextVaultData({ entries }));
       return toEntryDetails(savedEntry);
     });
   }
@@ -1180,6 +1657,8 @@ class VaultStore {
       const entries = this.vaultData.entries.slice();
       const existingKeys = new Map();
       for (const entry of entries) {
+        // An item in the trash does not hide an imported copy.
+        if (entry.deletedAt) continue;
         const key = entry.type === "login"
           ? JSON.stringify([entry.name, entry.username, entry.url])
           : JSON.stringify([entry.type, entry.name, entry.fields]);
@@ -1265,7 +1744,7 @@ class VaultStore {
       }
 
       if (imported > 0) {
-        await this.persistVaultData({ schemaVersion: VAULT_SCHEMA_VERSION, entries });
+        await this.persistVaultData(this.nextVaultData({ entries }));
       }
       return { imported, duplicates, invalid, totpSkipped };
     });
@@ -1288,12 +1767,16 @@ class VaultStore {
     }
     let opened;
     try {
-      opened = await reader.decryptVaultFile(filePath, secret);
+      opened = await reader.decryptVaultFile(filePath, secret, { allowContainer: true });
     } finally {
       recoveryKeyBytes?.fill(0);
     }
     try {
-      return opened.vaultData.entries.map((entry) => entry.type !== "login"
+      // Items in the backup's trash are left out. Attachments are not
+      // imported; their number is reported.
+      const entries = opened.vaultData.entries.filter((entry) => !entry.deletedAt);
+      const attachments = entries.reduce((sum, entry) => sum + (entry.attachments?.length ?? 0), 0);
+      const logins = entries.map((entry) => entry.type !== "login"
         ? {
           type: entry.type,
           name: entry.name,
@@ -1317,6 +1800,7 @@ class VaultStore {
         notes: entry.notes,
         totp: entry.totp ? toOtpauthUri(openTotp(entry.totp, opened.dataKey, entry.id)) : "",
       });
+      return { logins, attachments };
     } finally {
       opened.dataKey.fill(0);
     }
@@ -1341,6 +1825,9 @@ class VaultStore {
       if (existingIndex === -1 || this.vaultData.entries[existingIndex].type !== "login") {
         throw new Error("This login no longer exists.");
       }
+      if (this.vaultData.entries[existingIndex].deletedAt) {
+        throw new Error("Restore this item from the trash first.");
+      }
 
       const savedEntry = {
         ...this.vaultData.entries[existingIndex],
@@ -1348,25 +1835,543 @@ class VaultStore {
       };
       const entries = this.vaultData.entries.slice();
       entries[existingIndex] = savedEntry;
-      await this.persistVaultData({ schemaVersion: VAULT_SCHEMA_VERSION, entries });
+      await this.persistVaultData(this.nextVaultData({ entries }));
       return toEntrySummary(savedEntry);
     });
   }
 
-  async deleteEntry(id) {
+  // --- Saving content ------------------------------------------------------------
+
+  nextVaultData(changes) {
+    return {
+      schemaVersion: VAULT_SCHEMA_VERSION,
+      entries: changes.entries ?? this.vaultData.entries,
+      folders: changes.folders ?? this.vaultData.folders,
+    };
+  }
+
+  async replaceEntry(entry, next) {
+    const index = this.vaultData.entries.indexOf(entry);
+    if (index === -1) throw new Error("This login no longer exists.");
+    const entries = this.vaultData.entries.slice();
+    entries[index] = next;
+    await this.persistVaultData(this.nextVaultData({ entries }));
+  }
+
+  // Editor input to a folder: undefined keeps the current folder, null means
+  // none, and an ID must name an existing folder.
+  folderIdFor(folderId) {
+    if (folderId === undefined || folderId === null) return folderId;
+    if (!this.vaultData.folders.some((folder) => folder.id === folderId)) {
+      throw new Error("This folder no longer exists.");
+    }
+    return folderId;
+  }
+
+  // Combines saved content with the entry's metadata. A new entry gets the
+  // chosen folder. An edit that changes nothing returns `existing` itself; a
+  // real change puts the previous content into the history.
+  withSavedContent(existing, content, folderId, now) {
+    if (!existing) return withMeta(content, null, folderId ? { folderId } : {});
+    const changed = contentChanged(existing, content);
+    const folderChanged = folderId !== undefined && (existing.folderId ?? null) !== folderId;
+    if (!changed && !folderChanged) return existing;
+    const changes = {};
+    if (folderId !== undefined) changes.folderId = folderId;
+    if (changed) changes.history = historyAfterChange(existing, now);
+    return withMeta(changed ? content : { ...content, updatedAt: existing.updatedAt }, existing, changes);
+  }
+
+  // Typing the same password again keeps the sealed record (not a change).
+  resealedPassword(existing, id, password) {
+    if (existing) {
+      try {
+        if (openPassword(existing.password, this.dataKey, existing.id) === password) return existing.password;
+      } catch {
+        // An unreadable value is replaced.
+      }
+    }
+    return sealPassword(password, this.dataKey, id);
+  }
+
+  resealedTotp(existing, id, config) {
+    if (existing?.totp) {
+      try {
+        if (toOtpauthUri(openTotp(existing.totp, this.dataKey, existing.id)) === toOtpauthUri(config)) {
+          return existing.totp;
+        }
+      } catch {
+        // An unreadable value is replaced.
+      }
+    }
+    return sealTotp(config, this.dataKey, id);
+  }
+
+  // --- Folders and favorites ------------------------------------------------------
+  //
+  // Folder and favorite are organization, not content: changing them does not
+  // change the entry's date or add a version to its history.
+
+  listFolders() {
+    this.requireUnlocked();
+    return this.vaultData.folders
+      .map((folder) => ({ ...folder }))
+      .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base", numeric: true }));
+  }
+
+  findFolder(id) {
+    this.requireUnlocked();
+    const folder = typeof id === "string" ? this.vaultData.folders.find((item) => item.id === id) : null;
+    if (!folder) throw new Error("This folder no longer exists.");
+    return folder;
+  }
+
+  requireUniqueFolderName(name, exceptId) {
+    const lowered = name.toLowerCase();
+    if (this.vaultData.folders.some((folder) => folder.id !== exceptId && folder.name.toLowerCase() === lowered)) {
+      throw new Error("A folder with this name already exists.");
+    }
+  }
+
+  async createFolder(name) {
     return this.enqueueMutation(async () => {
       this.requireUnlocked();
-      if (typeof id !== "string" || !UUID_PATTERN.test(id)) {
-        throw new Error("Invalid login entry.");
+      const folderName = normalizeFolderName(name);
+      if (this.vaultData.folders.length >= MAX_FOLDERS) {
+        throw new Error("The vault has reached its folder limit.");
       }
-
-      const entries = this.vaultData.entries.filter((entry) => entry.id !== id);
-      if (entries.length === this.vaultData.entries.length) {
-        throw new Error("This login no longer exists.");
-      }
-
-      await this.persistVaultData({ schemaVersion: VAULT_SCHEMA_VERSION, entries });
+      this.requireUniqueFolderName(folderName, null);
+      const folder = { id: randomUUID(), name: folderName, createdAt: Date.now() };
+      await this.persistVaultData(this.nextVaultData({ folders: [...this.vaultData.folders, folder] }));
+      return { ...folder };
     });
+  }
+
+  async renameFolder(id, name) {
+    return this.enqueueMutation(async () => {
+      const folder = this.findFolder(id);
+      const folderName = normalizeFolderName(name);
+      if (folderName === folder.name) return { ...folder };
+      this.requireUniqueFolderName(folderName, folder.id);
+      const renamed = { ...folder, name: folderName };
+      await this.persistVaultData(this.nextVaultData({
+        folders: this.vaultData.folders.map((item) => (item === folder ? renamed : item)),
+      }));
+      return { ...renamed };
+    });
+  }
+
+  // Items in a deleted folder are kept; they only leave the folder.
+  async deleteFolder(id) {
+    return this.enqueueMutation(async () => {
+      const folder = this.findFolder(id);
+      await this.persistVaultData(this.nextVaultData({
+        folders: this.vaultData.folders.filter((item) => item !== folder),
+        entries: this.vaultData.entries.map((entry) =>
+          entry.folderId === folder.id ? withMeta(entry, entry, { folderId: null }) : entry),
+      }));
+      return { deleted: true };
+    });
+  }
+
+  // `folderId` is a folder ID, or null to take the entry out of its folder.
+  async setFolder(id, folderId) {
+    return this.enqueueMutation(async () => {
+      const entry = this.findEntry(id);
+      if (entry.deletedAt) throw new Error("Restore this item from the trash first.");
+      if (folderId === undefined || !isFolderIdInput(folderId)) throw new Error("This folder no longer exists.");
+      const target = this.folderIdFor(folderId || null);
+      if ((entry.folderId ?? null) === target) return toEntrySummary(entry);
+      const saved = withMeta(entry, entry, { folderId: target });
+      await this.replaceEntry(entry, saved);
+      return toEntrySummary(saved);
+    });
+  }
+
+  async setFavorite(id, favorite) {
+    return this.enqueueMutation(async () => {
+      const entry = this.findEntry(id);
+      if (typeof favorite !== "boolean") throw new Error("Invalid login entry.");
+      if (entry.deletedAt) throw new Error("Restore this item from the trash first.");
+      if ((entry.favorite === true) === favorite) return toEntrySummary(entry);
+      const saved = withMeta(entry, entry, { favorite });
+      await this.replaceEntry(entry, saved);
+      return toEntrySummary(saved);
+    });
+  }
+
+  // --- Trash -----------------------------------------------------------------------
+  //
+  // Deleting moves an entry to the trash, unchanged, with its attachments and
+  // history. It can be restored for 30 days (maintainNow removes it after
+  // that) or deleted for good, which also removes its attachment files.
+
+  async deleteEntry(id) {
+    return this.enqueueMutation(async () => {
+      const entry = this.findEntry(id);
+      if (entry.deletedAt) return toEntrySummary(entry);
+      const saved = withMeta(entry, entry, { deletedAt: Date.now() });
+      await this.replaceEntry(entry, saved);
+      return toEntrySummary(saved);
+    });
+  }
+
+  async restoreEntry(id) {
+    return this.enqueueMutation(async () => {
+      const entry = this.findEntry(id);
+      if (!entry.deletedAt) return toEntrySummary(entry);
+      const saved = withMeta(entry, entry, { deletedAt: null });
+      await this.replaceEntry(entry, saved);
+      return toEntrySummary(saved);
+    });
+  }
+
+  async deletePermanently(id) {
+    return this.enqueueMutation(async () => {
+      const entry = this.findEntry(id);
+      if (!entry.deletedAt) throw new Error("Move this item to the trash first.");
+      await this.removeEntries((item) => item === entry);
+      return { deleted: 1 };
+    });
+  }
+
+  async emptyTrash() {
+    return this.enqueueMutation(async () => {
+      this.requireUnlocked();
+      return { deleted: await this.removeEntries((entry) => Boolean(entry.deletedAt)) };
+    });
+  }
+
+  // Removes matching entries; their attachment files go after the save, so
+  // the vault never refers to a missing file.
+  async removeEntries(predicate) {
+    const removed = this.vaultData.entries.filter(predicate);
+    if (removed.length === 0) return 0;
+    const removedSet = new Set(removed);
+    await this.persistVaultData(this.nextVaultData({
+      entries: this.vaultData.entries.filter((entry) => !removedSet.has(entry)),
+    }));
+    await this.deleteAttachmentFiles(removed.flatMap((entry) => (entry.attachments ?? []).map((item) => item.id)));
+    return removed.length;
+  }
+
+  // --- History ---------------------------------------------------------------------
+
+  // Earlier versions, newest first, without secrets. `changes` lists the
+  // fields that were different in the version that replaced each one.
+  getHistory(id) {
+    const entry = this.findEntry(id);
+    const versions = entry.history ?? [];
+    return versions.map((version, index) =>
+      toVersionSummary(entry, version, index === 0 ? entry : versions[index - 1]));
+  }
+
+  findVersion(entry, versionId) {
+    const version = typeof versionId === "string"
+      ? (entry.history ?? []).find((item) => item.id === versionId)
+      : null;
+    if (!version) throw new Error("This version no longer exists.");
+    return version;
+  }
+
+  // A secret from an earlier version (the old password, or a secret field of
+  // a card, identity, or SSH key), for copy or reveal by main.
+  revealVersionSecret(id, versionId, field) {
+    const entry = this.findEntry(id);
+    const version = this.findVersion(entry, versionId);
+    let record = null;
+    if (entry.type === "login") {
+      if (field === "password") record = version.password;
+    } else if (typeof field === "string" && Object.hasOwn(version.secrets, field)) {
+      record = version.secrets[field];
+    }
+    if (!record) throw new Error("Could not copy this value.");
+    try {
+      return entry.type === "login"
+        ? openPassword(record, this.dataKey, entry.id)
+        : openItemSecret(record, this.dataKey, entry.id, field);
+    } catch {
+      throw new Error("Could not decrypt this password.");
+    }
+  }
+
+  // Makes an earlier version current. The content it replaces becomes the
+  // newest version, so restoring can itself be undone.
+  async restoreVersion(id, versionId) {
+    return this.enqueueMutation(async () => {
+      const entry = this.findEntry(id);
+      if (entry.deletedAt) throw new Error("Restore this item from the trash first.");
+      const version = this.findVersion(entry, versionId);
+      const now = Math.max(Date.now(), entry.createdAt);
+      const content = entry.type === "login"
+        ? {
+          id: entry.id,
+          type: "login",
+          name: version.name,
+          username: version.username,
+          password: version.password,
+          url: version.url,
+          notes: version.notes,
+          favicon: entry.favicon ?? "",
+          createdAt: entry.createdAt,
+          updatedAt: now,
+          ...(version.totp ? { totp: version.totp } : {}),
+        }
+        : {
+          id: entry.id,
+          type: entry.type,
+          name: version.name,
+          notes: version.notes,
+          fields: { ...version.fields },
+          secrets: { ...version.secrets },
+          createdAt: entry.createdAt,
+          updatedAt: now,
+        };
+      const others = (entry.history ?? []).filter((item) => item !== version);
+      const history = [snapshotOf(entry, now), ...others].slice(0, HISTORY_LIMIT);
+      const saved = withMeta(content, entry, { history });
+      await this.replaceEntry(entry, saved);
+      return toEntryDetails(saved);
+    });
+  }
+
+  // --- Attachments ------------------------------------------------------------------
+
+  static attachmentDirectoryFor(vaultPath) {
+    return `${vaultPath}.attachments`;
+  }
+
+  get attachmentDirectory() {
+    return VaultStore.attachmentDirectoryFor(this.filePath);
+  }
+
+  attachmentPath(attachmentId) {
+    return path.join(this.attachmentDirectory, `${attachmentId}.bin`);
+  }
+
+  // The vault file and its attachment folder are never a source or target
+  // for user files.
+  isVaultPath(candidate) {
+    const resolved = path.resolve(candidate);
+    const directory = path.resolve(this.attachmentDirectory);
+    return resolved === path.resolve(this.filePath) ||
+      resolved === directory ||
+      resolved.startsWith(`${directory}${path.sep}`);
+  }
+
+  async ensureAttachmentDirectory() {
+    await fs.mkdir(this.attachmentDirectory, { recursive: true, mode: 0o700 });
+    if (process.platform !== "win32") await fs.chmod(this.attachmentDirectory, 0o700);
+  }
+
+  findAttachment(id, attachmentId) {
+    const entry = this.findEntry(id);
+    const attachment = typeof attachmentId === "string"
+      ? (entry.attachments ?? []).find((item) => item.id === attachmentId)
+      : null;
+    if (!attachment) throw new Error("This attachment no longer exists.");
+    return { entry, attachment };
+  }
+
+  totalAttachmentBytes() {
+    return attachmentsOf(this.vaultData).reduce((sum, { attachment }) => sum + attachment.size, 0);
+  }
+
+  // Encrypts a copy of `sourcePath` and adds it to the entry. The encrypted
+  // file is written first and the vault second, so an interruption leaves at
+  // most an unreferenced file, which maintainNow removes.
+  async addAttachment(id, sourcePath) {
+    return this.enqueueMutation(async () => {
+      const entry = this.findEntry(id);
+      const sessionEpoch = this.sessionEpoch;
+      if (entry.deletedAt) throw new Error("Restore this item from the trash first.");
+      if ((entry.attachments?.length ?? 0) >= MAX_ATTACHMENTS_PER_ENTRY) {
+        throw new Error("An item can have up to 20 attachments.");
+      }
+      if (typeof sourcePath !== "string" || !path.isAbsolute(sourcePath) || this.isVaultPath(sourcePath)) {
+        throw new Error("Could not read this file.");
+      }
+
+      const attachmentId = randomUUID();
+      const fileKey = randomBytes(KEY_BYTES);
+      let plaintext = null;
+      let encrypted = null;
+      try {
+        try {
+          plaintext = await readFileWithLimit(sourcePath, MAX_ATTACHMENT_BYTES);
+        } catch (error) {
+          if (error?.tooLarge) throw new Error("Attachments can be up to 50 MB each.");
+          throw new Error("Could not read this file.");
+        }
+        if (this.sessionEpoch !== sessionEpoch || !this.isUnlocked()) {
+          throw new Error("The vault was locked while saving. Unlock it again.");
+        }
+        if (this.totalAttachmentBytes() + plaintext.length > MAX_TOTAL_ATTACHMENT_BYTES) {
+          throw new Error("Attachments in one vault can take up to 1 GB.");
+        }
+        encrypted = encryptAttachment(plaintext, fileKey, attachmentId);
+        const attachment = {
+          id: attachmentId,
+          name: normalizeAttachmentName(path.basename(sourcePath)),
+          size: plaintext.length,
+          key: sealAttachmentKey(fileKey, this.dataKey, entry.id, attachmentId),
+          createdAt: Date.now(),
+        };
+        const filePath = this.attachmentPath(attachmentId);
+        await this.ensureAttachmentDirectory();
+        await this.writeBytesAtomically(filePath, encrypted);
+        try {
+          await this.replaceEntry(entry, withMeta(entry, entry, {
+            attachments: [...(entry.attachments ?? []), attachment],
+          }));
+        } catch (error) {
+          if (!error?.written) await fs.unlink(filePath).catch(() => {});
+          throw error;
+        }
+        return toAttachmentSummary(attachment);
+      } finally {
+        plaintext?.fill(0);
+        encrypted?.fill(0);
+        fileKey.fill(0);
+      }
+    });
+  }
+
+  // Decrypts an attachment and writes it to `destinationPath`.
+  async exportAttachment(id, attachmentId, destinationPath) {
+    return this.enqueueMutation(async () => {
+      const { entry, attachment } = this.findAttachment(id, attachmentId);
+      if (typeof destinationPath !== "string" || !path.isAbsolute(destinationPath) || this.isVaultPath(destinationPath)) {
+        throw new Error("Choose a different location for the file.");
+      }
+      const plaintext = await this.openAttachment(entry, attachment);
+      try {
+        await this.writeBytesAtomically(path.resolve(destinationPath), plaintext);
+      } catch {
+        throw new Error("Could not save the file.");
+      } finally {
+        plaintext.fill(0);
+      }
+      return { saved: true, name: attachment.name };
+    });
+  }
+
+  async openAttachment(entry, attachment) {
+    let fileBytes = null;
+    let fileKey = null;
+    try {
+      fileBytes = await readFileWithLimit(this.attachmentPath(attachment.id), MAX_ATTACHMENT_BYTES + ATTACHMENT_OVERHEAD);
+      fileKey = openAttachmentKey(attachment.key, this.dataKey, entry.id, attachment.id);
+      return decryptAttachment(fileBytes, fileKey, attachment.id, attachment.size);
+    } catch {
+      throw new Error(`The attachment “${attachment.name}” in “${entry.name}” is missing or damaged.`);
+    } finally {
+      fileBytes?.fill(0);
+      fileKey?.fill(0);
+    }
+  }
+
+  async deleteAttachment(id, attachmentId) {
+    return this.enqueueMutation(async () => {
+      const { entry, attachment } = this.findAttachment(id, attachmentId);
+      if (entry.deletedAt) throw new Error("Restore this item from the trash first.");
+      await this.replaceEntry(entry, withMeta(entry, entry, {
+        attachments: entry.attachments.filter((item) => item !== attachment),
+      }));
+      await this.deleteAttachmentFiles([attachment.id]);
+      return { deleted: true };
+    });
+  }
+
+  async deleteAttachmentFiles(attachmentIds) {
+    await Promise.all(attachmentIds.map((attachmentId) =>
+      fs.unlink(this.attachmentPath(attachmentId)).catch(() => {})));
+  }
+
+  // Removes files no entry refers to: left by an interrupted save, deletion,
+  // or restore. Runs inside the mutation queue, so no attachment is being
+  // written at the same time.
+  async removeUnreferencedAttachments() {
+    if (!this.isUnlocked()) return 0;
+    const referenced = new Set(attachmentsOf(this.vaultData).map(({ attachment }) => attachment.id));
+    let names;
+    try {
+      names = await fs.readdir(this.attachmentDirectory);
+    } catch {
+      return 0;
+    }
+    if (!this.isUnlocked()) return 0;
+    let removed = 0;
+    for (const name of names) {
+      const match = name.match(/^(.+)\.bin$/);
+      const unreferenced = match
+        ? UUID_PATTERN.test(match[1]) && !referenced.has(match[1])
+        : name.endsWith(".tmp");
+      if (unreferenced) {
+        await fs.unlink(path.join(this.attachmentDirectory, name)).catch(() => {});
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
+  // Verifies and copies the attachments of a vault being restored. Returns
+  // the files it created; files that already existed hold the same content
+  // (attachment IDs are unique and files never change).
+  async restoreAttachmentFiles(opened) {
+    const wanted = attachmentsOf(opened.vaultData);
+    if (wanted.length === 0) return [];
+    const added = [];
+    try {
+      if (!opened.container) throw new Error("invalid");
+      await this.ensureAttachmentDirectory();
+      for (const { entryId, attachment } of wanted) {
+        const blob = opened.container.blobs.get(attachment.id);
+        if (!blob || blob.size !== attachment.size + ATTACHMENT_OVERHEAD) throw new Error("invalid");
+        const bytes = await readContainerFile(opened.container, attachment.id);
+        let fileKey = null;
+        let plaintext = null;
+        try {
+          fileKey = openAttachmentKey(attachment.key, opened.dataKey, entryId, attachment.id);
+          plaintext = decryptAttachment(bytes, fileKey, attachment.id, attachment.size);
+        } finally {
+          fileKey?.fill(0);
+          plaintext?.fill(0);
+        }
+        const target = this.attachmentPath(attachment.id);
+        const existed = await pathExists(target);
+        await this.writeBytesAtomically(target, bytes);
+        if (!existed) added.push(target);
+      }
+      return added;
+    } catch {
+      await Promise.all(added.map((file) => fs.unlink(file).catch(() => {})));
+      throw new Error("This backup is incomplete or damaged. Nothing was restored.");
+    }
+  }
+
+  // --- Housekeeping -------------------------------------------------------------------
+
+  // After the vault opens (inside the mutation queue): removes items that
+  // have been in the trash for 30 days and attachment files no item refers
+  // to. Failures are left for the next time.
+  async maintainNow(now = Date.now()) {
+    if (!this.isUnlocked()) return;
+    const cutoff = now - TRASH_RETENTION_MS;
+    try {
+      await this.removeEntries((entry) => Boolean(entry.deletedAt) && entry.deletedAt <= cutoff);
+    } catch {
+      // Tried again on the next unlock.
+    }
+    try {
+      await this.removeUnreferencedAttachments();
+    } catch {
+      // Tried again on the next unlock.
+    }
+  }
+
+  async maintain(now = Date.now()) {
+    return this.enqueueMutation(() => this.maintainNow(now));
   }
 
   requireUnlocked() {
@@ -1375,11 +2380,20 @@ class VaultStore {
     }
   }
 
-  async persistVaultData(vaultData) {
+  async persistVaultData(nextVaultData) {
     this.requireUnlocked();
     const sessionEpoch = this.sessionEpoch;
     const dataKey = this.dataKey;
-    const plaintext = Buffer.from(JSON.stringify(vaultData), "utf8");
+    let vaultData = nextVaultData;
+    let plaintext = Buffer.from(JSON.stringify(vaultData), "utf8");
+    // Oldest versions in the history make room before a save is refused.
+    while (plaintext.length > MAX_VAULT_PLAINTEXT_BYTES) {
+      const pruned = pruneHistory(vaultData, 0.1);
+      if (!pruned) break;
+      plaintext.fill(0);
+      vaultData = pruned;
+      plaintext = Buffer.from(JSON.stringify(vaultData), "utf8");
+    }
     try {
       if (plaintext.length > MAX_VAULT_PLAINTEXT_BYTES) {
         throw new Error("The vault is too large to save.");
@@ -1396,7 +2410,8 @@ class VaultStore {
       };
       await this.writeEnvelope(nextEnvelope);
       if (this.sessionEpoch !== sessionEpoch || this.dataKey !== dataKey) {
-        throw new Error("The vault was locked while saving. Unlock it again.");
+        // The new data is on disk; callers must not undo file changes.
+        throw Object.assign(new Error("The vault was locked while saving. Unlock it again."), { written: true });
       }
       this.envelope = nextEnvelope;
       this.vaultData = vaultData;
@@ -1405,33 +2420,54 @@ class VaultStore {
     }
   }
 
+  // Copies the encrypted vault file, plus its encrypted attachment files when
+  // there are any (see backup-file.js). Runs in the mutation queue so the
+  // copy matches one saved state. Every attachment is decrypted once first:
+  // a backup that could not be restored is not written at all.
   async exportBackup(destinationPath) {
-    if (!this.isUnlocked()) throw new Error("Unlock the vault first.");
+    return this.enqueueMutation(async () => {
+      if (!this.isUnlocked()) throw new Error("Unlock the vault first.");
 
-    const resolvedDestination = path.resolve(destinationPath);
-    if (resolvedDestination === path.resolve(this.filePath)) {
-      throw new Error("Choose a different location for the backup.");
-    }
+      const resolvedDestination = path.resolve(destinationPath);
+      if (this.isVaultPath(resolvedDestination)) {
+        throw new Error("Choose a different location for the backup.");
+      }
 
-    let encryptedFile = null;
-    try {
-      const stats = await fs.stat(this.filePath);
-      if (stats.size <= 0 || stats.size > MAX_FILE_BYTES) {
-        throw new Error("Invalid vault file");
+      const attachments = [];
+      for (const { entryId, attachment } of attachmentsOf(this.vaultData)) {
+        const entry = this.vaultData.entries.find((item) => item.id === entryId);
+        (await this.openAttachment(entry, attachment)).fill(0);
+        attachments.push({
+          id: attachment.id,
+          path: this.attachmentPath(attachment.id),
+          size: attachment.size + ATTACHMENT_OVERHEAD,
+        });
       }
-      encryptedFile = await fs.readFile(this.filePath);
-      if (encryptedFile.length <= 0 || encryptedFile.length > MAX_FILE_BYTES) {
-        throw new Error("Invalid vault file");
+
+      let encryptedFile = null;
+      try {
+        const stats = await fs.stat(this.filePath);
+        if (stats.size <= 0 || stats.size > MAX_FILE_BYTES) {
+          throw new Error("Invalid vault file");
+        }
+        encryptedFile = await fs.readFile(this.filePath);
+        if (encryptedFile.length <= 0 || encryptedFile.length > MAX_FILE_BYTES) {
+          throw new Error("Invalid vault file");
+        }
+        const envelope = JSON.parse(encryptedFile.toString("utf8"));
+        parseEnvelope(envelope);
+        if (attachments.length === 0) {
+          await this.writeBytesAtomically(resolvedDestination, encryptedFile);
+        } else {
+          await writeContainer(resolvedDestination, envelope, attachments);
+        }
+        return { exported: true, attachments: attachments.length };
+      } catch {
+        throw new Error("Could not create the encrypted backup.");
+      } finally {
+        encryptedFile?.fill(0);
       }
-      const envelope = JSON.parse(encryptedFile.toString("utf8"));
-      parseEnvelope(envelope);
-      await this.writeBytesAtomically(resolvedDestination, encryptedFile);
-      return { exported: true };
-    } catch {
-      throw new Error("Could not create the encrypted backup.");
-    } finally {
-      encryptedFile?.fill(0);
-    }
+    });
   }
 
   // `credentials` is the backup's master passphrase, or
@@ -1446,7 +2482,7 @@ class VaultStore {
       let recoveryKey = null;
       if (typeof credentials === "string") {
         validatePassphrase(credentials);
-        opened = await this.decryptVaultFile(sourcePath, credentials);
+        opened = await this.decryptVaultFile(sourcePath, credentials, { allowContainer: true });
         envelope = opened.envelope;
       } else {
         if (!hasExactKeys(credentials, ["recoveryKey", "newPassphrase"])) {
@@ -1455,7 +2491,7 @@ class VaultStore {
         validatePassphrase(credentials.newPassphrase);
         const recoveryKeyBytes = decodeRecoveryKey(credentials.recoveryKey);
         try {
-          opened = await this.decryptVaultFile(sourcePath, { recoveryKeyBytes });
+          opened = await this.decryptVaultFile(sourcePath, { recoveryKeyBytes }, { allowContainer: true });
         } finally {
           recoveryKeyBytes.fill(0);
         }
@@ -1475,7 +2511,19 @@ class VaultStore {
         if (this.sessionEpoch !== sessionEpoch) {
           throw new Error("Restore was interrupted because the vault was locked.");
         }
-        await this.writeEnvelope(envelope);
+        // Attachment files go in first, then the vault file is replaced in
+        // one rename. Until then the current vault and its files are intact,
+        // and files added for a restore that does not finish are removed.
+        const addedFiles = await this.restoreAttachmentFiles(opened);
+        try {
+          if (this.sessionEpoch !== sessionEpoch) {
+            throw new Error("Restore was interrupted because the vault was locked.");
+          }
+          await this.writeEnvelope(envelope);
+        } catch (error) {
+          await Promise.all(addedFiles.map((file) => fs.unlink(file).catch(() => {})));
+          throw error;
+        }
         if (this.sessionEpoch !== sessionEpoch) {
           throw new Error("Restore was interrupted because the vault was locked.");
         }
@@ -1485,6 +2533,8 @@ class VaultStore {
         this.envelope = envelope;
         this.issuedRecoveryKey = recoveryKey;
         opened.dataKey = null;
+        // The replaced vault's files are no longer referenced.
+        await this.maintainNow();
         return this.getStatus();
       } finally {
         opened.dataKey?.fill(0);
@@ -1493,8 +2543,9 @@ class VaultStore {
   }
 
   // `secret` is the master passphrase (string), { recoveryKeyBytes }, or
-  // { dataKey } for a key released by Touch ID.
-  async decryptVaultFile(filePath, secret) {
+  // { dataKey } for a key released by Touch ID. Backups may be containers
+  // with attachments (`allowContainer`); the vault file itself never is.
+  async decryptVaultFile(filePath, secret, { allowContainer = false } = {}) {
     const usingRecoveryKey = Boolean(secret?.recoveryKeyBytes);
     const usingDataKey = Boolean(secret?.dataKey);
     let wrappingKey = null;
@@ -1504,12 +2555,15 @@ class VaultStore {
     let rawFile = null;
 
     try {
-      const stats = await fs.stat(filePath);
-      if (stats.size <= 0 || stats.size > MAX_FILE_BYTES) {
-        throw new Error("Invalid vault file");
-      }
-      rawFile = await fs.readFile(filePath);
-      const envelope = JSON.parse(rawFile.toString("utf8"));
+      const source = await openVaultSource(filePath, {
+        allowContainer,
+        maxEnvelopeBytes: MAX_FILE_BYTES,
+        maxHeaderBytes: MAX_FILE_BYTES * 2,
+        maxAttachments: MAX_ENTRIES * MAX_ATTACHMENTS_PER_ENTRY,
+        maxAttachmentFileBytes: MAX_ATTACHMENT_BYTES + ATTACHMENT_OVERHEAD,
+      });
+      rawFile = source.envelopeBytes ?? null;
+      const envelope = source.container ? source.envelope : JSON.parse(rawFile.toString("utf8"));
       const parsed = parseEnvelope(envelope);
       if (usingDataKey) {
         parsed.salt.fill(0);
@@ -1553,6 +2607,7 @@ class VaultStore {
         envelope,
         vaultData: upgradeVaultData(vaultData, dataKey),
         dataKey,
+        container: source.container,
       };
       dataKey = null;
       return opened;

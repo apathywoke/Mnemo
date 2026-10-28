@@ -3,12 +3,22 @@
   const { secondaryLabel, filter } = ns.entities.login;
   const { setSiteIcon } = ns.entities.login;
 
-  function renderLoginList({ entries, selectedId, query, typeFilter = "all", container, count, empty, noResults, onSelect }) {
-    const filteredEntries = filter(entries, query, typeFilter);
+  // `scope` narrows the list (all, favorites, a folder, or the trash);
+  // `scopeEmptyText` is shown when the scope itself has nothing to list.
+  function renderLoginList({
+    entries, selectedId, query, typeFilter = "all", scope = { kind: "all" },
+    container, count, empty, noResults, scopeEmptyText = "", onSelect,
+  }) {
+    const filteredEntries = filter(entries, query, typeFilter, scope);
+    const inScope = entries.filter((entry) => ns.entities.login.inScope(entry, scope));
+    const vaultEmpty = !entries.some((entry) => !entry.deletedAt) && scope.kind !== "trash";
     container.replaceChildren();
-    count.textContent = String(entries.length);
-    empty.hidden = entries.length !== 0;
-    noResults.hidden = entries.length === 0 || filteredEntries.length !== 0;
+    count.textContent = String(inScope.length);
+    empty.hidden = !vaultEmpty;
+    noResults.hidden = vaultEmpty || filteredEntries.length !== 0;
+    noResults.textContent = inScope.length === 0 && scopeEmptyText
+      ? scopeEmptyText
+      : ns.shared.i18n.t("vault.noResults");
     container.hidden = filteredEntries.length === 0;
 
     for (const entry of filteredEntries) {
@@ -32,6 +42,13 @@
       meta.textContent = secondaryLabel(entry);
       copy.append(name, meta);
       row.append(icon, copy);
+      if (entry.favorite && !entry.deletedAt) {
+        const star = document.createElement("span");
+        star.className = "entry-row-star";
+        star.setAttribute("aria-label", ns.shared.i18n.t("organize.favorite"));
+        star.textContent = "★";
+        row.append(star);
+      }
       row.addEventListener("click", () => onSelect(entry.id));
       container.append(row);
     }

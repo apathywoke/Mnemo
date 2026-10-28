@@ -29,7 +29,8 @@ function sha1Hex(text) {
 function collectPasswords(store, fingerprintKey) {
   const passwords = [];
   for (const entry of store.listEntries()) {
-    if (entry.type !== "login") continue;
+    // Items in the trash are not part of the report.
+    if (entry.type !== "login" || entry.deletedAt) continue;
     let password;
     try {
       password = store.revealPassword(entry.id);

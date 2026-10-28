@@ -99,9 +99,30 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
     },
   };
 
+  // The real updater, kept offline: if the automatic check runs (20 s after
+  // launch, reached on a slow or busy machine), it finds no release instead
+  // of contacting GitHub.
+  const { Updater: RealUpdater } = require("../updater");
+  class OfflineUpdater extends RealUpdater {
+    constructor(options) {
+      super({
+        ...options,
+        get: async () => {
+          throw Object.assign(new Error("No update was found."), { notFound: true });
+        },
+      });
+    }
+  }
+  // Update state messages can arrive at any time; checks of what else was
+  // sent to the renderer leave them out.
+  const vaultEvents = () => sentToRenderer.splice(0).filter(([channel]) => channel !== "updates:state");
+
   const originalLoad = Module._load;
   Module._load = function loadWithElectronStub(request, parent, isMain) {
     if (request === "electron") return electronStub;
+    if (request === "./updater" && parent?.filename?.endsWith(`${path.sep}main.js`)) {
+      return { Updater: OfflineUpdater };
+    }
     return originalLoad.call(this, request, parent, isMain);
   };
   let mainPath;
@@ -275,6 +296,50 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   );
   await invoke("vault:delete-entry", card.id);
 
+  // Folders and favorites change organization only.
+  const folder = await invoke("vault:create-folder", "  Work  ");
+  assert.equal(folder.name, "Work");
+  await assert.rejects(invoke("vault:create-folder", "work"), /\[mnemo:errors\.folderExists\]/);
+  assert.equal((await invoke("vault:set-folder", saved.id, folder.id)).folderId, folder.id);
+  assert.equal((await invoke("vault:set-favorite", saved.id, true)).favorite, true);
+  assert.deepEqual((await invoke("vault:list-folders")).map((item) => item.name), ["Work"]);
+  await invoke("vault:delete-folder", folder.id);
+  assert.equal((await invoke("vault:get-entry", saved.id)).folderId, null);
+  await invoke("vault:set-favorite", saved.id, false);
+
+  // History: summaries only; the old password is copied or shown by main.
+  await invoke("vault:save-entry", { ...makeLogin({ id: saved.id, password: "a new password value" }), totp: "", removeTotp: true });
+  const [previous] = await invoke("vault:get-history", saved.id);
+  assert.ok(previous.changes.includes("password"));
+  assert.equal(/test-password-value|a new password value/.test(JSON.stringify(previous)), false);
+  await invoke("vault:copy-version-field", saved.id, previous.id, "password");
+  assert.equal(clipboardText, "test-password-value");
+  messageBoxes.length = 0;
+  await invoke("vault:reveal-version-field", saved.id, previous.id, "password");
+  assert.equal(messageBoxes.at(-1).detail, "test-password-value");
+  await invoke("vault:restore-version", saved.id, previous.id);
+  await invoke("vault:copy-entry-field", saved.id, "password");
+  assert.equal(clipboardText, "test-password-value");
+
+  // Attachments: chosen and saved through native dialogs; contents stay in main.
+  const attachmentSource = path.join(directory, "contract.txt");
+  await require("node:fs/promises").writeFile(attachmentSource, "signed contract");
+  openSelection = { canceled: false, filePaths: [attachmentSource] };
+  const attached = await invoke("vault:add-attachments", saved.id);
+  assert.equal(attached.added.length, 1);
+  assert.deepEqual(attached.failed, []);
+  assert.equal(attached.added[0].name, "contract.txt");
+  openSelection = { canceled: true, filePaths: [] };
+  const exportedAttachment = path.join(directory, "contract-copy.txt");
+  saveSelection = { canceled: false, filePath: exportedAttachment };
+  assert.equal((await invoke("vault:save-attachment", saved.id, attached.added[0].id)).saved, true);
+  assert.equal(await require("node:fs/promises").readFile(exportedAttachment, "utf8"), "signed contract");
+  saveSelection = { canceled: true, filePath: undefined };
+  messageResponse = 1;
+  assert.deepEqual(await invoke("vault:delete-attachment", saved.id, attached.added[0].id), { deleted: true });
+  messageResponse = 0;
+  assert.deepEqual((await invoke("vault:get-entry", saved.id)).attachments, []);
+
   messageBoxes.length = 0;
   assert.deepEqual(await invoke("vault:reveal-password", saved.id), { shown: true });
   assert.equal(messageBoxes.length, 1);
@@ -290,7 +355,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal(heldDialog.signal.aborted, false);
   powerMonitor.emit("lock-screen");
   assert.equal(heldDialog.signal.aborted, true);
-  assert.deepEqual(sentToRenderer.splice(0), [["vault:auto-locked"]]);
+  assert.deepEqual(vaultEvents(), [["vault:auto-locked"]]);
   await pendingReveal;
   holdDialogs = false;
   await invoke("vault:unlock", "correct horse battery staple");
@@ -317,6 +382,13 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   await assert.rejects(invoke("recovery:copy"), /\[mnemo:errors\.copyValue\]/);
   await invoke("vault:unlock", "new passphrase 123");
   await invoke("vault:delete-entry", saved.id);
+  // Deleted items wait in the trash; emptying it needs a native confirmation.
+  assert.ok((await invoke("vault:list-entries")).every((entry) => entry.deletedAt));
+  messageResponse = 0;
+  assert.deepEqual(await invoke("vault:empty-trash"), { deleted: 0 });
+  messageResponse = 1;
+  assert.deepEqual(await invoke("vault:empty-trash"), { deleted: 4 });
+  messageResponse = 0;
   assert.equal((await invoke("vault:list-entries")).length, 0);
   await assert.rejects(invoke("profiles:delete", profileId), /Lock the current vault/);
 
@@ -331,5 +403,5 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   ipcEvents.get("vault:activity")(
     { senderFrame: { url: "https://attacker.example/" }, sender: { mainFrame: trustedFrame } },
   );
-  assert.deepEqual(sentToRenderer, []);
+  assert.deepEqual(vaultEvents(), []);
 });

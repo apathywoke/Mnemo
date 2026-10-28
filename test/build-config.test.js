@@ -40,3 +40,31 @@ test("release builds ship only Ed25519 public update keys", async () => {
   }
   assert.ok(config.files.includes("build/update-keys/*.pem"));
 });
+
+// Every local module the main process or preload loads must be packaged,
+// or the release build fails at startup.
+test("release builds include every module that main and preload require", async () => {
+  const root = path.join(__dirname, "..");
+  // electron-builder globs: "**/" is any number of folders, "*" one name part.
+  const escape = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  const patterns = config.files.map((pattern) => new RegExp(`^${pattern
+    .split("**/")
+    .map((part) => part.split("*").map(escape).join("[^/]*"))
+    .join("(?:.*/)?")}$`));
+  const seen = new Set();
+  const queue = ["main.js", "preload.js"];
+  while (queue.length > 0) {
+    const file = queue.shift();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const source = await fs.readFile(path.join(root, file), "utf8");
+    for (const [, request] of source.matchAll(/require\(\s*["'](\.{1,2}\/[^"']+)["']\s*\)/g)) {
+      let resolved = path.relative(root, path.resolve(root, path.dirname(file), request));
+      if (!resolved.endsWith(".js") && !resolved.endsWith(".json")) resolved += ".js";
+      queue.push(resolved.split(path.sep).join("/"));
+    }
+  }
+  const missing = [...seen].filter((file) => !patterns.some((pattern) => pattern.test(file)));
+  assert.deepEqual(missing, []);
+  assert.ok(seen.has("backup-file.js") && seen.has("vault-store.js"));
+});

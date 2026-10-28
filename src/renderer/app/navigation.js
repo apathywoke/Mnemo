@@ -24,9 +24,11 @@
           $("#item-dialog").close();
           return;
         }
-        if ($("#delete-dialog").open) {
-          $("#delete-dialog").close();
-          return;
+        for (const id of ["#history-dialog", "#folders-dialog"]) {
+          if ($(id).open) {
+            $(id).close();
+            return;
+          }
         }
         if (ctx.pages.access.isProfileDeleteDialogOpen()) {
           ctx.pages.access.closeProfileDeleteDialog();
@@ -95,7 +97,8 @@
           $("#settings-dialog").open ||
           $("#entry-dialog").open ||
           $("#item-dialog").open ||
-          $("#delete-dialog").open ||
+          $("#history-dialog").open ||
+          $("#folders-dialog").open ||
           ctx.pages.access.isProfileDeleteDialogOpen() ||
           !$("#restore-panel").hidden ||
           !$("#recover-panel").hidden ||

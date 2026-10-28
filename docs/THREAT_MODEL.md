@@ -16,7 +16,9 @@ again whenever a trigger at the end of this document applies. Updated
 | Master passphrase | Typed into the renderer, sent once over IPC, then dropped | Never stored. |
 | Recovery key (256-bit) | Shown once in the renderer; kept in main memory until the user confirms it is saved; optionally in a user-saved text file; on paper | Opens the vault and resets the passphrase. |
 | Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock; if Touch ID is on, also in `biometric/<profile>.key`, encrypted with a Keychain-held key | Unwraps everything. |
-| Encrypted backups (`.vault`) | Wherever the user saves them | Same envelope and passphrase as the local vault. |
+| Attachments | `<vault>.attachments/<id>.bin`, each encrypted under its own key sealed inside the vault data; main-process memory while being added, saved, or verified; a plain copy wherever the user saves one | A file alone reveals only its size. |
+| Earlier versions (history) | Inside the encrypted vault data, sealed values kept sealed | Old passwords remain until 20 newer versions push them out or the item is deleted for good. |
+| Encrypted backups (`.vault`) | Wherever the user saves them | Same envelope and passphrase as the local vault; with attachments, a container that also holds the encrypted attachment files. |
 | Profile registry (`profiles.json`) | Application support folder, `0600` | Profile names in plain text, not secret by design. |
 | Integrity of the shipped app | `Mnemo.app` in `/Applications`; ad-hoc signed when installed from GitHub releases | A modified app can steal everything the user types. |
 | Update signing key (Ed25519 private key) | GitHub Actions secret in the `release` environment; nowhere else | Whoever holds it can install code on every copy that accepts updates. The matching public keys ship in `build/update-keys/`. |
@@ -99,6 +101,8 @@ again whenever a trigger at the end of this document applies. Updated
 | Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM | A weak passphrase still falls. The 7-character minimum is a usability floor, not a strength guarantee. |
 | Tamper with a vault or backup to plant data or downgrade parameters | AES-GCM with the header (format, version, KDF parameters, salt) as AAD; strict schema and size validation before and after decryption; fixed KDF parameters | None known. |
 | Swap sealed passwords between entries | Each password is sealed with the entry ID in its AAD; a swapped value fails authentication | None known. |
+| Read, alter, or swap attachment files | Each file is AES-256-GCM under its own key with the attachment ID as AAD; the key is sealed with the item and attachment IDs inside the vault data. A changed or swapped file fails to decrypt and is reported by name; backups are verified before they are written and before a restore replaces anything | File sizes and counts are visible. Deleting files is possible (denial of service); the vault then reports them as missing. |
+| Corrupt a backup to damage the vault it is restored into | The container must end exactly after its last file; every referenced attachment is decrypted before anything is written; the vault file is replaced last, in one rename | None known. |
 | Recover deleted vaults | Not addressed: deletion unlinks the file | APFS snapshots, Time Machine, and SSD remapping may keep old encrypted copies. These remain protected by their passphrase. |
 
 ### A2, malicious website (favicon fetch)
@@ -122,6 +126,8 @@ again whenever a trigger at the end of this document applies. Updated
 | Exfiltrate what it can read (metadata, notes, passphrase) | CSP `connect-src 'none'`; `webRequest` cancels HTTP(S) and WebSocket; WebRTC removed from the page, UDP restricted, and the session proxied to a closed port; DevTools disabled in packaged builds | DNS prefetch or other Chromium side channels not covered here. |
 | Escape to Node.js or the filesystem | `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`; narrow preload; no `webview`; window opening and navigation denied; strict CSP (`script-src 'self'`, `connect-src 'none'`); remote requests cancelled | Depends on Chromium's sandbox. |
 | Spoof IPC from another frame | Handlers accept only the main frame whose URL is the packaged `index.html` | None known. |
+| Destroy data through trash, history, or attachments | Deleting moves items to the trash (restorable for 30 days); deleting for good, emptying the trash, and deleting an attachment need a native confirmation in main; restoring a version keeps the replaced content as a version | It can move items to the trash, change folders and favorites, and restore older versions without a click. |
+| Read attachments or plant files | Files are chosen and saved only through native open and save dialogs in main; the renderer never sends a path and never receives contents | It can open those dialogs, which the user must still complete. |
 | Use Reports to learn about passwords | Main returns entry IDs, breach counts, and weak/reused flags only; fingerprints use a per-unlock HMAC key and never leave main | The renderer learns which entries share a password, which are weak, and (after a check) which are breached. It can start a breach check without a click, which sends 5-character SHA-1 prefixes to Have I Been Pwned. |
 | Learn passwords from the breach check (network observer or Have I Been Pwned) | Only the first 5 hex characters of each SHA-1 are sent, over HTTPS, with padded responses; matching is local | The prefixes and the number of distinct passwords are visible to Have I Been Pwned. A prefix narrows a password's SHA-1 to one of about a million hashes, which matters only for a password already in a guess list. |
 
@@ -216,6 +222,14 @@ auto-lock limits how long secrets stay in memory.
    the updater, and the Gatekeeper and Keychain prompts go away.
 10. **Update freshness.** Reject manifests older than a set age, or show the
     date of the newest known release, to make freeze attacks visible.
+11. **Attachments in memory.** Adding, saving, and verifying an attachment
+    holds the whole file (up to 50 MB) in main-process memory; buffers are
+    zeroed afterwards, but copies made by Node or the OS are not controlled.
+    Saved copies are plain files outside Mnemo.
+12. **History and deletion.** An old password stays in the vault (and in
+    backups made meanwhile) until 20 newer versions replace it or the item is
+    deleted for good. A per-item "clear history" action would let users drop
+    it sooner.
 
 ## 8. Internal review (2026-10-26)
 
