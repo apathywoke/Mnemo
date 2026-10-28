@@ -157,7 +157,8 @@ async function activeProfileName() {
 }
 
 function publicUpdateState() {
-  const blocker = updater?.installBlocker() ?? "notPackaged";
+  // installBlocker() returns null when the app can update itself.
+  const blocker = updater ? updater.installBlocker() : "notPackaged";
   return {
     ...updateState,
     currentVersion: app.getVersion(),

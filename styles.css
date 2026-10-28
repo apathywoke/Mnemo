@@ -3751,6 +3751,13 @@ h2 {
   margin-top: 4px;
 }
 
+/* .secondary-button has a top margin for forms; in a row it would sit
+   lower than the text beside it. */
+.report-breach-actions .secondary-button,
+.update-status-actions .secondary-button {
+  margin-top: 0;
+}
+
 .report-breach-actions .secondary-button:disabled {
   opacity: 0.5;
   cursor: default;
@@ -3800,7 +3807,7 @@ h2 {
 }
 
 .report-empty {
-  margin: 2px 0 0;
+  margin: 4px 0 0;
   color: var(--c-70c58b);
   font-size: 12px;
 }
