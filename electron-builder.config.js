@@ -54,6 +54,8 @@ module.exports = {
   forceCodeSigning: true,
   mac: {
     category: "public.app-category.productivity",
+    // Generated from build/icon.svg by `npm run icon`.
+    icon: "build/icon.icns",
     // Fixed names: the update manifest refers to the zips by name.
     artifactName: "${productName}-${version}-mac-${arch}.${ext}",
     target: [

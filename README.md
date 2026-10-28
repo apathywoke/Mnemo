@@ -22,7 +22,10 @@ security updates current.
 `npm run dist:mac` produces signed, notarized `.dmg` and `.zip` builds with
 hardened Electron fuses and asar integrity checks. It needs a Developer ID
 certificate and App Store Connect API key; see `docs/RELEASING.md`.
-`npm run pack:mac:local` makes an ad-hoc-signed local test build.
+`npm run pack:mac:local` makes an ad-hoc-signed local test build, and
+`npm run dist:mac:local` an ad-hoc-signed `.dmg` installer for this Mac in
+`release/`. The app icon is drawn in `build/icon.svg`; `npm run icon`
+regenerates `build/icon.png` and `build/icon.icns` from it.
 
 Pushing a version tag (`v0.2.0`) runs `.github/workflows/release.yml`, which
 tests, builds ad-hoc-signed `.dmg` and `.zip` files, signs an update manifest

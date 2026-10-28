@@ -9,7 +9,9 @@
     "test": "node --test",
     "dist:mac": "electron-builder --mac --config electron-builder.config.js",
     "pack:mac:local": "MNEMO_LOCAL_TEST_BUILD=1 electron-builder --mac dir --config electron-builder.config.js -c.forceCodeSigning=false -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false",
-    "verify:mac": "node scripts/verify-mac-release.js"
+    "verify:mac": "node scripts/verify-mac-release.js",
+    "icon": "electron scripts/make-icon.js",
+    "dist:mac:local": "MNEMO_LOCAL_TEST_BUILD=1 electron-builder --mac dmg --config electron-builder.config.js --publish never -c.forceCodeSigning=false -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false"
   },
   "devDependencies": {
     "@electron/fuses": "2.1.3",

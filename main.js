@@ -383,6 +383,10 @@ if (launchedWithRemoteDebugging) {
   });
 
   app.whenReady().then(() => {
+    // `npm start` runs the stock Electron.app; give its Dock tile Mnemo's
+    // icon. Packaged builds carry the icon (and the name) in the bundle.
+    if (!app.isPackaged) app.dock?.setIcon?.(path.join(__dirname, "build", "icon.png"));
+
     // Keep remote access disabled in the renderer; favicon retrieval is a separate,
     // explicit user action handled by the main process with host validation.
     session.defaultSession.webRequest.onBeforeRequest(

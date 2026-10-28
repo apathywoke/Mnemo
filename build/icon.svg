@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Mnemo app icon: the brand-art starburst on a macOS-sized plate
+       (824 px squircle on a 1024 px canvas). Rendered to icon.png and
+       icon.icns by scripts/make-icon.js. -->
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a1a1a"/>
+      <stop offset="1" stop-color="#070707"/>
+    </linearGradient>
+    <clipPath id="clip">
+      <rect x="100" y="100" width="824" height="824" rx="185"/>
+    </clipPath>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#plate)"/>
+  <g clip-path="url(#clip)" stroke="#262626" stroke-width="3">
+    <path d="M100 512h824M512 100v824"/>
+  </g>
+  <!-- Brand art geometry (180 px viewBox, centre 90) scaled by 4 around 512. -->
+  <g transform="translate(152 152) scale(4)" fill="none" stroke="#f2f2f2" stroke-width="4.5" stroke-linecap="square">
+    <path d="M90 18v46M90 116v46M18 90h46M116 90h46"/>
+    <path d="m39 39 33 33m36 36 33 33M141 39l-33 33m-36 36-33 33"/>
+  </g>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+</svg>
