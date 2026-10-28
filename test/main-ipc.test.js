@@ -172,7 +172,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.deepEqual(await invoke("settings:set-language", "de"), { language: "de", theme: "system", updateInterval: "1d" });
   await assert.rejects(
     invoke("profiles:create", "Primary", "short"),
-    /\[mnemo:errors\.passphraseTooShort\] Die Master-Passphrase muss mindestens 7 Zeichen lang sein\./,
+    /\[mnemo:errors\.passphraseTooShort\] Die Master-Passphrase muss mindestens 12 Zeichen lang sein\./,
   );
   await invoke("settings:set-language", "en");
 
@@ -194,7 +194,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   sentToRenderer.length = 0;
   await assert.rejects(untrustedInvoke("app:get-version"), /untrusted frame/);
   assert.deepEqual(await invoke("profiles:choose"), []);
-  await assert.rejects(invoke("profiles:create", "Primary", "short"), /at least 7 characters/);
+  await assert.rejects(invoke("profiles:create", "Primary", "short"), /at least 12 characters/);
 
   const created = await invoke("profiles:create", "Primary", "correct horse battery staple");
   const profileId = created.profile.id;

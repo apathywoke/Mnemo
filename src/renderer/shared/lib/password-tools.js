@@ -110,21 +110,28 @@
     return false;
   }
 
+  // Character groups for any script: lowercase (and letters without case,
+  // such as CJK), uppercase, numbers, and everything else. For ASCII these
+  // are exactly a-z, A-Z, 0-9, and the rest.
+  const CHARACTER_GROUPS = [
+    /[\p{Ll}\p{Lm}\p{Lo}]/u,
+    /[\p{Lu}\p{Lt}]/u,
+    /\p{N}/u,
+    /[^\p{L}\p{N}]/u,
+  ];
+
   function estimatePasswordStrength(password) {
     if (!password) return { level: "empty", value: 0, label: "Enter a password" };
 
+    // Length in code points, so "пароль" or an emoji counts as typed.
+    const length = Array.from(password).length;
     let score = 0;
-    if (password.length >= 8) score += 1;
-    if (password.length >= 12) score += 1;
-    if (password.length >= 16) score += 1;
-    if (password.length >= 20) score += 1;
+    if (length >= 8) score += 1;
+    if (length >= 12) score += 1;
+    if (length >= 16) score += 1;
+    if (length >= 20) score += 1;
 
-    const groups = [
-      /[a-z]/.test(password),
-      /[A-Z]/.test(password),
-      /\d/.test(password),
-      /[^a-zA-Z0-9]/.test(password),
-    ].filter(Boolean).length;
+    const groups = CHARACTER_GROUPS.filter((group) => group.test(password)).length;
     if (groups >= 2) score += 1;
     if (groups >= 3) score += 1;
     if (groups === 4) score += 1;

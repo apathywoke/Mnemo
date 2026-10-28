@@ -102,7 +102,7 @@
           <p class="eyebrow section-label" data-i18n="setup.eyebrow">NEW PROFILE</p>
           <h2 data-i18n="setup.title">Create a vault</h2>
           <p class="description" data-i18n="setup.description">
-            Choose a unique master passphrase with at least 7 characters. Longer passphrases are safer. It encrypts your vault and is never stored by the app.
+            Choose a unique master passphrase of at least 12 characters, rated Strong; a phrase of several unrelated words works well. It encrypts your vault and is never stored by the app.
           </p>
           <div class="recovery-warning" role="note">
             <span class="recovery-warning-mark" aria-hidden="true">!</span>
@@ -126,7 +126,7 @@
                 id="create-passphrase"
                 type="password"
                 autocomplete="new-password"
-                minlength="7"
+                minlength="12"
                 maxlength="1024"
                 required
               />
@@ -134,13 +134,21 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
               </button>
             </div>
+            <div class="password-strength passphrase-strength" data-strength-for="create-passphrase" data-strength="empty">
+              <div class="password-strength-heading">
+                <span data-i18n="strength.passphraseTitle">Passphrase strength</span>
+                <span class="password-strength-label" aria-live="polite" data-i18n="strength.empty">Enter a password</span>
+              </div>
+              <div class="password-strength-track" role="meter" aria-label="Master passphrase strength" data-i18n-aria-label="strength.passphraseMeterAria" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0"><span></span></div>
+              <p class="password-strength-note" data-i18n="strength.passphraseHint">At least 12 characters and rated Strong. A phrase of several unrelated words is long and easy to remember.</p>
+            </div>
             <label for="confirm-passphrase" data-i18n="setup.confirmPassphrase">Confirm master passphrase</label>
             <div class="secret-input-row">
               <input
                 id="confirm-passphrase"
                 type="password"
                 autocomplete="new-password"
-                minlength="7"
+                minlength="12"
                 maxlength="1024"
                 required
               />
@@ -240,7 +248,7 @@
                 id="recover-passphrase"
                 type="password"
                 autocomplete="new-password"
-                minlength="7"
+                minlength="12"
                 maxlength="1024"
                 required
               />
@@ -248,13 +256,21 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
               </button>
             </div>
+            <div class="password-strength passphrase-strength" data-strength-for="recover-passphrase" data-strength="empty">
+              <div class="password-strength-heading">
+                <span data-i18n="strength.passphraseTitle">Passphrase strength</span>
+                <span class="password-strength-label" aria-live="polite" data-i18n="strength.empty">Enter a password</span>
+              </div>
+              <div class="password-strength-track" role="meter" aria-label="Master passphrase strength" data-i18n-aria-label="strength.passphraseMeterAria" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0"><span></span></div>
+              <p class="password-strength-note" data-i18n="strength.passphraseHint">At least 12 characters and rated Strong. A phrase of several unrelated words is long and easy to remember.</p>
+            </div>
             <label for="recover-confirm-passphrase" data-i18n="recover.confirmPassphrase">Confirm new master passphrase</label>
             <div class="secret-input-row">
               <input
                 id="recover-confirm-passphrase"
                 type="password"
                 autocomplete="new-password"
-                minlength="7"
+                minlength="12"
                 maxlength="1024"
                 required
               />
@@ -326,14 +342,22 @@
               />
               <label for="restore-new-passphrase" data-i18n="recover.newPassphrase">New master passphrase</label>
               <div class="secret-input-row">
-                <input id="restore-new-passphrase" type="password" autocomplete="new-password" minlength="7" maxlength="1024" />
+                <input id="restore-new-passphrase" type="password" autocomplete="new-password" minlength="12" maxlength="1024" />
                 <button type="button" class="password-visibility-toggle" data-password-visibility-for="restore-new-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="restore-new-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
                 </button>
               </div>
+              <div class="password-strength passphrase-strength" data-strength-for="restore-new-passphrase" data-strength="empty">
+                <div class="password-strength-heading">
+                  <span data-i18n="strength.passphraseTitle">Passphrase strength</span>
+                  <span class="password-strength-label" aria-live="polite" data-i18n="strength.empty">Enter a password</span>
+                </div>
+                <div class="password-strength-track" role="meter" aria-label="Master passphrase strength" data-i18n-aria-label="strength.passphraseMeterAria" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0"><span></span></div>
+                <p class="password-strength-note" data-i18n="strength.passphraseHint">At least 12 characters and rated Strong. A phrase of several unrelated words is long and easy to remember.</p>
+              </div>
               <label for="restore-confirm-passphrase" data-i18n="recover.confirmPassphrase">Confirm new master passphrase</label>
               <div class="secret-input-row">
-                <input id="restore-confirm-passphrase" type="password" autocomplete="new-password" minlength="7" maxlength="1024" />
+                <input id="restore-confirm-passphrase" type="password" autocomplete="new-password" minlength="12" maxlength="1024" />
                 <button type="button" class="password-visibility-toggle" data-password-visibility-for="restore-confirm-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="restore-confirm-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
                 </button>
@@ -1072,6 +1096,7 @@
     <script src="./src/renderer/shared/ui/toast-notifications.js"></script>
     <script src="./src/renderer/shared/lib/password-tools.js"></script>
     <script src="./src/renderer/shared/ui/password-visibility.js"></script>
+    <script src="./src/renderer/shared/ui/passphrase-strength.js"></script>
     <script src="./src/renderer/entities/vault-profile/model/profile.js"></script>
     <script src="./src/renderer/entities/vault-profile/ui/profile-list.js"></script>
     <script src="./src/renderer/shared/item-types.js"></script>

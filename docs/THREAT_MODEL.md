@@ -72,8 +72,9 @@ again whenever a trigger at the end of this document applies. Updated
 - macOS, the user account, and the kernel are not compromised while the vault
   is unlocked. Mnemo cannot defend against malware running as the same user
   with Accessibility, screen-recording, or debugger rights, or as root.
-- The user picks a master passphrase that resists offline guessing. The app
-  enforces only a 7-character minimum.
+- The user picks a master passphrase that resists offline guessing. A new
+  passphrase must be at least 12 characters and rated Strong by a simple
+  heuristic; older vaults may still have a 7-character one.
 - Apple's code-signing, notarization, and Gatekeeper checks work as designed.
 - Electron 45 / Chromium are kept current; sandbox escapes are fixed upstream.
 
@@ -98,7 +99,7 @@ again whenever a trigger at the end of this document applies. Updated
 | --- | --- | --- |
 | Brute-force the recovery key | 256 random bits; the 24-bit checksum only detects typos and reveals nothing about the key | None known. |
 | Strip or replace the recovery wrap to plant a key the attacker knows | The recovery salt is in the AES-GCM associated data of the key wraps and the vault data; a missing or different recovery wrap cannot unwrap the real vault key, and the strict format check rejects the file | An attacker with write access can delete the recovery wrap together with the file (denial of service only). |
-| Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM | A weak passphrase still falls. The 7-character minimum is a usability floor, not a strength guarantee. |
+| Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM; a passphrase being set must be at least 12 characters and rated Strong by the built-in estimate, checked in main | The estimate is a heuristic without a dictionary, so a long but predictable phrase can pass. Vaults from before this rule may still have a 7-character passphrase until it is changed through recovery. |
 | Tamper with a vault or backup to plant data or downgrade parameters | AES-GCM with the header (format, version, KDF parameters, salt) as AAD; strict schema and size validation before and after decryption; fixed KDF parameters | None known. |
 | Swap sealed passwords between entries | Each password is sealed with the entry ID in its AAD; a swapped value fails authentication | None known. |
 | Read, alter, or swap attachment files | Each file is AES-256-GCM under its own key with the attachment ID as AAD; the key is sealed with the item and attachment IDs inside the vault data. A changed or swapped file fails to decrypt and is reported by name; backups are verified before they are written and before a restore replaces anything | File sizes and counts are visible. Deleting files is possible (denial of service); the vault then reports them as missing. |
@@ -215,8 +216,12 @@ auto-lock limits how long secrets stay in memory.
    Keychain itself refuses to release the key without a fingerprint and the
    key is invalidated when fingerprints change. Needs a native module, the
    data protection keychain, and a provisioning profile.
-8. **Passphrase strength.** Consider a stronger minimum or an entropy-based
-   check, and consider raising scrypt cost or moving to Argon2id.
+8. **Passphrase strength.** New passphrases need 12 characters and a Strong
+   rating from a simple heuristic (length, character classes of any script,
+   a few common words and runs). Consider a dictionary-based estimate (such
+   as zxcvbn, which would be a new dependency) or a word-count rule, a way
+   to change the passphrase without the recovery key so old 7-character
+   vaults can be upgraded, and raising scrypt cost or moving to Argon2id.
 9. **Developer ID.** GitHub releases are ad-hoc signed. With a Developer ID,
    sign and notarize in the release workflow, check the new app's Team ID in
    the updater, and the Gatekeeper and Keychain prompts go away.
@@ -248,7 +253,7 @@ found no Critical or High issues.
 | 6 | Low/Info | `file://` origin with `GrantFileProtocolExtraPrivileges` makes CSP `'self'` cover any local file | **Open.** See follow-up 1 in section 7. |
 | 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Open.** Move decoding to a sandboxed `utilityProcess` or to the renderer. |
 | 8 | Info | Release verification checked entitlements only on the outer app | **Fixed.** Every nested `.app`/`.framework` is checked, and `app.asar.unpacked` is rejected. |
-| 9 | Info | Clipboard text is not marked concealed or transient; vault rollback is not detected; 7-character passphrase minimum | **Open.** Already listed in section 7; concealed clipboard types need a small native helper. |
+| 9 | Info | Clipboard text is not marked concealed or transient; vault rollback is not detected; 7-character passphrase minimum | **Partly fixed.** New passphrases need 12 characters and a Strong rating (section 7, item 8). Clipboard and rollback are still open; concealed clipboard types need a small native helper. |
 
 The reviewer confirmed: IPC sender checks on every handler, a fixed preload
 surface, input validation, that passwords never reach the renderer, a DOM

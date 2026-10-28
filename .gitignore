@@ -11,6 +11,8 @@ npm-debug.log*
 .env.*
 !.env.example
 *.vault
+# Test vaults with made-up data only.
+!test/fixtures/*.vault
 vault.json
 profiles.json
 vaults/

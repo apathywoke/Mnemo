@@ -14,6 +14,7 @@
   ctx.pages.vault = ns.pages.vault.create(ctx);
   ctx.pages.access = ns.pages.access.create(ctx);
   ns.shared.passwordVisibility.bindAll();
+  ns.shared.passphraseStrength.bindAll();
   ns.app.bindNavigation(ctx);
 
   ctx.api.getVersion()

@@ -73,6 +73,7 @@
         }
         conceal();
         ctx.pages.vault?.updatePasswordStrength();
+        ns.shared.passphraseStrength?.refreshAll();
       },
       clearVaultView() {
         ctx.recoveryKey?.discard();

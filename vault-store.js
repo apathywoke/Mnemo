@@ -16,6 +16,7 @@ const { generateTotp, parseTotpInput, toOtpauthUri } = require("./totp");
 const { ITEM_TYPES } = require("./src/renderer/shared/item-types");
 const { describeSshKey, isPrivateKey } = require("./ssh-keys");
 const cardTools = require("./src/renderer/shared/lib/card-tools");
+const { estimatePasswordStrength } = require("./src/renderer/shared/lib/password-tools");
 const { openVaultSource, readContainerFile, writeContainer } = require("./backup-file");
 
 const scryptAsync = promisify(scrypt);
@@ -67,7 +68,11 @@ const TEXT_FIELDS = Object.freeze(["name", "username", "url", "notes"]);
 const MAX_SEALED_PASSWORD_BYTES = ENTRY_LIMITS.password * 3;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_PASSPHRASE_BYTES = 1024;
+// Existing vaults keep opening with passphrases of 7 or more characters; a
+// passphrase that is being set must be longer and rated strong, since it is
+// the only protection of the file against offline guessing.
 const MIN_PASSPHRASE_CHARACTERS = 7;
+const MIN_NEW_PASSPHRASE_CHARACTERS = 12;
 const MAX_SCRYPT_MEMORY_BYTES = 256 * 1024 * 1024;
 // Organization (schema 3).
 const MAX_FOLDERS = 500;
@@ -316,6 +321,22 @@ function validatePassphrase(passphrase) {
   }
   if (byteCount > MAX_PASSPHRASE_BYTES) {
     throw new Error("The master passphrase is too long.");
+  }
+}
+
+// For a passphrase being set (new vault, recovery, restore with the recovery
+// key), with the same estimate the editor shows. Unlocking and other checks
+// of the current passphrase use validatePassphrase() only.
+function validateNewPassphrase(passphrase) {
+  // The 12-character rule is reported first, not the 7-character floor.
+  if (typeof passphrase === "string" && Array.from(passphrase).length < MIN_NEW_PASSPHRASE_CHARACTERS) {
+    throw new Error(
+      `The master passphrase must be at least ${MIN_NEW_PASSPHRASE_CHARACTERS} characters long.`,
+    );
+  }
+  validatePassphrase(passphrase);
+  if (estimatePasswordStrength(passphrase).level !== "strong") {
+    throw new Error("This master passphrase is too easy to guess. Use a longer phrase of several unrelated words.");
   }
 }
 
@@ -1270,7 +1291,7 @@ class VaultStore {
 
   async create(passphrase) {
     const sessionEpoch = this.sessionEpoch;
-    validatePassphrase(passphrase);
+    validateNewPassphrase(passphrase);
     if (await this.fileExists()) {
       throw new Error("A vault already exists on this Mac.");
     }
@@ -1388,7 +1409,7 @@ class VaultStore {
   async recoverWithKey(recoveryKeyText, newPassphrase) {
     return this.enqueueMutation(async () => {
       const sessionEpoch = this.sessionEpoch;
-      validatePassphrase(newPassphrase);
+      validateNewPassphrase(newPassphrase);
       const recoveryKeyBytes = decodeRecoveryKey(recoveryKeyText);
       let opened = null;
       try {
@@ -2488,7 +2509,7 @@ class VaultStore {
         if (!hasExactKeys(credentials, ["recoveryKey", "newPassphrase"])) {
           throw new Error("The recovery key is not valid. Check it and try again.");
         }
-        validatePassphrase(credentials.newPassphrase);
+        validateNewPassphrase(credentials.newPassphrase);
         const recoveryKeyBytes = decodeRecoveryKey(credentials.recoveryKey);
         try {
           opened = await this.decryptVaultFile(sourcePath, { recoveryKeyBytes }, { allowContainer: true });
