@@ -2,7 +2,8 @@
 
 Status: draft for the prototype, written alongside the Electron hardening
 work (fuses, metadata-only renderer, signing and notarization). Review it
-again whenever a trigger at the end of this document applies.
+again whenever a trigger at the end of this document applies. Updated
+2026-10-28 for in-app updates (B6, A8).
 
 ## 1. What Mnemo protects
 
@@ -17,7 +18,8 @@ again whenever a trigger at the end of this document applies.
 | Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock; if Touch ID is on, also in `biometric/<profile>.key`, encrypted with a Keychain-held key | Unwraps everything. |
 | Encrypted backups (`.vault`) | Wherever the user saves them | Same envelope and passphrase as the local vault. |
 | Profile registry (`profiles.json`) | Application support folder, `0600` | Profile names in plain text, not secret by design. |
-| Integrity of the shipped app | Signed, notarized `Mnemo.app` | A modified app can steal everything the user types. |
+| Integrity of the shipped app | `Mnemo.app` in `/Applications`; ad-hoc signed when installed from GitHub releases | A modified app can steal everything the user types. |
+| Update signing key (Ed25519 private key) | GitHub Actions secret in the `release` environment; nowhere else | Whoever holds it can install code on every copy that accepts updates. The matching public keys ship in `build/update-keys/`. |
 
 ## 2. System and trust boundaries
 
@@ -33,9 +35,11 @@ again whenever a trigger at the end of this document applies.
  │    ── fs (0700 dir / 0600 files) ──── vault files, profiles.json    │  B2
  │    ── clipboard ───────────────────── other apps, Universal Clip.   │  B3
  │    ── HTTPS (user-initiated only) ─── website for its favicon       │  B4
+ │    ── HTTPS (scheduled, can be off) ─ GitHub releases (updates)     │  B6
  │    ── native dialogs ──────────────── reveal password, file pickers │
  └─────────────────────────────────────────────────────────────────────┘
-   B5: build machine → Developer ID signature → notarization → user's Mac
+   B5: GitHub Actions build → ad-hoc signature → GitHub release → user's Mac
+       (or: build machine → Developer ID signature → notarization)
 ```
 
 - **B1, renderer → main.** The renderer is treated as compromisable (for
@@ -46,10 +50,19 @@ again whenever a trigger at the end of this document applies.
 - **B2, main → disk.** Everything secret is encrypted before it is written.
   Writes are atomic (temp file plus rename) with restrictive permissions.
 - **B3, main → clipboard.** Leaves the app's control once written.
-- **B4, main → network.** Only the explicit "Load site icon" action. Renderer
-  network access is blocked by CSP and by `webRequest`.
-- **B5, supply chain.** Signing, notarization, fuses, and asar integrity make
-  tampering with an installed copy detectable by macOS and by Electron.
+- **B4, main → network.** Only the explicit "Load site icon" action and the
+  update check (B6). Renderer network access is blocked by CSP and by
+  `webRequest`.
+- **B5, supply chain.** Fuses and asar integrity make tampering with app code
+  inside an installed copy detectable by Electron. A Developer ID build adds
+  notarization and Gatekeeper; the ad-hoc builds published on GitHub do not
+  identify their author to macOS.
+- **B6, main → GitHub releases.** The main process reads the latest release
+  of `apathywoke/Mnemo`, its signed manifest, and the archive for this Mac.
+  Trust rests on the Ed25519 signature checked against keys bundled in the
+  running app, not on TLS or GitHub. The renderer only sees the version,
+  release notes, and progress, and can only ask main to check, download,
+  install, or open the release page.
 
 ## 3. Assumptions
 
@@ -72,6 +85,7 @@ again whenever a trigger at the end of this document applies.
 | A5 | Local process, same user, vault **unlocked** | As A4, while the user is working in Mnemo. |
 | A6 | Opportunistic physical or visual access | Unlocked, unattended Mac; shoulder surfing; screen sharing. |
 | A7 | Distribution attacker | Modifies the app in transit or on a download mirror, or re-signs it. |
+| A8 | Update channel attacker | Controls the network path, GitHub's responses, a GitHub release (through a stolen account or token), or the release workflow. |
 
 ## 5. Threats and mitigations
 
@@ -141,9 +155,24 @@ auto-lock limits how long secrets stay in memory.
 
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
-| Trojanized download | Developer ID signature, hardened runtime, notarization with a stapled ticket, Gatekeeper | Users who bypass Gatekeeper are not protected. There is no auto-update channel yet, so updates are manual. |
+| Trojanized download | Developer ID builds: signature, hardened runtime, notarization with a stapled ticket, Gatekeeper | GitHub releases are ad-hoc signed, so the first install asks the user to override Gatekeeper and cannot tell a genuine download from a re-signed one. Compare against the release page; the in-app updater (A8) protects later versions. |
 | Shipping an unsigned or misconfigured build | `forceCodeSigning`; the `afterSign` hook verifies fuses, asar integrity, the signature, entitlements, the ticket, and Gatekeeper; tests pin the fuse and entitlement configuration | Build-machine compromise is out of scope. Signing keys must be protected; prefer App Store Connect API keys stored in a secrets manager. |
 | Compromised npm dependency | No runtime dependencies; build tools pinned to exact versions with a lockfile; `npm audit` clean at the time of writing | Build-time dependencies (electron-builder) run with developer privileges. |
+
+### A8, update channel
+
+| Threat | Mitigation | Residual risk |
+| --- | --- | --- |
+| Network or GitHub serves a modified archive | The archive's SHA-512 and size must match the Ed25519-signed manifest; the unpacked app must have Mnemo's bundle ID, the signed version, and a valid code signature | None known without the private key. |
+| Attacker publishes a release from a stolen GitHub account or token | The release still needs a manifest signed by a bundled key; the key is not in the repository or on a developer machine | A stolen key plus a release is a full compromise of every auto-updating copy (see below). |
+| Downgrade to an older, vulnerable signed release | Only versions newer than the running one are offered; the release tag must equal the signed version | — |
+| Freeze: withholding updates by serving an old "latest" release or blocking GitHub | — | Not detected. The manifest has `releasedAt` but the app does not require freshness. The user can compare with the release page. |
+| Update key leak or misuse | Key held only in the `release` environment, used by a job that installs no npm packages; build job has no secrets; actions pinned to commit SHAs; the signing script refuses keys the app does not trust | Anyone with repository admin rights can read the environment's secrets through a workflow. Recovering from a leak needs a release signed with the leaked key that drops it, which the attacker can race. Protect the environment with tag rules and required reviewers. |
+| Malicious dependency in the build job tampers with the archive | Build tools pinned in the lockfile; tests run before the build | The signed manifest covers whatever the build produced; a compromised build tool is not detected. |
+| Path or command injection while installing | Archive names are restricted to `[A-Za-z0-9._-]` in the signed manifest; files are unpacked with `ditto` into a fresh directory next to the app; the relaunch script receives the PID and path as arguments, not as shell text | — |
+| Partially installed app | Staging and swap use renames on the same volume; a failed swap restores the previous app; leftovers are removed on the next launch | A crash between the two renames leaves the app at `.Mnemo-previous-….app` in the same folder; the user must rename it back. |
+| Updater installs into a translocated or read-only copy | Installation is refused outside a writable folder, on a mounted disk image, or under App Translocation; the banner offers the release page instead | — |
+| Keychain item tied to an ad-hoc signature | — | The ad-hoc signature changes with every build, so after an update macOS asks to let Mnemo use its "Safe Storage" Keychain item (Touch ID). Denying it disables Touch ID unlock until it is turned on again; the master passphrase still works. A Developer ID signature removes the prompt. |
 
 ## 6. Out of scope
 
@@ -179,6 +208,11 @@ auto-lock limits how long secrets stay in memory.
    data protection keychain, and a provisioning profile.
 8. **Passphrase strength.** Consider a stronger minimum or an entropy-based
    check, and consider raising scrypt cost or moving to Argon2id.
+9. **Developer ID.** GitHub releases are ad-hoc signed. With a Developer ID,
+   sign and notarize in the release workflow, check the new app's Team ID in
+   the updater, and the Gatekeeper and Keychain prompts go away.
+10. **Update freshness.** Reject manifests older than a set age, or show the
+    date of the newest known release, to make freeze attacks visible.
 
 ## 8. Internal review (2026-10-26)
 
@@ -208,7 +242,8 @@ the fuse and entitlement configuration, and no logging of secrets.
 
 ## 9. When to revisit this document
 
-- Adding any network feature (sync, breach checks, updates).
+- Adding any network feature (sync, breach checks), or changing the update
+  channel, its keys, or the release workflow.
 - Adding browser autofill or a browser extension bridge.
 - Changing the vault format, KDF, or key hierarchy.
 - Adding IPC methods or widening what the renderer receives.

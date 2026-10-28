@@ -17,6 +17,8 @@ vaults/
 *.tmp
 *.deleting
 *.pem
+# Public update keys ship with the app; private keys never go here.
+!build/update-keys/*.pem
 *.key
 *.p12
 *.pfx

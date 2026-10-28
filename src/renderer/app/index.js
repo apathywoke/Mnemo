@@ -6,6 +6,7 @@
   ctx.recoveryKey = ns.features.recoveryKey.init(ctx);
   ctx.importer = ns.features.importer.init(ctx);
   ctx.touchId = ns.features.touchId.init(ctx);
+  ctx.updates = ns.features.updates.init(ctx);
   ns.features.settings.bind(ctx);
 
   // Page composition follows FSD direction: pages compose widgets and features;

@@ -17,6 +17,16 @@ contextBridge.exposeInMainWorld("vaultApp", {
   getSettings: () => ipcRenderer.invoke("settings:get"),
   setLanguage: (code) => ipcRenderer.invoke("settings:set-language", code),
   setTheme: (theme) => ipcRenderer.invoke("settings:set-theme", theme),
+  setUpdateInterval: (interval) => ipcRenderer.invoke("settings:set-update-interval", interval),
+  // Updates are checked, downloaded, verified, and installed by main.
+  getUpdateState: () => ipcRenderer.invoke("updates:get-state"),
+  checkForUpdates: () => ipcRenderer.invoke("updates:check"),
+  downloadUpdate: () => ipcRenderer.invoke("updates:download"),
+  installUpdate: () => ipcRenderer.invoke("updates:install"),
+  openReleasePage: () => ipcRenderer.invoke("updates:open-release"),
+  onUpdateState: (callback) => {
+    ipcRenderer.on("updates:state", (_event, state) => callback(state));
+  },
   chooseProfile: () => ipcRenderer.invoke("profiles:choose"),
   selectProfile: (profileId) =>
     ipcRenderer.invoke("profiles:select", profileId),

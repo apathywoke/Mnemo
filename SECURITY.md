@@ -9,8 +9,9 @@ passwords until the design has received independent security review.
 
 ## Initial design commitments
 
-- No analytics, telemetry, crash reporting, account, sync backend, or
-  background network activity.
+- No analytics, telemetry, crash reporting, account, or sync backend. The
+  only background network activity is the update check described below,
+  which can be turned off.
 - UI code runs in a sandboxed renderer without Node.js integration.
 - Electron capabilities are exposed through a small, typed preload API.
 - Secrets must not be written to logs, console output, diagnostics, or crash
@@ -72,12 +73,37 @@ passwords until the design has received independent security review.
   preserves aspect ratio, converts the result to PNG, and saves it within the
   encrypted vault. These requests are not repeated unless the user explicitly
   loads or updates the icon.
-- Release builds are signed with a Developer ID certificate and the hardened
-  runtime, notarized, and have Electron fuses set: `RunAsNode`,
+- Packaged builds have Electron fuses set: `RunAsNode`,
   `EnableNodeCliInspectArguments`, and `EnableNodeOptionsEnvironmentVariable`
   are off; `OnlyLoadAppFromAsar` and embedded asar integrity validation are on.
-  Packaged builds refuse to start with Chromium remote-debugging switches. See
-  `docs/RELEASING.md`.
+  Packaged builds refuse to start with Chromium remote-debugging switches.
+  `npm run dist:mac` signs with a Developer ID certificate and the hardened
+  runtime and notarizes. Releases published on GitHub are currently
+  **ad-hoc signed** (no Developer ID, no notarization): macOS asks the user to
+  allow the first launch, and the signature proves only that the bundle is
+  intact, not who made it. See `docs/RELEASING.md`.
+- Updates come from this project's GitHub releases. About 20 seconds after
+  launch and then on the schedule chosen in Settings → Updates (every 30
+  minutes, hour, 6 hours, or day; daily by default; or never), and when the
+  user clicks **Check for updates**, the main process asks `api.github.com`
+  for the latest release. The schedule counts from the last check by the
+  clock, so time asleep counts. GitHub sees the device's IP address and the
+  app version in the User-Agent; nothing else is sent.
+- Every release carries `update-manifest.json` and an Ed25519 signature over
+  its exact bytes. The app trusts only the public keys bundled in it
+  (`build/update-keys/*.pem`); a manifest that does not verify is ignored.
+  The manifest gives the version and each archive's size and SHA-512. The app
+  never installs an older or equal version, requires the release tag to
+  match the signed version, downloads over HTTPS from GitHub's release hosts
+  only (redirects included), and caps sizes and time. The downloaded archive
+  must match the signed hash; after unpacking, the app must carry Mnemo's
+  bundle ID, the signed version, and a valid code signature. Nothing is
+  installed without the user clicking **Restart now**; the vault is locked
+  first. The old app is swapped out with renames on the same volume and put
+  back if the swap fails.
+- The private update key is held only in the GitHub Actions environment
+  `release`, used by a job that installs no npm packages. Whoever holds it can
+  ship code to every installed copy that auto-updates.
 - Every new vault gets a recovery key: 256 random bits shown once as 14
   groups of Crockford Base32 with a 24-bit checksum. The vault key is wrapped
   a second time under a key derived from it with HKDF-SHA256 and a separate

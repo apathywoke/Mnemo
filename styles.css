@@ -3335,3 +3335,331 @@ h2 {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
 }
+
+/* Update banner across the workspace */
+.update-banner {
+  margin: 0 clamp(10px, 3.5vw, 42px) 6px;
+  padding: 12px 14px;
+  border: 1px solid #2f4a38;
+  border-radius: 12px;
+  background: #121a14;
+}
+
+.update-banner[hidden] {
+  display: none;
+}
+
+.update-banner-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.update-banner-mark {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--c-70c58b);
+  border-radius: 50%;
+  color: var(--c-70c58b);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.update-banner-text {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.update-banner-text strong {
+  color: var(--c-f2f2f2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.update-banner-text span {
+  color: var(--c-9a9a9a);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.update-banner.has-error .update-banner-text span {
+  color: var(--c-f0b4b4);
+}
+
+.update-banner-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.update-banner-actions [hidden] {
+  display: none;
+}
+
+.update-action-button {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--c-eeeeee);
+  border-radius: 999px;
+  background: var(--c-eeeeee);
+  color: var(--c-090909);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.update-action-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.update-progress {
+  overflow: hidden;
+  height: 3px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--c-2a2a2a);
+}
+
+.update-progress[hidden] {
+  display: none;
+}
+
+.update-progress span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--c-70c58b);
+  transition: width 240ms ease;
+}
+
+.update-notes {
+  margin: 10px 0 0 36px;
+  color: var(--c-c9c9c9);
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.update-notes[hidden] {
+  display: none;
+}
+
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 6px;
+  color: var(--c-dedede);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-field .settings-checkbox {
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.settings-checkbox input {
+  margin: 0;
+  accent-color: var(--c-eeeeee);
+}
+
+:root[data-theme="light"] .update-banner {
+  border-color: #b9dcc4;
+  background: #eef7f1;
+}
+
+/* Settings → Updates: status card */
+.update-status-card {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.update-status-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.update-status-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--c-444444);
+  border-radius: 50%;
+  color: var(--c-9a9a9a);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.update-status-icon::before {
+  content: "↻";
+}
+
+.update-status-card[data-status="upToDate"] .update-status-icon {
+  border-color: var(--c-70c58b);
+  color: var(--c-70c58b);
+}
+
+.update-status-card[data-status="upToDate"] .update-status-icon::before {
+  content: "✓";
+}
+
+.update-status-card:is([data-status="available"], [data-status="downloading"], [data-status="ready"]) .update-status-icon {
+  border-color: var(--c-70c58b);
+  background: var(--c-70c58b);
+  color: var(--c-090909);
+}
+
+.update-status-card:is([data-status="available"], [data-status="downloading"], [data-status="ready"]) .update-status-icon::before {
+  content: "↑";
+}
+
+.update-status-card[data-status="error"] .update-status-icon {
+  border-color: var(--c-f0b4b4);
+  color: var(--c-f0b4b4);
+}
+
+.update-status-card[data-status="error"] .update-status-icon::before {
+  content: "!";
+}
+
+.update-status-card[data-status="checking"] .update-status-icon {
+  border-color: var(--c-444444);
+  border-top-color: var(--c-dddddd);
+  animation: update-spin 0.9s linear infinite;
+}
+
+.update-status-card[data-status="checking"] .update-status-icon::before {
+  content: "";
+}
+
+@keyframes update-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-status-card[data-status="checking"] .update-status-icon {
+    animation: none;
+  }
+}
+
+.update-status-text {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  padding-top: 1px;
+}
+
+.update-status-text strong {
+  color: var(--c-f2f2f2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.update-status-text span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.update-status-card.has-error .update-status-text span {
+  color: var(--c-f0b4b4);
+}
+
+.update-status-card .update-progress {
+  margin: 14px 0 0 42px;
+}
+
+.update-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 0 42px;
+}
+
+.update-status-actions [hidden] {
+  display: none;
+}
+
+.update-status-actions .update-action-button,
+.update-status-actions .secondary-button {
+  min-height: 34px;
+  font-size: 12px;
+}
+
+.update-status-actions .secondary-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.update-status-card .update-notes {
+  margin: 12px 0 0 42px;
+}
+
+.settings-tab {
+  position: relative;
+}
+
+.settings-tab-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: var(--c-70c58b);
+  vertical-align: 2px;
+}
+
+.settings-tab-dot[hidden] {
+  display: none;
+}
+
+.update-notes-link {
+  justify-self: start;
+  margin-top: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-dddddd);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-decoration-color: var(--c-555555);
+  text-underline-offset: 3px;
+}
+
+.update-notes-link::after {
+  content: " ▾";
+  font-size: 10px;
+}
+
+.update-notes-link[aria-expanded="true"]::after {
+  content: " ▴";
+}
+
+.update-notes-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.update-notes-link[hidden] {
+  display: none;
+}
