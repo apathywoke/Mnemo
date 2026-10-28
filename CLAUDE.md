@@ -17,12 +17,10 @@ Mnemo is a password manager: security beats convenience.
 - New UI text: add en, de, and ru (test/i18n.test.js
   checks this). Errors thrown in main are English and
   must match an `errors.*` message in messages.js.
-- New key prefix used from JS (like `trash.`): add it to
-  the prefix list in test/i18n.test.js, or the test does
-  not see those keys.
 - New main-process file: add it to `files` in
-  electron-builder.config.js and to `sources` in
-  test/i18n.test.js, so its errors are checked too.
+  electron-builder.config.js.
+- test/i18n.test.js finds main-process files and key
+  prefixes by itself.
 - Security behavior changed: update SECURITY.md and
   docs/THREAT_MODEL.md.
 - No `Co-Authored-By: Claude` or other Claude
