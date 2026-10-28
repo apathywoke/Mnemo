@@ -38,6 +38,16 @@ const MAX_REDIRECTS = 5;
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_NOTES_LENGTH = 8000;
 const LEFTOVER_PATTERN = /^\.Mnemo-(previous|update)-[0-9a-f]{16}(\.app)?$/;
+// Inside Electron, `fs` treats .asar archives as folders, so a recursive rm
+// of an app bundle stops at Contents/Resources with ENOTEMPTY. original-fs is
+// the unpatched module; it exists only inside Electron.
+const bundleFs = process.versions.electron ? require("original-fs") : fs;
+
+// Deletes an app bundle or a staging folder. Best effort: leftovers are
+// removed again on the next start.
+function removeTree(target) {
+  return bundleFs.promises.rm(target, { recursive: true, force: true }).catch(() => {});
+}
 
 // --- Versions ---------------------------------------------------------------
 
@@ -386,11 +396,11 @@ class Updater {
       this.staged = { version: update.version, stageDirectory, stagedApp };
       return { version: update.version };
     } catch (error) {
-      await fsp.rm(stageDirectory, { recursive: true, force: true }).catch(() => {});
+      await removeTree(stageDirectory);
       if (/does not match|not a valid|too large|reach|download/.test(error.message)) throw error;
       throw new Error("Could not install the update.");
     } finally {
-      await fsp.rm(workDirectory, { recursive: true, force: true }).catch(() => {});
+      await removeTree(workDirectory);
     }
   }
 
@@ -411,7 +421,7 @@ class Updater {
       await fsp.rename(previous, bundle);
       throw new Error("Could not install the update.");
     }
-    await fsp.rm(this.staged.stageDirectory, { recursive: true, force: true }).catch(() => {});
+    await removeTree(this.staged.stageDirectory);
     this.staged = null;
 
     this.relaunch(bundle);
@@ -435,7 +445,7 @@ class Updater {
     }
     await Promise.all(names
       .filter((name) => LEFTOVER_PATTERN.test(name) && name !== keep)
-      .map((name) => fsp.rm(path.join(parent, name), { recursive: true, force: true }).catch(() => {})));
+      .map((name) => removeTree(path.join(parent, name))));
   }
 }
 
