@@ -194,7 +194,9 @@ test("history keeps earlier versions, skips saves that change nothing, and resto
   assert.equal(versions.length, 1);
   assert.deepEqual(versions[0].changes, ["cvv"]);
   assert.equal(store.revealVersionSecret(visa.id, versions[0].id, "cvv"), "123");
-  assert.equal(JSON.stringify(versions).includes("123"), false);
+  // A three-digit CVV can also turn up inside a random ID or a timestamp in
+  // the summary, so look for it as a whole JSON string value.
+  assert.equal(JSON.stringify(versions).includes(JSON.stringify("123")), false);
 });
 
 test("history is trimmed, oldest first, when the vault would exceed its size limit", async (t) => {
