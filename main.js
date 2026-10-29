@@ -54,10 +54,6 @@ if (!app.commandLine?.hasSwitch("user-data-dir")) {
 const hasSingleInstanceLock =
   !launchedWithRemoteDebugging && app.requestSingleInstanceLock();
 const translator = createTranslator(i18nCatalog);
-let language = translator.defaultLanguage;
-let settingsStore = null;
-let biometricUnlock = null;
-let updater = null;
 // Automatic checks wait at least this long after launch, wake, or a
 // schedule change, so the network has time to come up.
 const UPDATE_FIRST_CHECK_MS = 20_000;
@@ -67,53 +63,63 @@ const UPDATE_INTERVALS_MS = Object.freeze({
   "6h": 6 * 60 * 60 * 1000,
   "1d": 24 * 60 * 60 * 1000,
 });
-let updateTimer = null;
-// What the renderer shows about updates. `available` holds the verified
-// manifest data for the newest release while one is pending.
-let updateState = { status: "idle", checkedAt: null, version: null, notes: "", progress: 0, error: null };
-let availableUpdate = null;
-let updateTask = null;
-let settingsLoaded = Promise.resolve();
-let mainWindow = null;
-let vaultStore = null;
-let profileManager = null;
-let activeProfileId = null;
-let lockEpoch = 0;
-// Password health: a per-unlock key for password fingerprints, and breach
-// counts from the last Have I Been Pwned check, by fingerprint. Memory only;
-// cleared on lock.
-let passwordHealthKey = null;
-let breachResults = null;
-let breachCheckedAt = null;
-let autoLockTimer = null;
-let clipboardClearTimer = null;
-let ownedClipboardText = null;
-let clipboardOperationQueue = Promise.resolve();
-// The recovery key most recently issued, kept only until the user confirms it
-// is saved (or the vault locks) so that copy and save work without the
-// renderer sending it back.
-let pendingRecoveryKey = null;
-// A parsed import waiting for the user's confirmation. The logins hold plain
-// passwords, so they are dropped on commit, cancel, or lock.
-let pendingImport = null;
+// Everything that changes while the app runs, in one object. Handlers compare
+// state.vaultStore and state.lockEpoch before and after an await to notice a
+// lock or a profile switch, so these values are read from here every time
+// and never copied out.
+const state = {
+  language: translator.defaultLanguage,
+  settingsStore: null,
+  biometricUnlock: null,
+  updater: null,
+  updateTimer: null,
+  // What the renderer shows about updates. `available` holds the verified
+  // manifest data for the newest release while one is pending.
+  updateState: { status: "idle", checkedAt: null, version: null, notes: "", progress: 0, error: null },
+  availableUpdate: null,
+  updateTask: null,
+  settingsLoaded: Promise.resolve(),
+  mainWindow: null,
+  vaultStore: null,
+  profileManager: null,
+  activeProfileId: null,
+  lockEpoch: 0,
+  // Password health: a per-unlock key for password fingerprints, and breach
+  // counts from the last Have I Been Pwned check, by fingerprint. Memory only;
+  // cleared on lock.
+  passwordHealthKey: null,
+  breachResults: null,
+  breachCheckedAt: null,
+  autoLockTimer: null,
+  clipboardClearTimer: null,
+  ownedClipboardText: null,
+  clipboardOperationQueue: Promise.resolve(),
+  // The recovery key most recently issued, kept only until the user confirms it
+  // is saved (or the vault locks) so that copy and save work without the
+  // renderer sending it back.
+  pendingRecoveryKey: null,
+  // A parsed import waiting for the user's confirmation. The logins hold plain
+  // passwords, so they are dropped on commit, cancel, or lock.
+  pendingImport: null,
+  // Native dialogs that display vault data; lockVault() closes them so a revealed
+  // password does not stay on screen after the vault locks.
+  openVaultDialogs: new Set(),
+};
 const IMPORT_SOURCES = Object.freeze({
   bitwarden: { filterKey: "dialog.importFilterBitwarden", extensions: ["json", "csv"] },
   onepassword: { filterKey: "dialog.importFilterOnePassword", extensions: ["1pux", "csv"] },
   mnemo: { filterKey: "dialog.backupFilter", extensions: ["vault"] },
 });
-// Native dialogs that display vault data; lockVault() closes them so a revealed
-// password does not stay on screen after the vault locks.
-const openVaultDialogs = new Set();
 
 async function showVaultDialog(options, { closeAfterMs = 0 } = {}) {
   const controller = new AbortController();
-  openVaultDialogs.add(controller);
+  state.openVaultDialogs.add(controller);
   const timer = closeAfterMs ? setTimeout(() => controller.abort(), closeAfterMs) : null;
   try {
-    return await dialog.showMessageBox(mainWindow, { ...options, signal: controller.signal });
+    return await dialog.showMessageBox(state.mainWindow, { ...options, signal: controller.signal });
   } finally {
     if (timer) clearTimeout(timer);
-    openVaultDialogs.delete(controller);
+    state.openVaultDialogs.delete(controller);
   }
 }
 
@@ -135,7 +141,7 @@ function showSecretDialog({ entryName, fieldLabel, value }) {
 }
 
 function tr(key, params) {
-  return translator.t(language, key, params);
+  return translator.t(state.language, key, params);
 }
 
 // Main-process modules throw English messages; send the renderer a translated
@@ -158,9 +164,9 @@ function toRestoreCredentials(value) {
 }
 
 async function activeProfileName() {
-  if (activeProfileId === null) return "Mnemo";
+  if (state.activeProfileId === null) return "Mnemo";
   try {
-    return (await profileManager.getProfile(activeProfileId)).name;
+    return (await state.profileManager.getProfile(state.activeProfileId)).name;
   } catch {
     return "Mnemo";
   }
@@ -168,13 +174,13 @@ async function activeProfileName() {
 
 function publicUpdateState() {
   // installBlocker() returns null when the app can update itself.
-  const blocker = updater ? updater.installBlocker() : "notPackaged";
+  const blocker = state.updater ? state.updater.installBlocker() : "notPackaged";
   return {
-    ...updateState,
+    ...state.updateState,
     currentVersion: app.getVersion(),
     canInstall: blocker === null,
     blocker,
-    updateInterval: settingsStore?.get().updateInterval ?? "1d",
+    updateInterval: state.settingsStore?.get().updateInterval ?? "1d",
   };
 }
 
@@ -182,39 +188,39 @@ function publicUpdateState() {
 // interval applies at once and time asleep counts. Off, or with an update
 // already downloaded, nothing is planned.
 function scheduleUpdateCheck() {
-  clearTimeout(updateTimer);
-  updateTimer = null;
-  const interval = UPDATE_INTERVALS_MS[settingsStore?.get().updateInterval];
-  if (!interval || !updater || updateState.status === "ready") return;
-  const due = updateState.checkedAt ? updateState.checkedAt + interval - Date.now() : 0;
-  updateTimer = setTimeout(() => void checkForUpdates(), Math.max(due, UPDATE_FIRST_CHECK_MS));
-  updateTimer.unref?.();
+  clearTimeout(state.updateTimer);
+  state.updateTimer = null;
+  const interval = UPDATE_INTERVALS_MS[state.settingsStore?.get().updateInterval];
+  if (!interval || !state.updater || state.updateState.status === "ready") return;
+  const due = state.updateState.checkedAt ? state.updateState.checkedAt + interval - Date.now() : 0;
+  state.updateTimer = setTimeout(() => void checkForUpdates(), Math.max(due, UPDATE_FIRST_CHECK_MS));
+  state.updateTimer.unref?.();
 }
 
 function setUpdateState(patch) {
-  updateState = { ...updateState, ...patch };
-  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
-    mainWindow.webContents.send("updates:state", publicUpdateState());
+  state.updateState = { ...state.updateState, ...patch };
+  if (state.mainWindow && !state.mainWindow.isDestroyed() && !state.mainWindow.webContents.isDestroyed()) {
+    state.mainWindow.webContents.send("updates:state", publicUpdateState());
   }
 }
 
 // One check or download at a time; a second request joins the first.
 function runUpdateTask(task) {
-  if (!updateTask) {
-    updateTask = task().finally(() => {
-      updateTask = null;
+  if (!state.updateTask) {
+    state.updateTask = task().finally(() => {
+      state.updateTask = null;
     });
   }
-  return updateTask;
+  return state.updateTask;
 }
 
 function checkForUpdates() {
   return runUpdateTask(async () => {
-    if (updateState.status === "ready") return publicUpdateState();
+    if (state.updateState.status === "ready") return publicUpdateState();
     setUpdateState({ status: "checking", error: null });
     try {
-      const update = await updater.check();
-      availableUpdate = update;
+      const update = await state.updater.check();
+      state.availableUpdate = update;
       setUpdateState(update
         ? { status: "available", version: update.version, notes: update.notes, checkedAt: Date.now() }
         : { status: "upToDate", version: null, notes: "", checkedAt: Date.now() });
@@ -228,12 +234,12 @@ function checkForUpdates() {
 
 function downloadUpdate() {
   return runUpdateTask(async () => {
-    if (!availableUpdate) throw new Error("No update is available for this Mac.");
+    if (!state.availableUpdate) throw new Error("No update is available for this Mac.");
     setUpdateState({ status: "downloading", progress: 0, error: null });
     try {
-      await updater.download(availableUpdate, (received, total) => {
+      await state.updater.download(state.availableUpdate, (received, total) => {
         const progress = total ? Math.floor((received / total) * 100) : 0;
-        if (progress !== updateState.progress) setUpdateState({ progress });
+        if (progress !== state.updateState.progress) setUpdateState({ progress });
       });
       setUpdateState({ status: "ready", progress: 100 });
       scheduleUpdateCheck();
@@ -246,22 +252,22 @@ function downloadUpdate() {
 }
 
 function enqueueClipboardOperation(operation) {
-  const result = clipboardOperationQueue.then(operation);
-  clipboardOperationQueue = result.catch(() => {});
+  const result = state.clipboardOperationQueue.then(operation);
+  state.clipboardOperationQueue = result.catch(() => {});
   return result;
 }
 
 function clearAutoLockTimer() {
-  if (autoLockTimer) clearTimeout(autoLockTimer);
-  autoLockTimer = null;
+  if (state.autoLockTimer) clearTimeout(state.autoLockTimer);
+  state.autoLockTimer = null;
 }
 
 async function clearOwnedClipboardNow() {
-  if (clipboardClearTimer) clearTimeout(clipboardClearTimer);
-  clipboardClearTimer = null;
+  if (state.clipboardClearTimer) clearTimeout(state.clipboardClearTimer);
+  state.clipboardClearTimer = null;
 
-  const expectedText = ownedClipboardText;
-  ownedClipboardText = null;
+  const expectedText = state.ownedClipboardText;
+  state.ownedClipboardText = null;
 
   if (expectedText !== null) {
     try {
@@ -278,8 +284,8 @@ function copyToClipboardTemporarily(value) {
   return enqueueClipboardOperation(async () => {
     await clearOwnedClipboardNow();
     await clipboard.writeText(value);
-    ownedClipboardText = value;
-    clipboardClearTimer = setTimeout(() => {
+    state.ownedClipboardText = value;
+    state.clipboardClearTimer = setTimeout(() => {
       void clearTemporaryClipboard();
     }, CLIPBOARD_CLEAR_MS);
     return { clearsAfterMs: CLIPBOARD_CLEAR_MS };
@@ -291,35 +297,35 @@ function clearTemporaryClipboard() {
 }
 
 function lockVault(notifyRenderer = false) {
-  lockEpoch += 1;
-  const wasUnlocked = vaultStore?.isUnlocked() ?? false;
+  state.lockEpoch += 1;
+  const wasUnlocked = state.vaultStore?.isUnlocked() ?? false;
   clearAutoLockTimer();
-  for (const controller of openVaultDialogs) controller.abort();
-  pendingRecoveryKey = null;
-  pendingImport = null;
-  passwordHealthKey?.fill(0);
-  passwordHealthKey = null;
-  breachResults = null;
-  breachCheckedAt = null;
-  openVaultDialogs.clear();
+  for (const controller of state.openVaultDialogs) controller.abort();
+  state.pendingRecoveryKey = null;
+  state.pendingImport = null;
+  state.passwordHealthKey?.fill(0);
+  state.passwordHealthKey = null;
+  state.breachResults = null;
+  state.breachCheckedAt = null;
+  state.openVaultDialogs.clear();
   clearTemporaryClipboard();
-  vaultStore?.lock();
+  state.vaultStore?.lock();
 
   if (
     notifyRenderer &&
     wasUnlocked &&
-    mainWindow &&
-    !mainWindow.isDestroyed() &&
-    !mainWindow.webContents.isDestroyed()
+    state.mainWindow &&
+    !state.mainWindow.isDestroyed() &&
+    !state.mainWindow.webContents.isDestroyed()
   ) {
-    mainWindow.webContents.send("vault:auto-locked");
+    state.mainWindow.webContents.send("vault:auto-locked");
   }
 }
 
 function resetAutoLockTimer() {
   clearAutoLockTimer();
-  if (!vaultStore?.isUnlocked()) return;
-  autoLockTimer = setTimeout(() => lockVault(true), AUTO_LOCK_MS);
+  if (!state.vaultStore?.isUnlocked()) return;
+  state.autoLockTimer = setTimeout(() => lockVault(true), AUTO_LOCK_MS);
 }
 
 function isAppPage(frame) {
@@ -334,7 +340,7 @@ function isAppPage(frame) {
 }
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  state.mainWindow = new BrowserWindow({
     width: 1040,
     height: 720,
     minWidth: 760,
@@ -353,24 +359,24 @@ function createWindow() {
 
   // WebRTC ICE traffic bypasses webRequest and CSP connect-src; keep it from
   // opening direct UDP connections (the session proxy below blocks the rest).
-  mainWindow.webContents.setWebRTCIPHandlingPolicy?.("disable_non_proxied_udp");
-  mainWindow.once("ready-to-show", () => mainWindow.show());
-  mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  mainWindow.webContents.on("will-navigate", (event, targetUrl) => {
+  state.mainWindow.webContents.setWebRTCIPHandlingPolicy?.("disable_non_proxied_udp");
+  state.mainWindow.once("ready-to-show", () => state.mainWindow.show());
+  state.mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  state.mainWindow.webContents.on("will-navigate", (event, targetUrl) => {
     if (!isAppPage({ url: targetUrl })) event.preventDefault();
   });
-  mainWindow.webContents.on("will-attach-webview", (event) => {
+  state.mainWindow.webContents.on("will-attach-webview", (event) => {
     event.preventDefault();
   });
-  mainWindow.on("closed", () => {
+  state.mainWindow.on("closed", () => {
     lockVault(false);
-    mainWindow = null;
+    state.mainWindow = null;
   });
 
-  mainWindow.webContents.on("before-input-event", resetAutoLockTimer);
+  state.mainWindow.webContents.on("before-input-event", resetAutoLockTimer);
 
-  mainWindow.loadFile(APP_PAGE);
-  return mainWindow;
+  state.mainWindow.loadFile(APP_PAGE);
+  return state.mainWindow;
 }
 
 // `countsAsActivity: false` is for background refreshes (one-time codes)
@@ -400,9 +406,9 @@ if (launchedWithRemoteDebugging) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
+    if (!state.mainWindow) return;
+    if (state.mainWindow.isMinimized()) state.mainWindow.restore();
+    state.mainWindow.focus();
   });
 
   app.whenReady().then(() => {
@@ -432,32 +438,32 @@ if (launchedWithRemoteDebugging) {
     powerMonitor.on("lock-screen", () => lockVault(true));
     powerMonitor.on("suspend", () => lockVault(true));
 
-    profileManager = new ProfileManager(app.getPath("userData"));
-    vaultStore = new VaultStore(profileManager.legacyVaultPath);
-    biometricUnlock = new BiometricUnlock(app.getPath("userData"), {
+    state.profileManager = new ProfileManager(app.getPath("userData"));
+    state.vaultStore = new VaultStore(state.profileManager.legacyVaultPath);
+    state.biometricUnlock = new BiometricUnlock(app.getPath("userData"), {
       safeStorage,
       systemPreferences,
     });
 
-    settingsStore = new SettingsStore(app.getPath("userData"), {
+    state.settingsStore = new SettingsStore(app.getPath("userData"), {
       isSupportedLanguage: translator.isSupported,
       defaultLanguage: translator.pickLanguage(app.getPreferredSystemLanguages?.()),
     });
     // nativeTheme drives both the native dialogs and the renderer's
     // prefers-color-scheme, so "system" follows macOS automatically.
-    settingsLoaded = settingsStore.load().then((settings) => {
-      language = settings.language;
+    state.settingsLoaded = state.settingsStore.load().then((settings) => {
+      state.language = settings.language;
       if (nativeTheme) nativeTheme.themeSource = settings.theme;
     });
 
-    updater = new Updater({
+    state.updater = new Updater({
       currentVersion: app.getVersion(),
       keysDirectory: path.join(__dirname, "build", "update-keys"),
       isPackaged: app.isPackaged,
       tempDirectory: app.getPath("temp"),
     });
-    void updater.cleanUpLeftovers();
-    void settingsLoaded.then(() => scheduleUpdateCheck());
+    void state.updater.cleanUpLeftovers();
+    void state.settingsLoaded.then(() => scheduleUpdateCheck());
     // Timers stand still while the Mac sleeps; re-plan from the clock.
     powerMonitor.on("resume", () => scheduleUpdateCheck());
 
@@ -468,12 +474,12 @@ if (launchedWithRemoteDebugging) {
     registerHandler("updates:install", async () => {
       // Lock first so no key material outlives the swap.
       lockVault(false);
-      await updater.install();
+      await state.updater.install();
       setImmediate(() => app.exit(0));
       return { relaunching: true };
     });
     registerHandler("updates:open-release", async () => {
-      const url = availableUpdate?.releaseUrl ?? "https://github.com/apathywoke/Mnemo/releases/latest";
+      const url = state.availableUpdate?.releaseUrl ?? "https://github.com/apathywoke/Mnemo/releases/latest";
       if (!url.startsWith("https://github.com/apathywoke/Mnemo/releases/")) {
         throw new Error("The update server address is not allowed.");
       }
@@ -481,8 +487,8 @@ if (launchedWithRemoteDebugging) {
       return { opened: true };
     });
     registerHandler("settings:set-update-interval", async (interval) => {
-      await settingsLoaded;
-      const settings = await settingsStore.setUpdateInterval(interval);
+      await state.settingsLoaded;
+      const settings = await state.settingsStore.setUpdateInterval(interval);
       scheduleUpdateCheck();
       setUpdateState({});
       return settings;
@@ -490,70 +496,70 @@ if (launchedWithRemoteDebugging) {
 
     registerHandler("app:get-version", () => app.getVersion());
     registerHandler("settings:get", async () => {
-      await settingsLoaded;
-      return settingsStore.get();
+      await state.settingsLoaded;
+      return state.settingsStore.get();
     });
     registerHandler("settings:set-theme", async (theme) => {
-      await settingsLoaded;
-      const settings = await settingsStore.setTheme(theme);
+      await state.settingsLoaded;
+      const settings = await state.settingsStore.setTheme(theme);
       if (nativeTheme) nativeTheme.themeSource = settings.theme;
       return settings;
     });
     registerHandler("settings:set-language", async (code) => {
-      await settingsLoaded;
-      const settings = await settingsStore.setLanguage(code);
-      language = settings.language;
+      await state.settingsLoaded;
+      const settings = await state.settingsStore.setLanguage(code);
+      state.language = settings.language;
       return settings;
     });
     registerHandler("profiles:choose", () => {
       lockVault(false);
-      activeProfileId = null;
-      vaultStore = new VaultStore(profileManager.legacyVaultPath);
-      return profileManager.listProfiles();
+      state.activeProfileId = null;
+      state.vaultStore = new VaultStore(state.profileManager.legacyVaultPath);
+      return state.profileManager.listProfiles();
     });
     registerHandler("profiles:select", async (profileId) => {
-      const profile = await profileManager.getProfile(profileId);
+      const profile = await state.profileManager.getProfile(profileId);
       lockVault(false);
-      vaultStore = new VaultStore(profileManager.getVaultPath(profile.id));
-      activeProfileId = profile.id;
-      return vaultStore.getStatus();
+      state.vaultStore = new VaultStore(state.profileManager.getVaultPath(profile.id));
+      state.activeProfileId = profile.id;
+      return state.vaultStore.getStatus();
     });
     registerHandler("profiles:delete", async (profileId) => {
-      if (activeProfileId !== null || vaultStore?.isUnlocked()) {
+      if (state.activeProfileId !== null || state.vaultStore?.isUnlocked()) {
         throw new Error("Lock the current vault before deleting a profile.");
       }
-      const deleted = await profileManager.deleteProfile(profileId);
-      await biometricUnlock.disable(profileId).catch(() => {});
+      const deleted = await state.profileManager.deleteProfile(profileId);
+      await state.biometricUnlock.disable(profileId).catch(() => {});
       return deleted;
     });
     registerHandler("profiles:create", async (name, passphrase) => {
-      if (activeProfileId !== null) {
+      if (state.activeProfileId !== null) {
         throw new Error("Choose the profile screen before creating a vault.");
       }
       lockVault(false);
-      const creationEpoch = lockEpoch;
-      const created = await profileManager.createProfile(name, passphrase);
+      const creationEpoch = state.lockEpoch;
+      const created = await state.profileManager.createProfile(name, passphrase);
       const recoveryKey = created.vaultStore.takeIssuedRecoveryKey();
-      if (lockEpoch !== creationEpoch || !recoveryKey) {
+      if (state.lockEpoch !== creationEpoch || !recoveryKey) {
         // The user never saw this vault's recovery key, so remove the new,
         // still empty vault instead of leaving one without a known key.
         created.vaultStore.lock();
-        await profileManager.deleteProfile(created.profile.id).catch(() => {});
+        await state.profileManager.deleteProfile(created.profile.id).catch(() => {});
         throw new Error("Creation was interrupted because the vault was locked.");
       }
-      vaultStore = created.vaultStore;
-      activeProfileId = created.profile.id;
-      pendingRecoveryKey = { key: recoveryKey, profileName: created.profile.name };
-      return { profile: created.profile, status: await vaultStore.getStatus(), recoveryKey };
+      state.vaultStore = created.vaultStore;
+      state.activeProfileId = created.profile.id;
+      state.pendingRecoveryKey = { key: recoveryKey, profileName: created.profile.name };
+      return { profile: created.profile, status: await state.vaultStore.getStatus(), recoveryKey };
     });
     registerHandler("profiles:restore-new", async (name, credentials) => {
       const restoreCredentials = toRestoreCredentials(credentials);
-      if (activeProfileId !== null) {
+      if (state.activeProfileId !== null) {
         throw new Error("Choose the profile screen before restoring a new vault.");
       }
       lockVault(false);
-      const restoreEpoch = lockEpoch;
-      const selection = await dialog.showOpenDialog(mainWindow, {
+      const restoreEpoch = state.lockEpoch;
+      const selection = await dialog.showOpenDialog(state.mainWindow, {
         title: tr("dialog.chooseBackupTitle"),
         buttonLabel: tr("dialog.chooseBackupButton"),
         properties: ["openFile"],
@@ -562,32 +568,32 @@ if (launchedWithRemoteDebugging) {
       if (selection.canceled || selection.filePaths.length === 0) {
         return { canceled: true };
       }
-      if (lockEpoch !== restoreEpoch) {
+      if (state.lockEpoch !== restoreEpoch) {
         throw new Error("Restore was interrupted because the Mac was locked.");
       }
 
-      const restored = await profileManager.restoreProfile(
+      const restored = await state.profileManager.restoreProfile(
         name,
         selection.filePaths[0],
         restoreCredentials,
       );
-      vaultStore = restored.vaultStore;
-      activeProfileId = restored.profile.id;
-      const recoveryKey = vaultStore.takeIssuedRecoveryKey();
-      if (lockEpoch !== restoreEpoch) {
-        vaultStore.lock();
+      state.vaultStore = restored.vaultStore;
+      state.activeProfileId = restored.profile.id;
+      const recoveryKey = state.vaultStore.takeIssuedRecoveryKey();
+      if (state.lockEpoch !== restoreEpoch) {
+        state.vaultStore.lock();
         throw new Error("The backup was restored but the vault remained locked.");
       }
       if (recoveryKey) {
-        pendingRecoveryKey = { key: recoveryKey, profileName: restored.profile.name };
+        state.pendingRecoveryKey = { key: recoveryKey, profileName: restored.profile.name };
       }
       return { canceled: false, profile: restored.profile, recoveryKey };
     });
-    registerHandler("vault:get-status", () => vaultStore.getStatus());
+    registerHandler("vault:get-status", () => state.vaultStore.getStatus());
     registerHandler("vault:unlock", async (passphrase) => {
-      const status = await vaultStore.unlock(passphrase);
-      if (activeProfileId !== null) {
-        await profileManager.markOpened(activeProfileId).catch(() => {});
+      const status = await state.vaultStore.unlock(passphrase);
+      if (state.activeProfileId !== null) {
+        await state.profileManager.markOpened(state.activeProfileId).catch(() => {});
       }
       return status;
     });
@@ -595,54 +601,54 @@ if (launchedWithRemoteDebugging) {
     // rekeyNow), so a Touch ID file holds a key that no longer opens the
     // vault: it is removed, and Touch ID is turned on again by the user.
     async function forgetTouchIdKey(profileId) {
-      if (profileId !== null) await biometricUnlock.disable(profileId).catch(() => {});
+      if (profileId !== null) await state.biometricUnlock.disable(profileId).catch(() => {});
     }
     registerHandler("vault:recover", async (recoveryKey, newPassphrase) => {
-      const recoveryEpoch = lockEpoch;
-      const store = vaultStore;
-      const profileId = activeProfileId;
+      const recoveryEpoch = state.lockEpoch;
+      const store = state.vaultStore;
+      const profileId = state.activeProfileId;
       const result = await store.recoverWithKey(recoveryKey, newPassphrase);
       // The new key is on disk even if the vault locked meanwhile.
       await forgetTouchIdKey(profileId);
-      if (store !== vaultStore || lockEpoch !== recoveryEpoch) {
+      if (store !== state.vaultStore || state.lockEpoch !== recoveryEpoch) {
         store.lock();
         throw new Error("Recovery was interrupted because the vault was locked.");
       }
-      if (activeProfileId !== null) {
-        await profileManager.markOpened(activeProfileId).catch(() => {});
+      if (state.activeProfileId !== null) {
+        await state.profileManager.markOpened(state.activeProfileId).catch(() => {});
       }
-      pendingRecoveryKey = { key: result.recoveryKey, profileName: await activeProfileName() };
+      state.pendingRecoveryKey = { key: result.recoveryKey, profileName: await activeProfileName() };
       return result;
     });
     registerHandler("vault:get-recovery-status", () => ({
-      enabled: vaultStore.hasRecoveryKey(),
+      enabled: state.vaultStore.hasRecoveryKey(),
     }));
     registerHandler("vault:create-recovery-key", async (passphrase) => {
-      const profileId = activeProfileId;
-      const recoveryKey = await vaultStore.createRecoveryKey(passphrase);
+      const profileId = state.activeProfileId;
+      const recoveryKey = await state.vaultStore.createRecoveryKey(passphrase);
       await forgetTouchIdKey(profileId);
-      pendingRecoveryKey = { key: recoveryKey, profileName: await activeProfileName() };
+      state.pendingRecoveryKey = { key: recoveryKey, profileName: await activeProfileName() };
       return { recoveryKey };
     });
     // A new master passphrase comes with a new recovery key, shown and
     // offered for backup like one created from Settings.
     registerHandler("vault:change-passphrase", async (currentPassphrase, newPassphrase) => {
-      const store = vaultStore;
-      const profileId = activeProfileId;
+      const store = state.vaultStore;
+      const profileId = state.activeProfileId;
       const recoveryKey = await store.changePassphrase(currentPassphrase, newPassphrase);
       await forgetTouchIdKey(profileId);
-      if (store !== vaultStore) throw new Error("Unlock the vault first.");
-      pendingRecoveryKey = { key: recoveryKey, profileName: await activeProfileName() };
+      if (store !== state.vaultStore) throw new Error("Unlock the vault first.");
+      state.pendingRecoveryKey = { key: recoveryKey, profileName: await activeProfileName() };
       return { recoveryKey };
     });
     registerHandler("recovery:copy", () => {
-      if (!pendingRecoveryKey) throw new Error("Could not copy this value.");
-      return copyToClipboardTemporarily(pendingRecoveryKey.key);
+      if (!state.pendingRecoveryKey) throw new Error("Could not copy this value.");
+      return copyToClipboardTemporarily(state.pendingRecoveryKey.key);
     });
     registerHandler("recovery:save", async () => {
-      if (!pendingRecoveryKey) throw new Error("Could not save the recovery key.");
-      const pending = pendingRecoveryKey;
-      const selection = await dialog.showSaveDialog(mainWindow, {
+      if (!state.pendingRecoveryKey) throw new Error("Could not save the recovery key.");
+      const pending = state.pendingRecoveryKey;
+      const selection = await dialog.showSaveDialog(state.mainWindow, {
         title: tr("dialog.saveRecoveryTitle"),
         buttonLabel: tr("dialog.saveRecoveryButton"),
         defaultPath: tr("dialog.recoveryFileName", {
@@ -651,7 +657,7 @@ if (launchedWithRemoteDebugging) {
         filters: [{ name: tr("dialog.recoveryFilter"), extensions: ["txt"] }],
       });
       if (selection.canceled || !selection.filePath) return { canceled: true };
-      if (pendingRecoveryKey !== pending) throw new Error("Could not save the recovery key.");
+      if (state.pendingRecoveryKey !== pending) throw new Error("Could not save the recovery key.");
       const contents = [
         tr("recoveryFile.title"),
         "",
@@ -672,24 +678,24 @@ if (launchedWithRemoteDebugging) {
       return { canceled: false };
     });
     registerHandler("recovery:dismiss", () => {
-      pendingRecoveryKey = null;
+      state.pendingRecoveryKey = null;
       return { dismissed: true };
     });
     // Touch ID unlock for the selected profile. Status works while locked so
     // the unlock screen can offer it.
     registerHandler("biometric:status", async () => ({
-      available: biometricUnlock.isAvailable(),
-      enabled: activeProfileId !== null && (await biometricUnlock.isEnabled(activeProfileId)),
+      available: state.biometricUnlock.isAvailable(),
+      enabled: state.activeProfileId !== null && (await state.biometricUnlock.isEnabled(state.activeProfileId)),
     }));
     registerHandler("biometric:enable", async (passphrase) => {
-      if (activeProfileId === null) throw new Error("Choose a valid vault profile.");
-      const store = vaultStore;
-      const profileId = activeProfileId;
+      if (state.activeProfileId === null) throw new Error("Choose a valid vault profile.");
+      const store = state.vaultStore;
+      const profileId = state.activeProfileId;
       store.requireUnlocked();
       await store.verifyPassphrase(passphrase);
       const dataKey = store.exportDataKey();
       try {
-        await biometricUnlock.enable(
+        await state.biometricUnlock.enable(
           profileId,
           dataKey,
           tr("biometric.reasonEnable", { name: await activeProfileName() }),
@@ -700,21 +706,21 @@ if (launchedWithRemoteDebugging) {
       return { enabled: true };
     });
     registerHandler("biometric:disable", async () => {
-      if (activeProfileId === null) throw new Error("Choose a valid vault profile.");
-      await biometricUnlock.disable(activeProfileId);
+      if (state.activeProfileId === null) throw new Error("Choose a valid vault profile.");
+      await state.biometricUnlock.disable(state.activeProfileId);
       return { enabled: false };
     });
     registerHandler("vault:unlock-biometric", async () => {
-      if (activeProfileId === null) throw new Error("Choose a valid vault profile.");
-      const store = vaultStore;
-      const profileId = activeProfileId;
-      const unlockEpoch = lockEpoch;
-      const dataKey = await biometricUnlock.releaseKey(
+      if (state.activeProfileId === null) throw new Error("Choose a valid vault profile.");
+      const store = state.vaultStore;
+      const profileId = state.activeProfileId;
+      const unlockEpoch = state.lockEpoch;
+      const dataKey = await state.biometricUnlock.releaseKey(
         profileId,
         tr("biometric.reasonUnlock", { name: await activeProfileName() }),
       );
       try {
-        if (store !== vaultStore || lockEpoch !== unlockEpoch) {
+        if (store !== state.vaultStore || state.lockEpoch !== unlockEpoch) {
           throw new Error("Unlock was interrupted because the vault was locked.");
         }
         let status;
@@ -724,11 +730,11 @@ if (launchedWithRemoteDebugging) {
           // A key that no longer opens the file (restored from another
           // backup, for example) is removed so the button stops appearing.
           if (/^Touch ID can no longer/.test(error.message)) {
-            await biometricUnlock.disable(profileId).catch(() => {});
+            await state.biometricUnlock.disable(profileId).catch(() => {});
           }
           throw error;
         }
-        await profileManager.markOpened(profileId).catch(() => {});
+        await state.profileManager.markOpened(profileId).catch(() => {});
         return status;
       } finally {
         dataKey.fill(0);
@@ -737,20 +743,20 @@ if (launchedWithRemoteDebugging) {
 
     // The renderer gets entry metadata only. Passwords are decrypted in this
     // process on an explicit copy or reveal and are never returned over IPC.
-    registerHandler("vault:list-entries", () => vaultStore.listEntries());
-    registerHandler("vault:get-entry", (entryId) => vaultStore.getEntry(entryId));
+    registerHandler("vault:list-entries", () => state.vaultStore.listEntries());
+    registerHandler("vault:get-entry", (entryId) => state.vaultStore.getEntry(entryId));
     // The current one-time code only; the secret never leaves this process.
     registerHandler(
       "vault:get-totp",
-      (entryId) => vaultStore.getTotpCode(entryId),
+      (entryId) => state.vaultStore.getTotpCode(entryId),
       { countsAsActivity: false },
     );
     registerHandler("vault:save-entry", (entry) =>
-      vaultStore.saveEntry(entry),
+      state.vaultStore.saveEntry(entry),
     );
     registerHandler("vault:fetch-site-icon", async (entryId) => {
-      if (!vaultStore.isUnlocked()) throw new Error("Unlock the vault first.");
-      const entry = vaultStore.getEntry(entryId);
+      if (!state.vaultStore.isUnlocked()) throw new Error("Unlock the vault first.");
+      const entry = state.vaultStore.getEntry(entryId);
       if (!entry.url) {
         throw new Error("Add a website address to this login first.");
       }
@@ -769,7 +775,7 @@ if (launchedWithRemoteDebugging) {
       if (confirmation.response !== 1) return { canceled: true };
 
       const favicon = await fetchSiteFavicon(entry.url);
-      const savedEntry = await vaultStore.saveFavicon(entry.id, favicon.dataUrl);
+      const savedEntry = await state.vaultStore.saveFavicon(entry.id, favicon.dataUrl);
       return {
         canceled: false,
         entry: savedEntry,
@@ -777,21 +783,21 @@ if (launchedWithRemoteDebugging) {
       };
     });
     // Deleting moves an item to the trash; see vault:delete-forever.
-    registerHandler("vault:delete-entry", (id) => vaultStore.deleteEntry(id));
+    registerHandler("vault:delete-entry", (id) => state.vaultStore.deleteEntry(id));
 
     // Folders and favorites.
-    registerHandler("vault:list-folders", () => vaultStore.listFolders());
-    registerHandler("vault:create-folder", (name) => vaultStore.createFolder(name));
-    registerHandler("vault:rename-folder", (id, name) => vaultStore.renameFolder(id, name));
-    registerHandler("vault:delete-folder", (id) => vaultStore.deleteFolder(id));
-    registerHandler("vault:set-folder", (id, folderId) => vaultStore.setFolder(id, folderId));
-    registerHandler("vault:set-favorite", (id, favorite) => vaultStore.setFavorite(id, favorite));
+    registerHandler("vault:list-folders", () => state.vaultStore.listFolders());
+    registerHandler("vault:create-folder", (name) => state.vaultStore.createFolder(name));
+    registerHandler("vault:rename-folder", (id, name) => state.vaultStore.renameFolder(id, name));
+    registerHandler("vault:delete-folder", (id) => state.vaultStore.deleteFolder(id));
+    registerHandler("vault:set-folder", (id, folderId) => state.vaultStore.setFolder(id, folderId));
+    registerHandler("vault:set-favorite", (id, favorite) => state.vaultStore.setFavorite(id, favorite));
 
     // Trash. Deleting for good cannot be undone, so it is confirmed in a
     // native dialog that a compromised renderer cannot click through.
-    registerHandler("vault:restore-entry", (id) => vaultStore.restoreEntry(id));
+    registerHandler("vault:restore-entry", (id) => state.vaultStore.restoreEntry(id));
     async function confirmVaultAction(store, { title, message, detail, confirm }) {
-      const epoch = lockEpoch;
+      const epoch = state.lockEpoch;
       const confirmation = await showVaultDialog({
         type: "warning",
         title,
@@ -803,11 +809,11 @@ if (launchedWithRemoteDebugging) {
         noLink: true,
       });
       if (confirmation.response !== 1) return false;
-      if (store !== vaultStore || lockEpoch !== epoch) throw new Error("Unlock the vault first.");
+      if (store !== state.vaultStore || state.lockEpoch !== epoch) throw new Error("Unlock the vault first.");
       return true;
     }
     registerHandler("vault:delete-forever", async (id) => {
-      const store = vaultStore;
+      const store = state.vaultStore;
       const entry = store.getEntry(id);
       if (!entry.deletedAt) throw new Error("Move this item to the trash first.");
       const confirmed = await confirmVaultAction(store, {
@@ -820,7 +826,7 @@ if (launchedWithRemoteDebugging) {
       return store.deletePermanently(id);
     });
     registerHandler("vault:empty-trash", async () => {
-      const store = vaultStore;
+      const store = state.vaultStore;
       const count = store.listEntries().filter((entry) => entry.deletedAt).length;
       if (count === 0) return { deleted: 0 };
       const confirmed = await confirmVaultAction(store, {
@@ -835,18 +841,18 @@ if (launchedWithRemoteDebugging) {
 
     // History: summaries without secrets; old secrets are copied or shown by
     // main, like current ones.
-    registerHandler("vault:get-history", (id) => vaultStore.getHistory(id));
-    registerHandler("vault:restore-version", (id, versionId) => vaultStore.restoreVersion(id, versionId));
+    registerHandler("vault:get-history", (id) => state.vaultStore.getHistory(id));
+    registerHandler("vault:restore-version", (id, versionId) => state.vaultStore.restoreVersion(id, versionId));
     registerHandler("vault:copy-version-field", (id, versionId, field) => {
-      const value = vaultStore.revealVersionSecret(id, versionId, field);
+      const value = state.vaultStore.revealVersionSecret(id, versionId, field);
       if (!value) throw new Error("Could not copy this value.");
       return copyToClipboardTemporarily(value);
     });
     registerHandler("vault:reveal-version-field", async (id, versionId, field) => {
-      const entry = vaultStore.getEntry(id);
-      const value = vaultStore.revealVersionSecret(id, versionId, field);
-      const version = vaultStore.getHistory(id).find((item) => item.id === versionId);
-      const when = new Intl.DateTimeFormat(language, { dateStyle: "medium", timeStyle: "short" })
+      const entry = state.vaultStore.getEntry(id);
+      const value = state.vaultStore.revealVersionSecret(id, versionId, field);
+      const version = state.vaultStore.getHistory(id).find((item) => item.id === versionId);
+      const when = new Intl.DateTimeFormat(state.language, { dateStyle: "medium", timeStyle: "short" })
         .format(new Date(version.updatedAt));
       await showSecretDialog({
         entryName: entry.name,
@@ -862,16 +868,16 @@ if (launchedWithRemoteDebugging) {
     // Attachments: files are picked and saved through native dialogs here, so
     // the renderer never sees paths or contents.
     registerHandler("vault:add-attachments", async (id) => {
-      const store = vaultStore;
-      const epoch = lockEpoch;
+      const store = state.vaultStore;
+      const epoch = state.lockEpoch;
       store.getEntry(id);
-      const selection = await dialog.showOpenDialog(mainWindow, {
+      const selection = await dialog.showOpenDialog(state.mainWindow, {
         title: tr("dialog.addAttachmentTitle"),
         buttonLabel: tr("dialog.addAttachmentButton"),
         properties: ["openFile", "multiSelections"],
       });
       if (selection.canceled || selection.filePaths.length === 0) return { added: [], failed: [] };
-      if (store !== vaultStore || lockEpoch !== epoch) throw new Error("Unlock the vault first.");
+      if (store !== state.vaultStore || state.lockEpoch !== epoch) throw new Error("Unlock the vault first.");
       const added = [];
       const failed = [];
       for (const filePath of selection.filePaths) {
@@ -885,20 +891,20 @@ if (launchedWithRemoteDebugging) {
       return { added, failed };
     });
     registerHandler("vault:save-attachment", async (id, attachmentId) => {
-      const store = vaultStore;
-      const epoch = lockEpoch;
+      const store = state.vaultStore;
+      const epoch = state.lockEpoch;
       const { attachment } = store.findAttachment(id, attachmentId);
-      const selection = await dialog.showSaveDialog(mainWindow, {
+      const selection = await dialog.showSaveDialog(state.mainWindow, {
         title: tr("dialog.saveAttachmentTitle"),
         buttonLabel: tr("dialog.saveAttachmentButton"),
         defaultPath: path.join(app.getPath("downloads"), attachment.name),
       });
       if (selection.canceled || !selection.filePath) return { saved: false };
-      if (store !== vaultStore || lockEpoch !== epoch) throw new Error("Unlock the vault first.");
+      if (store !== state.vaultStore || state.lockEpoch !== epoch) throw new Error("Unlock the vault first.");
       return store.exportAttachment(id, attachmentId, selection.filePath);
     });
     registerHandler("vault:delete-attachment", async (id, attachmentId) => {
-      const store = vaultStore;
+      const store = state.vaultStore;
       const { attachment } = store.findAttachment(id, attachmentId);
       const confirmed = await confirmVaultAction(store, {
         title: tr("dialog.deleteAttachmentTitle"),
@@ -913,21 +919,21 @@ if (launchedWithRemoteDebugging) {
     // Reports: weak and reused passwords are found locally on every request;
     // breaches only when the user asks, through k-anonymity range queries.
     function readPasswordsForReport() {
-      if (!vaultStore?.isUnlocked()) throw new Error("Unlock the vault first.");
-      passwordHealthKey ??= randomBytes(32);
-      return collectPasswords(vaultStore, passwordHealthKey);
+      if (!state.vaultStore?.isUnlocked()) throw new Error("Unlock the vault first.");
+      state.passwordHealthKey ??= randomBytes(32);
+      return collectPasswords(state.vaultStore, state.passwordHealthKey);
     }
     registerHandler("vault:password-health", () =>
-      buildReport(readPasswordsForReport(), { breaches: breachResults, checkedAt: breachCheckedAt }));
+      buildReport(readPasswordsForReport(), { breaches: state.breachResults, checkedAt: state.breachCheckedAt }));
     registerHandler("vault:check-breaches", async () => {
-      const store = vaultStore;
-      const epoch = lockEpoch;
+      const store = state.vaultStore;
+      const epoch = state.lockEpoch;
       const passwords = readPasswordsForReport();
       const counts = await checkPwnedHashes(passwords.map((password) => password.sha1));
-      if (store !== vaultStore || lockEpoch !== epoch) throw new Error("Unlock the vault first.");
-      breachResults = new Map(passwords.map((password) => [password.fingerprint, counts.get(password.sha1)]));
-      breachCheckedAt = Date.now();
-      return buildReport(passwords, { breaches: breachResults, checkedAt: breachCheckedAt });
+      if (store !== state.vaultStore || state.lockEpoch !== epoch) throw new Error("Unlock the vault first.");
+      state.breachResults = new Map(passwords.map((password) => [password.fingerprint, counts.get(password.sha1)]));
+      state.breachCheckedAt = Date.now();
+      return buildReport(passwords, { breaches: state.breachResults, checkedAt: state.breachCheckedAt });
     });
     // Item fields a user may copy: schema fields marked `copy` and the SSH
     // fingerprint. Secret fields are read here and never returned.
@@ -935,7 +941,7 @@ if (launchedWithRemoteDebugging) {
       const schemaField = ITEM_TYPES[entry.type].fields.find((item) => item.key === field);
       if (schemaField?.copy) {
         return schemaField.kind === "secret"
-          ? vaultStore.revealItemSecret(entry.id, field)
+          ? state.vaultStore.revealItemSecret(entry.id, field)
           : entry.fields[field] ?? "";
       }
       if (entry.type === "ssh" && field === "fingerprint") return entry.fields.fingerprint ?? "";
@@ -944,7 +950,7 @@ if (launchedWithRemoteDebugging) {
 
     registerHandler("vault:copy-entry-field", (entryId, field) => {
       if (typeof field !== "string") throw new Error("Could not copy this value.");
-      const entry = vaultStore.getEntry(entryId);
+      const entry = state.vaultStore.getEntry(entryId);
       let value;
       if (entry.type !== "login") {
         value = copyableItemValue(entry, field);
@@ -952,21 +958,21 @@ if (launchedWithRemoteDebugging) {
         throw new Error("Could not copy this value.");
       } else {
         value = field === "password"
-          ? vaultStore.revealPassword(entryId)
+          ? state.vaultStore.revealPassword(entryId)
           : field === "totp"
-            ? vaultStore.getTotpCode(entryId).code
+            ? state.vaultStore.getTotpCode(entryId).code
             : entry.username;
       }
       if (!value) throw new Error("Could not copy this value.");
       return copyToClipboardTemporarily(value);
     });
-    registerHandler("vault:save-item", (item) => vaultStore.saveItem(item));
+    registerHandler("vault:save-item", (item) => state.vaultStore.saveItem(item));
     registerHandler("vault:reveal-field", async (entryId, field) => {
-      const entry = vaultStore.getEntry(entryId);
+      const entry = state.vaultStore.getEntry(entryId);
       if (entry.type === "login" || !entry.secretFields.includes(field)) {
         throw new Error("Could not copy this value.");
       }
-      const raw = vaultStore.revealItemSecret(entry.id, field);
+      const raw = state.vaultStore.revealItemSecret(entry.id, field);
       // Card numbers are easier to read and compare in groups of four.
       const value = entry.type === "card" && field === "number" ? cardTools.formatNumber(raw) : raw;
       await showSecretDialog({
@@ -977,8 +983,8 @@ if (launchedWithRemoteDebugging) {
       return { shown: true };
     });
     registerHandler("vault:reveal-password", async (entryId) => {
-      const entry = vaultStore.getEntry(entryId);
-      const password = vaultStore.revealPassword(entry.id);
+      const entry = state.vaultStore.getEntry(entryId);
+      const password = state.vaultStore.revealPassword(entry.id);
       await showSecretDialog({
         entryName: entry.name,
         fieldLabel: tr("editor.password"),
@@ -987,21 +993,21 @@ if (launchedWithRemoteDebugging) {
       return { shown: true };
     });
     async function saveBackup(store) {
-      const selection = await dialog.showSaveDialog(mainWindow, {
+      const selection = await dialog.showSaveDialog(state.mainWindow, {
         title: tr("dialog.saveBackupTitle"),
         buttonLabel: tr("dialog.saveBackupButton"),
         defaultPath: tr("dialog.backupFileName"),
         filters: [{ name: tr("dialog.backupFilter"), extensions: ["vault"] }],
       });
       if (selection.canceled || !selection.filePath) return { canceled: true };
-      if (store !== vaultStore) throw new Error("Unlock the vault first.");
+      if (store !== state.vaultStore) throw new Error("Unlock the vault first.");
       await store.exportBackup(selection.filePath);
       return { canceled: false };
     }
     // Exporting copies every secret in the vault, so it asks for the master
     // passphrase again even though the vault is open.
     registerHandler("vault:export-backup", async (passphrase) => {
-      const store = vaultStore;
+      const store = state.vaultStore;
       store.requireUnlocked();
       await store.verifyPassphrase(passphrase);
       return saveBackup(store);
@@ -1009,17 +1015,17 @@ if (launchedWithRemoteDebugging) {
     // Right after a recovery key is issued the passphrase was just entered;
     // this path stays available only until that key dialog is closed.
     registerHandler("vault:export-backup-new-key", async () => {
-      if (!pendingRecoveryKey) throw new Error("Unlock the vault first.");
-      return saveBackup(vaultStore);
+      if (!state.pendingRecoveryKey) throw new Error("Unlock the vault first.");
+      return saveBackup(state.vaultStore);
     });
 
     registerHandler("import:choose-file", async (source, credentials) => {
       if (!Object.hasOwn(IMPORT_SOURCES, source)) throw new Error("This file type is not supported.");
-      const store = vaultStore;
+      const store = state.vaultStore;
       store.requireUnlocked();
-      pendingImport = null;
+      state.pendingImport = null;
       const { filterKey, extensions } = IMPORT_SOURCES[source];
-      const selection = await dialog.showOpenDialog(mainWindow, {
+      const selection = await dialog.showOpenDialog(state.mainWindow, {
         title: tr("dialog.importTitle"),
         buttonLabel: tr("dialog.importButton"),
         properties: ["openFile"],
@@ -1049,8 +1055,8 @@ if (launchedWithRemoteDebugging) {
       } else {
         parsed = await parseImportFile(source, filePath, { fallbackName: tr("import.untitled") });
       }
-      if (store !== vaultStore || !store.isUnlocked()) throw new Error("Unlock the vault first.");
-      pendingImport = { source, filePath, logins: parsed.logins, store };
+      if (store !== state.vaultStore || !store.isUnlocked()) throw new Error("Unlock the vault first.");
+      state.pendingImport = { source, filePath, logins: parsed.logins, store };
       return {
         canceled: false,
         fileName: path.basename(filePath),
@@ -1059,8 +1065,8 @@ if (launchedWithRemoteDebugging) {
       };
     });
     registerHandler("import:commit", async () => {
-      const pending = pendingImport;
-      if (!pending?.logins || pending.store !== vaultStore) {
+      const pending = state.pendingImport;
+      if (!pending?.logins || pending.store !== state.vaultStore) {
         throw new Error("Unlock the vault first.");
       }
       const { logins } = pending;
@@ -1069,23 +1075,23 @@ if (launchedWithRemoteDebugging) {
       return { ...result, canTrashFile: pending.source !== "mnemo" };
     });
     registerHandler("import:trash-file", async () => {
-      const pending = pendingImport;
-      pendingImport = null;
+      const pending = state.pendingImport;
+      state.pendingImport = null;
       if (!pending || pending.source === "mnemo") return { trashed: false };
       await shell.trashItem(pending.filePath);
       return { trashed: true };
     });
     registerHandler("import:cancel", () => {
-      pendingImport = null;
+      state.pendingImport = null;
       return { canceled: true };
     });
 
     // Deletes the open vault's profile. Needs the master passphrase and a
     // native confirmation, so a compromised renderer cannot do it alone.
     registerHandler("vault:delete-active", async (passphrase) => {
-      if (activeProfileId === null) throw new Error("Choose a valid vault profile.");
-      const store = vaultStore;
-      const profileId = activeProfileId;
+      if (state.activeProfileId === null) throw new Error("Choose a valid vault profile.");
+      const store = state.vaultStore;
+      const profileId = state.activeProfileId;
       store.requireUnlocked();
       await store.verifyPassphrase(passphrase);
       const profileName = await activeProfileName();
@@ -1100,24 +1106,24 @@ if (launchedWithRemoteDebugging) {
         noLink: true,
       });
       if (confirmation.response !== 1) return { deleted: false };
-      if (store !== vaultStore || activeProfileId !== profileId) {
+      if (store !== state.vaultStore || state.activeProfileId !== profileId) {
         throw new Error("Unlock the vault first.");
       }
       lockVault(false);
-      activeProfileId = null;
-      vaultStore = new VaultStore(profileManager.legacyVaultPath);
-      await profileManager.deleteProfile(profileId);
-      await biometricUnlock.disable(profileId).catch(() => {});
+      state.activeProfileId = null;
+      state.vaultStore = new VaultStore(state.profileManager.legacyVaultPath);
+      await state.profileManager.deleteProfile(profileId);
+      await state.biometricUnlock.disable(profileId).catch(() => {});
       return { deleted: true };
     });
     registerHandler("vault:restore-backup", async (credentials) => {
       const restoreCredentials = toRestoreCredentials(credentials);
       // Bind to the vault that was open when the request started; a profile
       // switch or lock while the dialogs are open cancels the restore.
-      const store = vaultStore;
-      const restoreEpoch = lockEpoch;
-      const isStale = () => store !== vaultStore || lockEpoch !== restoreEpoch;
-      const selection = await dialog.showOpenDialog(mainWindow, {
+      const store = state.vaultStore;
+      const restoreEpoch = state.lockEpoch;
+      const isStale = () => store !== state.vaultStore || state.lockEpoch !== restoreEpoch;
+      const selection = await dialog.showOpenDialog(state.mainWindow, {
         title: tr("dialog.chooseBackupTitle"),
         buttonLabel: tr("dialog.chooseBackupButton"),
         properties: ["openFile"],
@@ -1129,7 +1135,7 @@ if (launchedWithRemoteDebugging) {
       if (isStale()) throw new Error("Restore was interrupted because the vault was locked.");
 
       if ((await store.getStatus()).vaultExists) {
-        const confirmation = await dialog.showMessageBox(mainWindow, {
+        const confirmation = await dialog.showMessageBox(state.mainWindow, {
           type: "warning",
           title: tr("dialog.replaceTitle"),
           message: tr("dialog.replaceMessage"),
@@ -1147,21 +1153,21 @@ if (launchedWithRemoteDebugging) {
       const recoveryKey = store.takeIssuedRecoveryKey();
       // The restored file may use a different vault key than the one stored
       // for Touch ID.
-      if (activeProfileId !== null) {
-        await biometricUnlock.disable(activeProfileId).catch(() => {});
+      if (state.activeProfileId !== null) {
+        await state.biometricUnlock.disable(state.activeProfileId).catch(() => {});
       }
       if (isStale()) {
         store.lock();
         throw new Error("Restore was interrupted because the vault was locked.");
       }
       if (recoveryKey) {
-        pendingRecoveryKey = { key: recoveryKey, profileName: await activeProfileName() };
+        state.pendingRecoveryKey = { key: recoveryKey, profileName: await activeProfileName() };
       }
       return { canceled: false, recoveryKey };
     });
     registerHandler("vault:lock", () => {
       lockVault(false);
-      return vaultStore.getStatus();
+      return state.vaultStore.getStatus();
     });
 
     ipcMain.on("vault:activity", (event) => {
