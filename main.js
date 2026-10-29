@@ -19,8 +19,6 @@ const { parseImportFile } = require("./importers");
 const i18nCatalog = require("./src/renderer/shared/i18n/messages");
 const { createTranslator } = require("./src/renderer/shared/i18n/translate");
 const VaultStore = require("./vault-store");
-const { randomBytes } = require("node:crypto");
-const { buildReport, checkPwnedHashes, collectPasswords } = require("./password-health");
 const { createState } = require("./src/main/state");
 const { createTranslation } = require("./src/main/i18n");
 const { createProfileHelpers } = require("./src/main/profiles");
@@ -37,6 +35,7 @@ const IPC_GROUPS = [
   require("./src/main/ipc/security"),
   require("./src/main/ipc/entries"),
   require("./src/main/ipc/organize"),
+  require("./src/main/ipc/reports"),
 ];
 
 // Chromium's remote debugging switches have no Electron fuse. A local process
@@ -155,25 +154,6 @@ if (launchedWithRemoteDebugging) {
 
     for (const group of IPC_GROUPS) group.register(ctx);
 
-    // Reports: weak and reused passwords are found locally on every request;
-    // breaches only when the user asks, through k-anonymity range queries.
-    function readPasswordsForReport() {
-      if (!state.vaultStore?.isUnlocked()) throw new Error("Unlock the vault first.");
-      state.passwordHealthKey ??= randomBytes(32);
-      return collectPasswords(state.vaultStore, state.passwordHealthKey);
-    }
-    registerHandler("vault:password-health", () =>
-      buildReport(readPasswordsForReport(), { breaches: state.breachResults, checkedAt: state.breachCheckedAt }));
-    registerHandler("vault:check-breaches", async () => {
-      const store = state.vaultStore;
-      const epoch = state.lockEpoch;
-      const passwords = readPasswordsForReport();
-      const counts = await checkPwnedHashes(passwords.map((password) => password.sha1));
-      if (store !== state.vaultStore || state.lockEpoch !== epoch) throw new Error("Unlock the vault first.");
-      state.breachResults = new Map(passwords.map((password) => [password.fingerprint, counts.get(password.sha1)]));
-      state.breachCheckedAt = Date.now();
-      return buildReport(passwords, { breaches: state.breachResults, checkedAt: state.breachCheckedAt });
-    });
     async function saveBackup(store) {
       const selection = await dialog.showSaveDialog(state.mainWindow, {
         title: tr("dialog.saveBackupTitle"),
