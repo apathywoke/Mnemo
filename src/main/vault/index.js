@@ -6,6 +6,7 @@ const assert = require("node:assert");
 const VaultStore = require("./store");
 
 const METHOD_GROUPS = [
+  require("./store-keys"),
 ];
 
 for (const group of METHOD_GROUPS) {
