@@ -6,7 +6,7 @@ const path = require("node:path");
 const {
   randomBytes,
 } = require("node:crypto");
-const { openVaultSource } = require("../../../backup-file");
+const { openVaultSource } = require("../backup-file");
 const {
   VAULT_SCHEMA_VERSION,
   KEY_BYTES,

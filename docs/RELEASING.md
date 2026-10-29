@@ -302,7 +302,7 @@ the item is **"local-vault-prototype Safe Storage"**; `productName: "Mnemo"`
 in `electron-builder.config.js` only names the bundle and does not change it.
 
 **Async API.** Electron 45 deprecates `safeStorage.isEncryptionAvailable`,
-`encryptString`, and `decryptString`; `biometric-unlock.js` uses
+`encryptString`, and `decryptString`; `src/main/biometric-unlock.js` uses
 `isAsyncEncryptionAvailable`, `encryptStringAsync`, and `decryptStringAsync`.
 Electron documents that data written by `encryptString` decrypts with
 `decryptStringAsync`, so key files from earlier versions keep working; the

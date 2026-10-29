@@ -65,7 +65,7 @@ passwords until the design has received independent security review.
   vault, and asks for confirmation first when a local vault already exists.
   When the vault has attachments, the backup is a container (`MNEMOBK1`) with
   the envelope and the attachment files exactly as they are stored, still
-  encrypted (see `backup-file.js`). Export decrypts every attachment once
+  encrypted (see `src/main/backup-file.js`). Export decrypts every attachment once
   first and refuses, naming the file, if one is missing or damaged. Restore
   checks that every attachment the vault refers to is present and decrypts;
   only then does it copy the files and replace the vault file in one rename.

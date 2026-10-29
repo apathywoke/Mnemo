@@ -10,7 +10,7 @@
 // returned to the renderer.
 const { createHash, createHmac } = require("node:crypto");
 const https = require("node:https");
-const { estimatePasswordStrength } = require("./src/renderer/shared/lib/password-tools.js");
+const { estimatePasswordStrength } = require("../renderer/shared/lib/password-tools.js");
 
 const PWNED_HOST = "api.pwnedpasswords.com";
 const MAX_RANGE_BYTES = 1024 * 1024;

@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { encodeBase32, generateTotp, parseTotpInput, toOtpauthUri } = require("../totp");
+const { encodeBase32, generateTotp, parseTotpInput, toOtpauthUri } = require("../src/main/totp");
 
 // RFC 6238 appendix B: 8-digit codes for three algorithms at six times.
 const SECRETS = {

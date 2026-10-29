@@ -18,11 +18,15 @@ Mnemo is a password manager: security beats convenience.
   checks this). Errors thrown in main are English and
   must match an `errors.*` message in messages.js.
 - Main-process code lives in src/main/ (vault/ for the
-  vault store, ipc/ for IPC handlers); main.js and
-  vault-store.js are only entry points. New files there
-  are packaged by `src/main/**/*.js`; a new main-process
-  file anywhere else goes into `files` in
+  vault store, ipc/ for IPC handlers, other modules next
+  to them). Only main.js, preload.js, and the
+  vault-store.js shim stay at the root. src/main/ is
+  packaged by `src/main/**/*.js`; a main-process file
+  anywhere else goes into `files` in
   electron-builder.config.js.
+- Paths built from `__dirname` must exist and be
+  packaged (test/build-config.test.js checks every one);
+  moving a file changes what they point to.
 - Mutable main-process state lives in the `state` object
   that main.js creates; modules receive it and keep none
   of their own, since tests reload main.js.

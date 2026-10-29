@@ -1,6 +1,6 @@
 // IPC handlers. Password reports: weak, reused, and breached passwords.
 const { randomBytes } = require("node:crypto");
-const { buildReport, checkPwnedHashes, collectPasswords } = require("../../../password-health");
+const { buildReport, checkPwnedHashes, collectPasswords } = require("../password-health");
 
 function register(ctx) {
   const { state, registerHandler } = ctx;
