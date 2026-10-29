@@ -35,6 +35,9 @@ const { createLock } = require("./src/main/lock");
 const { createWindowManager } = require("./src/main/window");
 const { createRegisterHandler } = require("./src/main/ipc/register");
 const { createUpdates } = require("./src/main/updates");
+const IPC_GROUPS = [
+  require("./src/main/ipc/updates"),
+];
 
 const COPYABLE_ENTRY_FIELDS = new Set(["username", "password", "totp"]);
 // Chromium's remote debugging switches have no Electron fuse. A local process
@@ -86,11 +89,7 @@ const {
   isAppPage,
   createWindow,
   registerHandler,
-  publicUpdateState,
   scheduleUpdateCheck,
-  setUpdateState,
-  checkForUpdates,
-  downloadUpdate,
 } = ctx;
 
 if (launchedWithRemoteDebugging) {
@@ -160,32 +159,7 @@ if (launchedWithRemoteDebugging) {
     // Timers stand still while the Mac sleeps; re-plan from the clock.
     powerMonitor.on("resume", () => scheduleUpdateCheck());
 
-    // Update state changes do not count as user activity.
-    registerHandler("updates:get-state", () => publicUpdateState(), { countsAsActivity: false });
-    registerHandler("updates:check", () => checkForUpdates());
-    registerHandler("updates:download", () => downloadUpdate());
-    registerHandler("updates:install", async () => {
-      // Lock first so no key material outlives the swap.
-      lockVault(false);
-      await state.updater.install();
-      setImmediate(() => app.exit(0));
-      return { relaunching: true };
-    });
-    registerHandler("updates:open-release", async () => {
-      const url = state.availableUpdate?.releaseUrl ?? "https://github.com/apathywoke/Mnemo/releases/latest";
-      if (!url.startsWith("https://github.com/apathywoke/Mnemo/releases/")) {
-        throw new Error("The update server address is not allowed.");
-      }
-      await shell.openExternal(url);
-      return { opened: true };
-    });
-    registerHandler("settings:set-update-interval", async (interval) => {
-      await state.settingsLoaded;
-      const settings = await state.settingsStore.setUpdateInterval(interval);
-      scheduleUpdateCheck();
-      setUpdateState({});
-      return settings;
-    });
+    for (const group of IPC_GROUPS) group.register(ctx);
 
     registerHandler("app:get-version", () => app.getVersion());
     registerHandler("settings:get", async () => {
