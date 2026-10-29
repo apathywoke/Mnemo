@@ -22,12 +22,13 @@ const { parseImportFile } = require("./importers");
 const { ITEM_TYPES } = require("./src/renderer/shared/item-types");
 const cardTools = require("./src/renderer/shared/lib/card-tools");
 const i18nCatalog = require("./src/renderer/shared/i18n/messages");
-const { createTranslator, encodeIpcError } = require("./src/renderer/shared/i18n/translate");
+const { createTranslator } = require("./src/renderer/shared/i18n/translate");
 const VaultStore = require("./vault-store");
 const { fetchSiteFavicon, getFaviconHost } = require("./favicon-fetcher");
 const { randomBytes } = require("node:crypto");
 const { buildReport, checkPwnedHashes, collectPasswords } = require("./password-health");
 const { createState } = require("./src/main/state");
+const { createTranslation } = require("./src/main/i18n");
 
 const APP_PAGE = path.join(__dirname, "index.html");
 const AUTO_LOCK_MS = 5 * 60 * 1000;
@@ -71,6 +72,9 @@ const IMPORT_SOURCES = Object.freeze({
 });
 
 const state = createState(translator);
+const ctx = { state, translator };
+Object.assign(ctx, createTranslation(ctx));
+const { tr, toIpcError } = ctx;
 
 async function showVaultDialog(options, { closeAfterMs = 0 } = {}) {
   const controller = new AbortController();
@@ -99,19 +103,6 @@ function showSecretDialog({ entryName, fieldLabel, value }) {
     cancelId: 0,
     noLink: true,
   }, { closeAfterMs: REVEAL_DIALOG_MS });
-}
-
-function tr(key, params) {
-  return translator.t(state.language, key, params);
-}
-
-// Main-process modules throw English messages; send the renderer a translated
-// message tagged with its key. Unrecognized errors get a generic message so
-// internal details do not reach the UI.
-function toIpcError(error) {
-  const match = translator.matchError(error?.message);
-  const key = match?.key ?? "errors.unknown";
-  return new Error(encodeIpcError(key, tr(key, match?.params)));
 }
 
 // Restore credentials from the renderer: the backup's passphrase, or a
