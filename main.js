@@ -37,6 +37,7 @@ const { createRegisterHandler } = require("./src/main/ipc/register");
 const { createUpdates } = require("./src/main/updates");
 const IPC_GROUPS = [
   require("./src/main/ipc/updates"),
+  require("./src/main/ipc/settings"),
 ];
 
 const COPYABLE_ENTRY_FIELDS = new Set(["username", "password", "totp"]);
@@ -161,23 +162,6 @@ if (launchedWithRemoteDebugging) {
 
     for (const group of IPC_GROUPS) group.register(ctx);
 
-    registerHandler("app:get-version", () => app.getVersion());
-    registerHandler("settings:get", async () => {
-      await state.settingsLoaded;
-      return state.settingsStore.get();
-    });
-    registerHandler("settings:set-theme", async (theme) => {
-      await state.settingsLoaded;
-      const settings = await state.settingsStore.setTheme(theme);
-      if (nativeTheme) nativeTheme.themeSource = settings.theme;
-      return settings;
-    });
-    registerHandler("settings:set-language", async (code) => {
-      await state.settingsLoaded;
-      const settings = await state.settingsStore.setLanguage(code);
-      state.language = settings.language;
-      return settings;
-    });
     registerHandler("profiles:choose", () => {
       lockVault(false);
       state.activeProfileId = null;
