@@ -10,6 +10,7 @@ const METHOD_GROUPS = [
   require("./store-backup"),
   require("./store-entries"),
   require("./store-organize"),
+  require("./store-attachments"),
 ];
 
 for (const group of METHOD_GROUPS) {
