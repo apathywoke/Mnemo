@@ -57,6 +57,14 @@ operations still go through the narrow `vaultApp` preload API. `main.js` and
 `preload.js` remain outside the renderer feature layers because they belong to
 separate Electron processes.
 
+The main process lives in `src/main/`. `main.js` is its entry point: it pins
+the data folder, creates the shared `state` object and a `ctx` with the
+helpers from `src/main/` (dialogs, clipboard, lock, window, updates), and
+registers the IPC handlers from `src/main/ipc/`, one file per feature. The
+vault store is in `src/main/vault/`: `store.js` holds the file lifecycle, the
+`store-*.js` files add feature methods, and the other files hold the file
+format, crypto, and validation; `vault-store.js` only re-exports it.
+
 ## Current security boundary
 
 - The renderer loads only the packaged local HTML, CSS, and JavaScript.

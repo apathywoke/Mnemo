@@ -17,8 +17,15 @@ Mnemo is a password manager: security beats convenience.
 - New UI text: add en, de, and ru (test/i18n.test.js
   checks this). Errors thrown in main are English and
   must match an `errors.*` message in messages.js.
-- New main-process file: add it to `files` in
+- Main-process code lives in src/main/ (vault/ for the
+  vault store, ipc/ for IPC handlers); main.js and
+  vault-store.js are only entry points. New files there
+  are packaged by `src/main/**/*.js`; a new main-process
+  file anywhere else goes into `files` in
   electron-builder.config.js.
+- Mutable main-process state lives in the `state` object
+  that main.js creates; modules receive it and keep none
+  of their own, since tests reload main.js.
 - test/i18n.test.js finds main-process files and key
   prefixes by itself.
 - Security behavior changed: update SECURITY.md and
