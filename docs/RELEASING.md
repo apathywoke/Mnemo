@@ -142,8 +142,12 @@ real vaults.
    `Mnemo-<version>-mac-<arch>.dmg` and `.zip` for `arm64` and `x64` with
    `npm run dist:mac:adhoc` (see [Ad-hoc release builds](#ad-hoc-release-builds)).
    The `afterSign` hook verifies them in `adhoc-release` mode.
-2. **publish** (Linux, environment `release`): takes the release notes from
-   the tag message, runs `scripts/make-update-manifest.js` with the
+2. **publish** (Linux, environment `release`): checks out the full history
+   and first checks that the tag's commit is on `main`
+   (`git merge-base --is-ancestor <tag commit> origin/main`); a tag anywhere
+   else fails the job with "Tag … is not on main" before anything is
+   downloaded or signed. It then takes the release notes from the tag
+   message, runs `scripts/make-update-manifest.js` with the
    `MNEMO_UPDATE_PRIVATE_KEY` secret, and creates the GitHub release with the
    zips, dmgs, `update-manifest.json`, and `update-manifest.json.sig`. This
    job installs no npm packages, so dependencies never see the key.
@@ -206,14 +210,36 @@ A5, A7).
    ```
 
 2. Repository Settings → Environments → `release`: add the secret
-   `MNEMO_UPDATE_PRIVATE_KEY` (the whole PEM). Under deployment branches and
-   tags, allow only tags matching `v*`; add yourself as a required reviewer
-   so every release waits for an approval.
+   `MNEMO_UPDATE_PRIVATE_KEY` (the whole PEM), then apply
+   [GitHub settings (done by the owner)](#github-settings-done-by-the-owner).
 3. Commit the public key to `build/update-keys/` (any `*.pem` name). Every
    `.pem` there is trusted by the builds that include it.
 
 Never commit the private key, paste it into an issue or chat, or store it on
 a shared machine.
+
+### GitHub settings (done by the owner)
+
+The workflow checks what it can: the tag must match `package.json`, and its
+commit must be on `main`. Who may create a release tag and who approves the
+job holding the key are repository settings that a workflow cannot set or
+check. The owner sets them once:
+
+1. **Environment `release` → Required reviewers:** the owner. Every publish
+   job then waits for an approval, after the build and before the key is
+   available.
+2. **Environment `release` → Deployment branches and tags:** "Selected
+   branches and tags" with a single tag rule, `v*`, and no branches. The
+   secret is then unavailable to a workflow run for any other ref,
+   including a manual run.
+3. **Only the owner creates `v*` tags:** Settings → Rules → Rulesets → New
+   tag ruleset, enforcement Active, target tags matching `v*`, with
+   "Restrict creations", "Restrict updates", and "Restrict deletions", and
+   only Repository admin in the bypass list. Others can then neither push a
+   release tag nor move or delete one.
+
+Together with the check in the publish job, a release needs the owner to tag
+a commit that is already on `main` and to approve the job.
 
 ### What the app does
 
