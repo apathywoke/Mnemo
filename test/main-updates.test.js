@@ -122,6 +122,9 @@ async function loadMain(t) {
     Module._load = originalLoad;
   }
   t.after(() => { delete require.cache[mainPath]; });
+  // Quitting locks the vault and clears its timers, so a failure cannot
+  // keep the run alive.
+  t.after(() => app.emit("before-quit"));
 
   const frame = { url: pathToFileURL(path.join(__dirname, "..", "index.html")).href };
   const invoke = (channel, ...args) => handlers.get(channel)({ senderFrame: frame, sender: { mainFrame: frame } }, ...args);
