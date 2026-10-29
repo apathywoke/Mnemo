@@ -44,10 +44,10 @@ test("password strength UI describes its estimate as a heuristic", async () => {
 
 test("Mnemo is the application brand while Local Vault remains a legacy profile name", async () => {
   const html = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
-  const main = await fs.readFile(path.join(__dirname, "..", "main.js"), "utf8");
+  const window = await fs.readFile(path.join(__dirname, "..", "src", "main", "window.js"), "utf8");
 
   assert.match(html, /<title>Mnemo<\/title>/);
   assert.match(html, /aria-label="Mnemo"/);
   assert.match(html, /<span>MNEMO<\/span>/);
-  assert.match(main, /title: "Mnemo"/);
+  assert.match(window, /title: "Mnemo"/);
 });
