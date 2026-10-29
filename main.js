@@ -32,9 +32,9 @@ const { createTranslation } = require("./src/main/i18n");
 const { createProfileHelpers } = require("./src/main/profiles");
 const { createDialogs } = require("./src/main/dialogs");
 const { createClipboard } = require("./src/main/clipboard");
+const { createLock } = require("./src/main/lock");
 
 const APP_PAGE = path.join(__dirname, "index.html");
-const AUTO_LOCK_MS = 5 * 60 * 1000;
 const COPYABLE_ENTRY_FIELDS = new Set(["username", "password", "totp"]);
 // Chromium's remote debugging switches have no Electron fuse. A local process
 // that relaunches the app with them could drive the unlocked renderer and call
@@ -77,6 +77,7 @@ Object.assign(ctx, createTranslation(ctx));
 Object.assign(ctx, createProfileHelpers(ctx));
 Object.assign(ctx, createDialogs(ctx));
 Object.assign(ctx, createClipboard(ctx));
+Object.assign(ctx, createLock(ctx));
 const {
   tr,
   toIpcError,
@@ -85,7 +86,8 @@ const {
   showVaultDialog,
   showSecretDialog,
   copyToClipboardTemporarily,
-  clearTemporaryClipboard,
+  lockVault,
+  resetAutoLockTimer,
 } = ctx;
 
 function publicUpdateState() {
@@ -165,43 +167,6 @@ function downloadUpdate() {
     }
     return publicUpdateState();
   });
-}
-
-function clearAutoLockTimer() {
-  if (state.autoLockTimer) clearTimeout(state.autoLockTimer);
-  state.autoLockTimer = null;
-}
-
-function lockVault(notifyRenderer = false) {
-  state.lockEpoch += 1;
-  const wasUnlocked = state.vaultStore?.isUnlocked() ?? false;
-  clearAutoLockTimer();
-  for (const controller of state.openVaultDialogs) controller.abort();
-  state.pendingRecoveryKey = null;
-  state.pendingImport = null;
-  state.passwordHealthKey?.fill(0);
-  state.passwordHealthKey = null;
-  state.breachResults = null;
-  state.breachCheckedAt = null;
-  state.openVaultDialogs.clear();
-  clearTemporaryClipboard();
-  state.vaultStore?.lock();
-
-  if (
-    notifyRenderer &&
-    wasUnlocked &&
-    state.mainWindow &&
-    !state.mainWindow.isDestroyed() &&
-    !state.mainWindow.webContents.isDestroyed()
-  ) {
-    state.mainWindow.webContents.send("vault:auto-locked");
-  }
-}
-
-function resetAutoLockTimer() {
-  clearAutoLockTimer();
-  if (!state.vaultStore?.isUnlocked()) return;
-  state.autoLockTimer = setTimeout(() => lockVault(true), AUTO_LOCK_MS);
 }
 
 function isAppPage(frame) {
