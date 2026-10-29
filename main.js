@@ -1,6 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { fileURLToPath } = require("node:url");
+const electron = require("electron");
 const {
   app,
   BrowserWindow,
@@ -13,7 +14,7 @@ const {
   session,
   shell,
   systemPreferences,
-} = require("electron");
+} = electron;
 const ProfileManager = require("./profile-manager");
 const SettingsStore = require("./settings-store");
 const BiometricUnlock = require("./biometric-unlock");
@@ -30,12 +31,11 @@ const { buildReport, checkPwnedHashes, collectPasswords } = require("./password-
 const { createState } = require("./src/main/state");
 const { createTranslation } = require("./src/main/i18n");
 const { createProfileHelpers } = require("./src/main/profiles");
+const { createDialogs } = require("./src/main/dialogs");
 
 const APP_PAGE = path.join(__dirname, "index.html");
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 const CLIPBOARD_CLEAR_MS = 30_000;
-// Windows that show a secret close on their own, like the clipboard clears.
-const REVEAL_DIALOG_MS = 30_000;
 const COPYABLE_ENTRY_FIELDS = new Set(["username", "password", "totp"]);
 // Chromium's remote debugging switches have no Electron fuse. A local process
 // that relaunches the app with them could drive the unlocked renderer and call
@@ -73,39 +73,18 @@ const IMPORT_SOURCES = Object.freeze({
 });
 
 const state = createState(translator);
-const ctx = { state, translator };
+const ctx = { state, translator, electron };
 Object.assign(ctx, createTranslation(ctx));
 Object.assign(ctx, createProfileHelpers(ctx));
-const { tr, toIpcError, toRestoreCredentials, activeProfileName } = ctx;
-
-async function showVaultDialog(options, { closeAfterMs = 0 } = {}) {
-  const controller = new AbortController();
-  state.openVaultDialogs.add(controller);
-  const timer = closeAfterMs ? setTimeout(() => controller.abort(), closeAfterMs) : null;
-  try {
-    return await dialog.showMessageBox(state.mainWindow, { ...options, signal: controller.signal });
-  } finally {
-    if (timer) clearTimeout(timer);
-    state.openVaultDialogs.delete(controller);
-  }
-}
-
-// A native window with one secret value. It is drawn by macOS, so the value
-// never enters the renderer, and it closes after REVEAL_DIALOG_MS or on lock.
-function showSecretDialog({ entryName, fieldLabel, value }) {
-  return showVaultDialog({
-    type: "none",
-    title: entryName,
-    // The value is alone in `detail` so selecting it copies nothing extra;
-    // the auto-close note goes under the heading instead.
-    message: `${entryName} · ${fieldLabel}\n${tr("dialog.revealCloses", { seconds: REVEAL_DIALOG_MS / 1000 })}`,
-    detail: value,
-    buttons: [tr("dialog.done")],
-    defaultId: 0,
-    cancelId: 0,
-    noLink: true,
-  }, { closeAfterMs: REVEAL_DIALOG_MS });
-}
+Object.assign(ctx, createDialogs(ctx));
+const {
+  tr,
+  toIpcError,
+  toRestoreCredentials,
+  activeProfileName,
+  showVaultDialog,
+  showSecretDialog,
+} = ctx;
 
 function publicUpdateState() {
   // installBlocker() returns null when the app can update itself.
