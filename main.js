@@ -38,6 +38,7 @@ const { createUpdates } = require("./src/main/updates");
 const IPC_GROUPS = [
   require("./src/main/ipc/updates"),
   require("./src/main/ipc/settings"),
+  require("./src/main/ipc/profiles"),
 ];
 
 const COPYABLE_ENTRY_FIELDS = new Set(["username", "password", "totp"]);
@@ -162,84 +163,6 @@ if (launchedWithRemoteDebugging) {
 
     for (const group of IPC_GROUPS) group.register(ctx);
 
-    registerHandler("profiles:choose", () => {
-      lockVault(false);
-      state.activeProfileId = null;
-      state.vaultStore = new VaultStore(state.profileManager.legacyVaultPath);
-      return state.profileManager.listProfiles();
-    });
-    registerHandler("profiles:select", async (profileId) => {
-      const profile = await state.profileManager.getProfile(profileId);
-      lockVault(false);
-      state.vaultStore = new VaultStore(state.profileManager.getVaultPath(profile.id));
-      state.activeProfileId = profile.id;
-      return state.vaultStore.getStatus();
-    });
-    registerHandler("profiles:delete", async (profileId) => {
-      if (state.activeProfileId !== null || state.vaultStore?.isUnlocked()) {
-        throw new Error("Lock the current vault before deleting a profile.");
-      }
-      const deleted = await state.profileManager.deleteProfile(profileId);
-      await state.biometricUnlock.disable(profileId).catch(() => {});
-      return deleted;
-    });
-    registerHandler("profiles:create", async (name, passphrase) => {
-      if (state.activeProfileId !== null) {
-        throw new Error("Choose the profile screen before creating a vault.");
-      }
-      lockVault(false);
-      const creationEpoch = state.lockEpoch;
-      const created = await state.profileManager.createProfile(name, passphrase);
-      const recoveryKey = created.vaultStore.takeIssuedRecoveryKey();
-      if (state.lockEpoch !== creationEpoch || !recoveryKey) {
-        // The user never saw this vault's recovery key, so remove the new,
-        // still empty vault instead of leaving one without a known key.
-        created.vaultStore.lock();
-        await state.profileManager.deleteProfile(created.profile.id).catch(() => {});
-        throw new Error("Creation was interrupted because the vault was locked.");
-      }
-      state.vaultStore = created.vaultStore;
-      state.activeProfileId = created.profile.id;
-      state.pendingRecoveryKey = { key: recoveryKey, profileName: created.profile.name };
-      return { profile: created.profile, status: await state.vaultStore.getStatus(), recoveryKey };
-    });
-    registerHandler("profiles:restore-new", async (name, credentials) => {
-      const restoreCredentials = toRestoreCredentials(credentials);
-      if (state.activeProfileId !== null) {
-        throw new Error("Choose the profile screen before restoring a new vault.");
-      }
-      lockVault(false);
-      const restoreEpoch = state.lockEpoch;
-      const selection = await dialog.showOpenDialog(state.mainWindow, {
-        title: tr("dialog.chooseBackupTitle"),
-        buttonLabel: tr("dialog.chooseBackupButton"),
-        properties: ["openFile"],
-        filters: [{ name: tr("dialog.backupFilter"), extensions: ["vault"] }],
-      });
-      if (selection.canceled || selection.filePaths.length === 0) {
-        return { canceled: true };
-      }
-      if (state.lockEpoch !== restoreEpoch) {
-        throw new Error("Restore was interrupted because the Mac was locked.");
-      }
-
-      const restored = await state.profileManager.restoreProfile(
-        name,
-        selection.filePaths[0],
-        restoreCredentials,
-      );
-      state.vaultStore = restored.vaultStore;
-      state.activeProfileId = restored.profile.id;
-      const recoveryKey = state.vaultStore.takeIssuedRecoveryKey();
-      if (state.lockEpoch !== restoreEpoch) {
-        state.vaultStore.lock();
-        throw new Error("The backup was restored but the vault remained locked.");
-      }
-      if (recoveryKey) {
-        state.pendingRecoveryKey = { key: recoveryKey, profileName: restored.profile.name };
-      }
-      return { canceled: false, profile: restored.profile, recoveryKey };
-    });
     registerHandler("vault:get-status", () => state.vaultStore.getStatus());
     registerHandler("vault:unlock", async (passphrase) => {
       const status = await state.vaultStore.unlock(passphrase);
