@@ -22,6 +22,25 @@ async function listFiles(directory) {
   return nested.flat();
 }
 
+// Main-process sources: every .js file at the root and under src/main/,
+// except tests. The renderer lives in src/renderer/ and is not included.
+async function mainProcessFiles() {
+  const rootFiles = (await fs.readdir(root, { withFileTypes: true }))
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
+    .map((entry) => path.join(root, entry.name));
+  const mainDirectory = path.join(root, "src", "main");
+  const nested = await fs.stat(mainDirectory).then(() => listFiles(mainDirectory), () => []);
+  return [...rootFiles, ...nested.filter((file) => file.endsWith(".js"))]
+    .filter((file) => !file.endsWith(".test.js"));
+}
+
+// Key prefixes come from the catalog, so a new group of keys is checked as
+// soon as it has its first English message.
+const KEY_PREFIXES = new Set(Object.keys(english).map((key) => key.split(".")[0]));
+
+// "profiles.json" looks like a key but is a file name.
+const FILE_NAME = /\.(?:asar|bin|css|dmg|html|icns|js|json|pem|plist|png|sig|tmp|txt|vault|zip)$/;
+
 function placeholders(template) {
   return Array.from(template.matchAll(/\{(\w+)\}/g), ([, name]) => name).sort();
 }
@@ -69,17 +88,19 @@ test("main-process errors are recognized and survive the IPC wrapper", () => {
 });
 
 test("every English error thrown by the main process has a translation", async () => {
-  const sources = ["main.js", "vault-store.js", "profile-manager.js", "favicon-fetcher.js", "settings-store.js", "importers.js", "biometric-unlock.js", "totp.js", "ssh-keys.js", "updater.js", "password-health.js", "backup-file.js"];
+  const sources = await mainProcessFiles();
+  const names = sources.map((file) => path.relative(root, file));
+  assert.ok(names.includes("main.js") && names.includes("vault-store.js"), names.join(", "));
   const internalOnly = new Set(["Invalid vault file", "Invalid vault data", "Invalid profile registry", "mismatch", "missing password", "invalid csv", "invalid", "Invalid key", "truncated", "Invalid version", "Update key ${name} is not an Ed25519 public key", "Invalid password hash", "Invalid attachment"]);
   let checked = 0;
   for (const file of sources) {
-    const source = await fs.readFile(path.join(root, file), "utf8");
+    const source = await fs.readFile(file, "utf8");
     const pattern = /(?:new Error|unsupportedFavicon)\(\s*(["`])((?:(?!\1)[^\\]|\\.)*)\1/g;
     for (const [, , literal] of source.matchAll(pattern)) {
       if (internalOnly.has(literal)) continue;
       // Replace template interpolations with sample values before matching.
       const sample = literal.replace(/\$\{[^}]+\}/g, "x");
-      assert.ok(translator.matchError(sample), `${file}: no errors.* template for "${literal}"`);
+      assert.ok(translator.matchError(sample), `${path.relative(root, file)}: no errors.* template for "${literal}"`);
       checked += 1;
     }
   }
@@ -94,13 +115,14 @@ test("every translation key used by the UI exists", async () => {
   ));
   const rendererFiles = (await listFiles(path.join(root, "src", "renderer")))
     .filter((file) => file.endsWith(".js") && !file.includes(`${path.sep}i18n${path.sep}`));
-  for (const file of [...rendererFiles, path.join(root, "main.js")]) {
+  for (const file of [...rendererFiles, ...(await mainProcessFiles())]) {
     const source = await fs.readFile(file, "utf8");
+    // Any "prefix.name" string with a known prefix is a key...
     for (const [, key] of source.matchAll(/["']((?:[a-z]+[A-Za-z]*)\.[a-zA-Z]+)["']/g)) {
-      if (/^(common|profiles?|setup|unlock|restore|vault|login|detail|editor|strength|generator|deleteLogin|fatal|deleteProfile|footer|settings|toast|dialog|errors|header|brand|import|backupOffer|recoveryKey|recover|touchId|biometric|item|card|updates|reports|organize|trash|folders|attachments|history)\./.test(key)) {
-        keys.add(key);
-      }
+      if (KEY_PREFIXES.has(key.split(".")[0]) && !FILE_NAME.test(key)) keys.add(key);
     }
+    // ...and so is a literal passed to t() or tr(), even with a new prefix.
+    for (const [, key] of source.matchAll(/\b(?:t|tr)\(\s*["']([a-zA-Z]+\.[\w.]+)["']/g)) keys.add(key);
   }
   assert.ok(keys.size > 150);
   for (const key of keys) assert.ok(Object.hasOwn(english, key), `missing key ${key}`);
