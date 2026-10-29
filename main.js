@@ -33,6 +33,7 @@ const { createDialogs } = require("./src/main/dialogs");
 const { createClipboard } = require("./src/main/clipboard");
 const { createLock } = require("./src/main/lock");
 const { createWindowManager } = require("./src/main/window");
+const { createRegisterHandler } = require("./src/main/ipc/register");
 
 const COPYABLE_ENTRY_FIELDS = new Set(["username", "password", "totp"]);
 // Chromium's remote debugging switches have no Electron fuse. A local process
@@ -78,6 +79,7 @@ Object.assign(ctx, createDialogs(ctx));
 Object.assign(ctx, createClipboard(ctx));
 Object.assign(ctx, createLock(ctx));
 Object.assign(ctx, createWindowManager(ctx));
+Object.assign(ctx, createRegisterHandler(ctx));
 const {
   tr,
   toIpcError,
@@ -90,6 +92,7 @@ const {
   resetAutoLockTimer,
   isAppPage,
   createWindow,
+  registerHandler,
 } = ctx;
 
 function publicUpdateState() {
@@ -168,27 +171,6 @@ function downloadUpdate() {
       throw error;
     }
     return publicUpdateState();
-  });
-}
-
-// `countsAsActivity: false` is for background refreshes (one-time codes)
-// that must not keep an idle vault unlocked.
-function registerHandler(channel, handler, { countsAsActivity = true } = {}) {
-  ipcMain.handle(channel, async (event, ...args) => {
-    try {
-      if (
-        event.senderFrame !== event.sender.mainFrame ||
-        !isAppPage(event.senderFrame)
-      ) {
-        throw new Error("Rejected IPC request from an untrusted frame");
-      }
-
-      const result = await handler(...args);
-      if (countsAsActivity) resetAutoLockTimer();
-      return result;
-    } catch (error) {
-      throw toIpcError(error);
-    }
   });
 }
 
