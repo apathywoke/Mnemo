@@ -15,8 +15,13 @@ const PROFILE_ID_PATTERN = /^(legacy|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[8
 // the Keychain item, and the stored key is protected by the login keychain.
 // A Secure Enclave key with biometric access control would bind the release
 // to the fingerprint itself; it needs a native module and signed builds.
-// Keep this interface (isAvailable/isEnabled/enable/disable/releaseKey) so
-// that backend can replace this one.
+// Keep this interface (isAvailable/isEnabled/enable/disable/releaseKey, all
+// async) so that backend can replace this one.
+//
+// safeStorage is used through its async API; the synchronous one is
+// deprecated in Electron 45. Electron documents that data written by the
+// old encryptString decrypts with decryptStringAsync, so key files written
+// by earlier versions keep working.
 class BiometricUnlock {
   constructor(directory, { safeStorage, systemPreferences, platform = process.platform }) {
     this.directory = path.join(directory, "biometric");
@@ -25,12 +30,12 @@ class BiometricUnlock {
     this.platform = platform;
   }
 
-  isAvailable() {
+  async isAvailable() {
     try {
       return (
         this.platform === "darwin" &&
         Boolean(this.systemPreferences?.canPromptTouchID?.()) &&
-        Boolean(this.safeStorage?.isEncryptionAvailable?.())
+        Boolean(await this.safeStorage?.isAsyncEncryptionAvailable?.())
       );
     } catch {
       return false;
@@ -55,7 +60,7 @@ class BiometricUnlock {
   }
 
   async prompt(reason) {
-    if (!this.isAvailable()) throw new Error("Touch ID is not available on this Mac.");
+    if (!(await this.isAvailable())) throw new Error("Touch ID is not available on this Mac.");
     try {
       await this.systemPreferences.promptTouchID(reason);
     } catch {
@@ -78,7 +83,7 @@ class BiometricUnlock {
     });
     let encrypted;
     try {
-      encrypted = this.safeStorage.encryptString(payload);
+      encrypted = await this.safeStorage.encryptStringAsync(payload);
     } catch {
       throw new Error("Could not turn on Touch ID.");
     }
@@ -116,7 +121,12 @@ class BiometricUnlock {
       const stats = await fs.stat(filePath);
       if (stats.size <= 0 || stats.size > MAX_FILE_BYTES) throw new Error("invalid");
       encrypted = await fs.readFile(filePath);
-      const payload = JSON.parse(this.safeStorage.decryptString(encrypted));
+      // shouldReEncrypt is not acted on: rewriting the file here could race
+      // with turning Touch ID off and bring back a key that was removed. A
+      // file that stops decrypting ends in the error below, and the user
+      // turns Touch ID on again.
+      const { result } = await this.safeStorage.decryptStringAsync(encrypted);
+      const payload = JSON.parse(result);
       if (
         payload?.version !== FILE_VERSION ||
         payload.profileId !== profileId ||

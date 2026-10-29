@@ -119,7 +119,7 @@ function register(ctx) {
   // Touch ID unlock for the selected profile. Status works while locked so
   // the unlock screen can offer it.
   registerHandler("biometric:status", async () => ({
-    available: state.biometricUnlock.isAvailable(),
+    available: await state.biometricUnlock.isAvailable(),
     enabled: state.activeProfileId !== null && (await state.biometricUnlock.isEnabled(state.activeProfileId)),
   }));
 
