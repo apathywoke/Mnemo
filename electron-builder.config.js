@@ -49,6 +49,7 @@ module.exports = {
     "favicon-fetcher.js",
     "index.html",
     "styles.css",
+    "src/main/**/*.js",
     "src/renderer/**/*.js",
   ],
   electronFuses,
