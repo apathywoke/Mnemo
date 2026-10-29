@@ -104,7 +104,7 @@ async function loadMain(t) {
       },
     },
     shell: { openExternal: async (url) => opened.push(url), trashItem: async () => {} },
-    safeStorage: { isEncryptionAvailable: () => false },
+    safeStorage: { isAsyncEncryptionAvailable: async () => false },
     systemPreferences: { canPromptTouchID: () => false },
   };
 

@@ -92,9 +92,12 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
     },
     nativeImage: { createFromBuffer: () => ({ isEmpty: () => true }) },
     safeStorage: {
-      isEncryptionAvailable: () => true,
-      encryptString: (text) => Buffer.from(`sealed:${text}`),
-      decryptString: (buffer) => buffer.toString().replace(/^sealed:/, ""),
+      isAsyncEncryptionAvailable: async () => true,
+      encryptStringAsync: async (text) => Buffer.from(`sealed:${text}`),
+      decryptStringAsync: async (buffer) => ({
+        shouldReEncrypt: false,
+        result: buffer.toString().replace(/^sealed:/, ""),
+      }),
     },
     systemPreferences: {
       canPromptTouchID: () => true,

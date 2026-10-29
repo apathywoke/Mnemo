@@ -301,6 +301,18 @@ if called, otherwise `productName`, otherwise `name` from the packaged
 the item is **"local-vault-prototype Safe Storage"**; `productName: "Mnemo"`
 in `electron-builder.config.js` only names the bundle and does not change it.
 
+**Async API.** Electron 45 deprecates `safeStorage.isEncryptionAvailable`,
+`encryptString`, and `decryptString`; `biometric-unlock.js` uses
+`isAsyncEncryptionAvailable`, `encryptStringAsync`, and `decryptStringAsync`.
+Electron documents that data written by `encryptString` decrypts with
+`decryptStringAsync`, so key files from earlier versions keep working; the
+tests check this only with stubs. Before releasing the first version with the
+async API, run the manual check from step 3 below: turn on Touch ID in the
+previous release, update, and unlock with Touch ID. When
+`decryptStringAsync` reports `shouldReEncrypt`, the key file is not
+rewritten (that could race with turning Touch ID off); if a file ever stops
+decrypting, the user turns Touch ID on again.
+
 Changing `name` in `package.json` or adding `productName` there therefore
 changes the Keychain item. Electron then creates a new key, the existing
 `biometric/<profile>.key` files no longer decrypt, and Touch ID unlock stops

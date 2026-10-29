@@ -7,7 +7,10 @@ const BiometricUnlock = require("../biometric-unlock");
 const { makeTempDirectory } = require("../support/helpers");
 
 // Stand-ins for Electron's safeStorage (Keychain-backed) and Touch ID prompt.
-function makeElectron({ touchId = true, encryption = true } = {}) {
+// Only the async safeStorage API is offered: the synchronous one is
+// deprecated, and a call to it fails these tests. `encryption` may be an
+// Error, which isAsyncEncryptionAvailable then rejects with.
+function makeElectron({ touchId = true, encryption = true, reEncrypt = false } = {}) {
   const prompts = [];
   let nextPrompt = "allow";
   const keychainKey = randomBytes(32);
@@ -16,11 +19,14 @@ function makeElectron({ touchId = true, encryption = true } = {}) {
     prompts,
     respond(value) { nextPrompt = value; },
     safeStorage: {
-      isEncryptionAvailable: () => encryption,
-      encryptString: (text) => Buffer.concat([Buffer.from("v10"), xor(Buffer.from(text))]),
-      decryptString: (buffer) => {
+      isAsyncEncryptionAvailable: async () => {
+        if (encryption instanceof Error) throw encryption;
+        return encryption;
+      },
+      encryptStringAsync: async (text) => Buffer.concat([Buffer.from("v10"), xor(Buffer.from(text))]),
+      decryptStringAsync: async (buffer) => {
         if (buffer.subarray(0, 3).toString() !== "v10") throw new Error("bad");
-        return xor(buffer.subarray(3)).toString();
+        return { shouldReEncrypt: reEncrypt, result: xor(buffer.subarray(3)).toString() };
       },
     },
     systemPreferences: {
@@ -41,7 +47,7 @@ test("Touch ID stores the vault key encrypted and releases it after a prompt", a
   const biometric = new BiometricUnlock(directory, { ...electron, platform: "darwin" });
   const dataKey = randomBytes(32);
 
-  assert.equal(biometric.isAvailable(), true);
+  assert.equal(await biometric.isAvailable(), true);
   assert.equal(await biometric.isEnabled(PROFILE), false);
   await biometric.enable(PROFILE, dataKey, "turn on Touch ID");
   assert.deepEqual(electron.prompts, ["turn on Touch ID"]);
@@ -79,13 +85,34 @@ test("Touch ID is unavailable without the sensor, Keychain encryption, or macOS"
   for (const [options, platform] of [
     [{ touchId: false }, "darwin"],
     [{ encryption: false }, "darwin"],
+    [{ encryption: new Error("Keychain is not ready") }, "darwin"],
     [{}, "linux"],
   ]) {
     const biometric = new BiometricUnlock(directory, { ...makeElectron(options), platform });
-    assert.equal(biometric.isAvailable(), false);
+    assert.equal(await biometric.isAvailable(), false);
     await assert.rejects(
       biometric.enable(PROFILE, randomBytes(32), "x"),
       /not available on this Mac/,
     );
   }
+});
+
+test("a key file Electron asks to re-encrypt still unlocks and is left as it is", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const electron = makeElectron({ reEncrypt: true });
+  const biometric = new BiometricUnlock(directory, { ...electron, platform: "darwin" });
+  const dataKey = randomBytes(32);
+  await biometric.enable(PROFILE, dataKey, "turn on Touch ID");
+  const file = path.join(directory, "biometric", `${PROFILE}.key`);
+  const before = await fs.readFile(file);
+
+  assert.deepEqual(await biometric.releaseKey(PROFILE, "unlock"), dataKey);
+  assert.deepEqual(await fs.readFile(file), before);
+
+  // A Keychain that refuses to decrypt gives the error on which the app turns
+  // Touch ID off for this vault.
+  electron.safeStorage.decryptStringAsync = async () => {
+    throw new Error("Keychain access was denied");
+  };
+  await assert.rejects(biometric.releaseKey(PROFILE, "unlock"), /can no longer unlock/);
 });
