@@ -8,6 +8,7 @@ const VaultStore = require("./store");
 const METHOD_GROUPS = [
   require("./store-keys"),
   require("./store-backup"),
+  require("./store-entries"),
 ];
 
 for (const group of METHOD_GROUPS) {
