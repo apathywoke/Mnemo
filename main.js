@@ -5,7 +5,6 @@ const electron = require("electron");
 const {
   app,
   BrowserWindow,
-  clipboard,
   dialog,
   ipcMain,
   nativeTheme,
@@ -32,10 +31,10 @@ const { createState } = require("./src/main/state");
 const { createTranslation } = require("./src/main/i18n");
 const { createProfileHelpers } = require("./src/main/profiles");
 const { createDialogs } = require("./src/main/dialogs");
+const { createClipboard } = require("./src/main/clipboard");
 
 const APP_PAGE = path.join(__dirname, "index.html");
 const AUTO_LOCK_MS = 5 * 60 * 1000;
-const CLIPBOARD_CLEAR_MS = 30_000;
 const COPYABLE_ENTRY_FIELDS = new Set(["username", "password", "totp"]);
 // Chromium's remote debugging switches have no Electron fuse. A local process
 // that relaunches the app with them could drive the unlocked renderer and call
@@ -77,6 +76,7 @@ const ctx = { state, translator, electron };
 Object.assign(ctx, createTranslation(ctx));
 Object.assign(ctx, createProfileHelpers(ctx));
 Object.assign(ctx, createDialogs(ctx));
+Object.assign(ctx, createClipboard(ctx));
 const {
   tr,
   toIpcError,
@@ -84,6 +84,8 @@ const {
   activeProfileName,
   showVaultDialog,
   showSecretDialog,
+  copyToClipboardTemporarily,
+  clearTemporaryClipboard,
 } = ctx;
 
 function publicUpdateState() {
@@ -165,49 +167,9 @@ function downloadUpdate() {
   });
 }
 
-function enqueueClipboardOperation(operation) {
-  const result = state.clipboardOperationQueue.then(operation);
-  state.clipboardOperationQueue = result.catch(() => {});
-  return result;
-}
-
 function clearAutoLockTimer() {
   if (state.autoLockTimer) clearTimeout(state.autoLockTimer);
   state.autoLockTimer = null;
-}
-
-async function clearOwnedClipboardNow() {
-  if (state.clipboardClearTimer) clearTimeout(state.clipboardClearTimer);
-  state.clipboardClearTimer = null;
-
-  const expectedText = state.ownedClipboardText;
-  state.ownedClipboardText = null;
-
-  if (expectedText !== null) {
-    try {
-      if ((await clipboard.readText()) === expectedText) {
-        await clipboard.clear();
-      }
-    } catch {
-      // Clipboard cleanup is best-effort if macOS denies access or exits.
-    }
-  }
-}
-
-function copyToClipboardTemporarily(value) {
-  return enqueueClipboardOperation(async () => {
-    await clearOwnedClipboardNow();
-    await clipboard.writeText(value);
-    state.ownedClipboardText = value;
-    state.clipboardClearTimer = setTimeout(() => {
-      void clearTemporaryClipboard();
-    }, CLIPBOARD_CLEAR_MS);
-    return { clearsAfterMs: CLIPBOARD_CLEAR_MS };
-  });
-}
-
-function clearTemporaryClipboard() {
-  return enqueueClipboardOperation(clearOwnedClipboardNow);
 }
 
 function lockVault(notifyRenderer = false) {
