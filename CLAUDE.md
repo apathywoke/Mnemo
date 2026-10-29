@@ -23,6 +23,10 @@ Mnemo is a password manager: security beats convenience.
   are packaged by `src/main/**/*.js`; a new main-process
   file anywhere else goes into `files` in
   electron-builder.config.js.
+- Code that both the main process and the renderer load
+  (password-tools.js) lives in src/shared/, packaged by
+  `src/shared/**/*.js`. It must work as a CommonJS module
+  and as a plain <script>.
 - Mutable main-process state lives in the `state` object
   that main.js creates; modules receive it and keep none
   of their own, since tests reload main.js.

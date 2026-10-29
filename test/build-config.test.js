@@ -90,16 +90,21 @@ test("release builds ship only Ed25519 public update keys", async () => {
   assert.ok(config.files.includes("build/update-keys/*.pem"));
 });
 
+// electron-builder globs as regular expressions: "**/" is any number of
+// folders, "*" one name part.
+function packagedPatterns() {
+  const escape = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  return config.files.map((pattern) => new RegExp(`^${pattern
+    .split("**/")
+    .map((part) => part.split("*").map(escape).join("[^/]*"))
+    .join("(?:.*/)?")}$`));
+}
+
 // Every local module the main process or preload loads must be packaged,
 // or the release build fails at startup.
 test("release builds include every module that main and preload require", async () => {
   const root = path.join(__dirname, "..");
-  // electron-builder globs: "**/" is any number of folders, "*" one name part.
-  const escape = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-  const patterns = config.files.map((pattern) => new RegExp(`^${pattern
-    .split("**/")
-    .map((part) => part.split("*").map(escape).join("[^/]*"))
-    .join("(?:.*/)?")}$`));
+  const patterns = packagedPatterns();
   const seen = new Set();
   const queue = ["main.js", "preload.js"];
   while (queue.length > 0) {
@@ -116,4 +121,22 @@ test("release builds include every module that main and preload require", async 
   const missing = [...seen].filter((file) => !patterns.some((pattern) => pattern.test(file)));
   assert.deepEqual(missing, []);
   assert.ok(seen.has("backup-file.js") && seen.has("vault-store.js"));
+});
+
+
+// The page loads its scripts and styles by path, so a file moved out of
+// src/renderer must still exist and be packaged.
+test("every script and stylesheet the page loads exists and is packaged", async () => {
+  const root = path.join(__dirname, "..");
+  const html = await fs.readFile(path.join(root, "index.html"), "utf8");
+  const assets = Array.from(
+    html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)="\.\/([^"]+)"/g),
+    ([, file]) => file,
+  );
+  assert.ok(assets.includes("src/shared/password-tools.js") && assets.includes("styles.css"), assets.join(", "));
+  const patterns = packagedPatterns();
+  for (const file of assets) {
+    await fs.access(path.join(root, file));
+    assert.ok(patterns.some((pattern) => pattern.test(file)), `${file} is not in files`);
+  }
 });
