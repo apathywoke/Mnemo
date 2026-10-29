@@ -59,27 +59,6 @@ test("a manual run of the release workflow never publishes", async () => {
   assert.equal(workflow.indexOf("MNEMO_UPDATE_PRIVATE_KEY") > workflow.indexOf("\n  publish:\n"), true);
 });
 
-test("only ad-hoc builds may disable library validation", async () => {
-  const { ALLOWED_ENTITLEMENTS, resolveMode } = require("../scripts/verify-mac-release");
-  const plist = await fs.readFile(path.join(__dirname, "..", "build", "entitlements.adhoc.plist"), "utf8");
-  const keys = Array.from(plist.matchAll(/<key>([^<]+)<\/key>/g), ([, key]) => key);
-  assert.deepEqual(keys, ["com.apple.security.cs.allow-jit", "com.apple.security.cs.disable-library-validation"]);
-
-  assert.deepEqual([...ALLOWED_ENTITLEMENTS.release], ["com.apple.security.cs.allow-jit"]);
-  assert.deepEqual([...ALLOWED_ENTITLEMENTS.local], ["com.apple.security.cs.allow-jit"]);
-  assert.deepEqual([...ALLOWED_ENTITLEMENTS["adhoc-release"]], keys);
-  for (const allowed of Object.values(ALLOWED_ENTITLEMENTS)) {
-    assert.equal(allowed.has("com.apple.security.cs.allow-dyld-environment-variables"), false);
-    assert.equal(allowed.has("com.apple.security.get-task-allow"), false);
-  }
-
-  assert.equal(resolveMode({ env: {} }), "release");
-  assert.equal(resolveMode({ env: { MNEMO_VERIFY_MODE: "adhoc-release" } }), "adhoc-release");
-  assert.equal(resolveMode({ env: { MNEMO_LOCAL_TEST_BUILD: "1" } }), "local");
-  assert.equal(resolveMode({ flags: ["--mode=adhoc-release"], env: { MNEMO_LOCAL_TEST_BUILD: "1" } }), "adhoc-release");
-  assert.throws(() => resolveMode({ env: { MNEMO_VERIFY_MODE: "adhoc" } }), /Unknown verification mode/);
-});
-
 // A v* tag on a commit that is not on main must not be published
 // (docs/RELEASING.md, "GitHub settings").
 test("the publish job checks that the tag's commit is on main before using the key", async () => {
@@ -143,6 +122,27 @@ test("the tag check passes a tag on main and stops a tag that is not on main", a
   const offMain = runCheck("v1.0.1");
   assert.equal(offMain.status, 1);
   assert.match(offMain.stdout, /::error::Tag v1\.0\.1 points to [0-9a-f]{40}, which is not on main\./);
+});
+
+test("only ad-hoc builds may disable library validation", async () => {
+  const { ALLOWED_ENTITLEMENTS, resolveMode } = require("../scripts/verify-mac-release");
+  const plist = await fs.readFile(path.join(__dirname, "..", "build", "entitlements.adhoc.plist"), "utf8");
+  const keys = Array.from(plist.matchAll(/<key>([^<]+)<\/key>/g), ([, key]) => key);
+  assert.deepEqual(keys, ["com.apple.security.cs.allow-jit", "com.apple.security.cs.disable-library-validation"]);
+
+  assert.deepEqual([...ALLOWED_ENTITLEMENTS.release], ["com.apple.security.cs.allow-jit"]);
+  assert.deepEqual([...ALLOWED_ENTITLEMENTS.local], ["com.apple.security.cs.allow-jit"]);
+  assert.deepEqual([...ALLOWED_ENTITLEMENTS["adhoc-release"]], keys);
+  for (const allowed of Object.values(ALLOWED_ENTITLEMENTS)) {
+    assert.equal(allowed.has("com.apple.security.cs.allow-dyld-environment-variables"), false);
+    assert.equal(allowed.has("com.apple.security.get-task-allow"), false);
+  }
+
+  assert.equal(resolveMode({ env: {} }), "release");
+  assert.equal(resolveMode({ env: { MNEMO_VERIFY_MODE: "adhoc-release" } }), "adhoc-release");
+  assert.equal(resolveMode({ env: { MNEMO_LOCAL_TEST_BUILD: "1" } }), "local");
+  assert.equal(resolveMode({ flags: ["--mode=adhoc-release"], env: { MNEMO_LOCAL_TEST_BUILD: "1" } }), "adhoc-release");
+  assert.throws(() => resolveMode({ env: { MNEMO_VERIFY_MODE: "adhoc" } }), /Unknown verification mode/);
 });
 
 test("release builds ship only Ed25519 public update keys", async () => {
