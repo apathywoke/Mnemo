@@ -57,6 +57,9 @@ const hasSingleInstanceLock =
   !launchedWithRemoteDebugging && app.requestSingleInstanceLock();
 const translator = createTranslator(i18nCatalog);
 
+// Shared with the modules in src/main/: `state` holds every mutable value,
+// and each create*() adds its functions. Modules take Electron from ctx, so a
+// reloaded main.js (as in tests) hands them the current module.
 const state = createState(translator);
 const ctx = { state, translator, electron };
 Object.assign(ctx, createTranslation(ctx));
