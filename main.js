@@ -29,6 +29,7 @@ const { randomBytes } = require("node:crypto");
 const { buildReport, checkPwnedHashes, collectPasswords } = require("./password-health");
 const { createState } = require("./src/main/state");
 const { createTranslation } = require("./src/main/i18n");
+const { createProfileHelpers } = require("./src/main/profiles");
 
 const APP_PAGE = path.join(__dirname, "index.html");
 const AUTO_LOCK_MS = 5 * 60 * 1000;
@@ -74,7 +75,8 @@ const IMPORT_SOURCES = Object.freeze({
 const state = createState(translator);
 const ctx = { state, translator };
 Object.assign(ctx, createTranslation(ctx));
-const { tr, toIpcError } = ctx;
+Object.assign(ctx, createProfileHelpers(ctx));
+const { tr, toIpcError, toRestoreCredentials, activeProfileName } = ctx;
 
 async function showVaultDialog(options, { closeAfterMs = 0 } = {}) {
   const controller = new AbortController();
@@ -103,25 +105,6 @@ function showSecretDialog({ entryName, fieldLabel, value }) {
     cancelId: 0,
     noLink: true,
   }, { closeAfterMs: REVEAL_DIALOG_MS });
-}
-
-// Restore credentials from the renderer: the backup's passphrase, or a
-// recovery key with a new passphrase. Only known fields are passed on.
-function toRestoreCredentials(value) {
-  if (typeof value === "string") return value;
-  if (value !== null && typeof value === "object") {
-    return { recoveryKey: value.recoveryKey, newPassphrase: value.newPassphrase };
-  }
-  throw new Error("Enter a master passphrase.");
-}
-
-async function activeProfileName() {
-  if (state.activeProfileId === null) return "Mnemo";
-  try {
-    return (await state.profileManager.getProfile(state.activeProfileId)).name;
-  } catch {
-    return "Mnemo";
-  }
 }
 
 function publicUpdateState() {
