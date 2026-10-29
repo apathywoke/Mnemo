@@ -223,12 +223,15 @@ must not be used with real vaults on a shared machine.
    Keychain itself refuses to release the key without a fingerprint and the
    key is invalidated when fingerprints change. Needs a native module, the
    data protection keychain, and a provisioning profile.
-8. **Passphrase strength.** New passphrases need 12 characters and a Strong
-   rating from a simple heuristic (length, character classes of any script,
-   a few common words and runs). Consider a dictionary-based estimate (such
-   as zxcvbn, which would be a new dependency) or a word-count rule, a way
-   to change the passphrase without the recovery key so old 7-character
-   vaults can be upgraded, and raising scrypt cost or moving to Argon2id.
+8. **Passphrase strength.** Partly done. New passphrases need 12
+   characters and a Strong rating from a simple heuristic: length,
+   character classes of any script, a few common words and runs, and since
+   then repeats (one block repeated, by its smallest period, or fewer than 8
+   different characters is Weak). The passphrase can be changed in Settings
+   with the current one, so old 7-character vaults can be upgraded; they are
+   not forced to. Still open: a dictionary-based estimate (such as zxcvbn,
+   which would be a new dependency) or a word-count rule, and raising scrypt
+   cost or moving to Argon2id.
 9. **Developer ID.** GitHub releases are ad-hoc signed. With a Developer ID,
    sign and notarize in the release workflow, drop
    `build/entitlements.adhoc.plist` so library validation is back, check the
