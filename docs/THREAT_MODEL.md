@@ -46,9 +46,10 @@ again whenever a trigger at the end of this document applies. Updated
 
 - **B1, renderer → main.** The renderer is treated as compromisable (for
   example by a future XSS bug or a malicious vault value). Every IPC handler
-  checks that the sender is the app's own main frame loaded from the packaged
-  `index.html`, and validates its arguments. The renderer cannot ask for a
-  password in plain text: copy and reveal are performed by the main process.
+  checks that the sender is the app's own main frame loaded from
+  `app://mnemo/index.html`, and validates its arguments. The renderer cannot
+  ask for a password in plain text: copy and reveal are performed by the main
+  process.
 - **B2, main → disk.** Everything secret is encrypted before it is written.
   Writes are atomic (temp file plus rename) with restrictive permissions.
 - **B3, main → clipboard.** Leaves the app's control once written.
@@ -128,7 +129,8 @@ again whenever a trigger at the end of this document applies. Updated
 | Read or mint a recovery key | The key is shown in the renderer once, by design. Creating a new key requires the current master passphrase in main | A compromised renderer during vault creation, recovery, or key creation sees the recovery key, which is equivalent to the passphrase it can already see. |
 | Exfiltrate what it can read (metadata, notes, passphrase) | CSP `connect-src 'none'`; `webRequest` cancels HTTP(S) and WebSocket; WebRTC removed from the page, UDP restricted, and the session proxied to a closed port; DevTools disabled in packaged builds | DNS prefetch or other Chromium side channels not covered here. |
 | Escape to Node.js or the filesystem | `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`; narrow preload; no `webview`; window opening and navigation denied; strict CSP (`script-src 'self'`, `connect-src 'none'`); remote requests cancelled | Depends on Chromium's sandbox. |
-| Spoof IPC from another frame | Handlers accept only the main frame whose URL is the packaged `index.html` | None known. |
+| Spoof IPC from another frame | Handlers accept only the main frame whose URL is `app://mnemo/index.html`; `file://` and other origins are refused | None known. |
+| Read local files through the page's origin | The page is served from `app://mnemo/`, not `file://`; `GrantFileProtocolExtraPrivileges` is off; the `app://` handler serves only HTML, JavaScript, and CSS files inside the app folder and rejects traversal (percent-encoded `..`, backslashes, NUL) after normalizing the path and checking its prefix | In development (`npm start`) the app folder is the repository, so any `.html`, `.js`, or `.css` file in it, including `node_modules`, can be read by the page. Packaged builds serve only what is in `app.asar`. |
 | Destroy data through trash, history, or attachments | Deleting moves items to the trash (restorable for 30 days); deleting for good, emptying the trash, and deleting an attachment need a native confirmation in main; restoring a version keeps the replaced content as a version | It can move items to the trash, change folders and favorites, and restore older versions without a click. |
 | Read attachments or plant files | Files are chosen and saved only through native open and save dialogs in main; the renderer never sends a path and never receives contents | It can open those dialogs, which the user must still complete. |
 | Use Reports to learn about passwords | Main returns entry IDs, breach counts, and weak/reused flags only; fingerprints use a per-unlock HMAC key and never leave main | The renderer learns which entries share a password, which are weak, and (after a check) which are breached. It can start a breach check without a click, which sends 5-character SHA-1 prefixes to Have I Been Pwned. |
@@ -203,9 +205,9 @@ must not be used with real vaults on a shared machine.
 
 ## 7. Known residual risks and follow-ups
 
-1. **`file://` privileges.** `GrantFileProtocolExtraPrivileges` stays on because
-   `loadFile()` from `app.asar` fails without it. Move the UI to a custom
-   `app://` protocol (`protocol.handle`) and then turn the fuse off.
+1. **`file://` privileges.** **Done.** The UI is served from `app://mnemo/`
+   by `protocol.handle` with a path traversal check, and
+   `GrantFileProtocolExtraPrivileges` is off.
 2. **Notes are not sealed per entry.** They are decrypted with the vault index
    and can be read by a compromised renderer one entry at a time. Seal them like
    passwords if notes are expected to hold secrets.
@@ -259,7 +261,7 @@ found no Critical or High issues.
 | 3 | Low | No permission check handler, so checks report "granted" | **Fixed.** Permission checks and device permissions are denied; clipboard reads verified to fail in the running app. |
 | 4 | Low | Restore read the global vault after awaiting dialogs and ignored the lock epoch; profile deletion is confirmed only in the renderer | **Mostly fixed.** Restore binds to the vault and epoch at the start and aborts if either changes. Deleting the open vault from Settings needs its passphrase and a native confirmation. Deleting a locked profile from the profile list still relies on the renderer's type-the-name dialog. |
 | 5 | Low | DevTools available in packaged builds (self-XSS through the console) | **Fixed.** `devTools` is disabled when packaged. |
-| 6 | Low/Info | `file://` origin with `GrantFileProtocolExtraPrivileges` makes CSP `'self'` cover any local file | **Open.** See follow-up 1 in section 7. |
+| 6 | Low/Info | `file://` origin with `GrantFileProtocolExtraPrivileges` makes CSP `'self'` cover any local file | **Fixed.** The page is served from `app://mnemo/`, so `'self'` covers only that origin; the fuse is off. See follow-up 1 in section 7. |
 | 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Open.** Move decoding to a sandboxed `utilityProcess` or to the renderer. |
 | 8 | Info | Release verification checked entitlements only on the outer app | **Fixed.** Every nested `.app`/`.framework` is checked, and `app.asar.unpacked` is rejected. |
 | 9 | Info | Clipboard text is not marked concealed or transient; vault rollback is not detected; 7-character passphrase minimum | **Partly fixed.** New passphrases need 12 characters and a Strong rating (section 7, item 8). Clipboard and rollback are still open; concealed clipboard types need a small native helper. |

@@ -91,7 +91,8 @@ passwords until the design has received independent security review.
   loads or updates the icon.
 - Packaged builds have Electron fuses set: `RunAsNode`,
   `EnableNodeCliInspectArguments`, and `EnableNodeOptionsEnvironmentVariable`
-  are off; `OnlyLoadAppFromAsar` and embedded asar integrity validation are on.
+  are off; `OnlyLoadAppFromAsar` and embedded asar integrity validation are on;
+  `GrantFileProtocolExtraPrivileges` is off.
   Packaged builds refuse to start with Chromium remote-debugging switches.
   `npm run dist:mac` signs with a Developer ID certificate and the hardened
   runtime and notarizes. Releases published on GitHub are currently
@@ -102,6 +103,11 @@ passwords until the design has received independent security review.
   an ad-hoc signature has no Team ID, these builds also carry
   `disable-library-validation`; without it they cannot load their own
   Electron framework. See `docs/RELEASING.md`.
+- The interface is served from `app://mnemo/index.html`, not `file://`. The
+  `app://` handler serves only HTML, JavaScript, and CSS files inside the app
+  folder (`app.asar` when packaged) and rejects paths that leave it, including
+  `..` hidden by percent-encoding. IPC handlers and navigation accept only
+  `app://mnemo/index.html`; the same page opened from `file://` is not trusted.
 - Updates come from this project's GitHub releases. About 20 seconds after
   launch and then on the schedule chosen in Settings → Updates (every 30
   minutes, hour, 6 hours, or day; daily by default; or never), and when the

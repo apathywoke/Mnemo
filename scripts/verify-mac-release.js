@@ -31,6 +31,18 @@ const FUSE_NAMES = Object.freeze({
   loadBrowserProcessSpecificV8Snapshot: FuseV1Options.LoadBrowserProcessSpecificV8Snapshot,
   grantFileProtocolExtraPrivileges: FuseV1Options.GrantFileProtocolExtraPrivileges,
 });
+// Fuses whose state protects the vault. The verifier holds these itself, so
+// an edit to electronFuses in electron-builder.config.js cannot weaken them
+// without failing verification.
+const REQUIRED_FUSES = Object.freeze({
+  runAsNode: false,
+  enableNodeOptionsEnvironmentVariable: false,
+  enableNodeCliInspectArguments: false,
+  enableEmbeddedAsarIntegrityValidation: true,
+  onlyLoadAppFromAsar: true,
+  // The UI is served from app://mnemo/, so file:// needs no privileges.
+  grantFileProtocolExtraPrivileges: false,
+});
 const MODES = Object.freeze(["release", "adhoc-release", "local"]);
 // allow-dyld-environment-variables and get-task-allow are never allowed: they
 // would undo the hardened runtime's protection against injected libraries and
@@ -59,10 +71,16 @@ function findExecutable(appPath) {
   return { info, executable: path.join(appPath, "Contents", "MacOS", info.CFBundleExecutable) };
 }
 
-async function verifyFuses(executable) {
-  const wire = await getCurrentFuseWire(executable);
+// Compares a fuse wire with the configured fuses, and the configured fuses
+// with REQUIRED_FUSES.
+function compareFuses(wire, configured = electronFuses) {
   const failures = [];
-  for (const [name, expected] of Object.entries(electronFuses)) {
+  for (const [name, required] of Object.entries(REQUIRED_FUSES)) {
+    if (configured[name] !== required) {
+      failures.push(`${name}: electron-builder.config.js sets ${configured[name]}, releases require ${required}`);
+    }
+  }
+  for (const [name, expected] of Object.entries(configured)) {
     const actual = wire[FUSE_NAMES[name]];
     const expectedState = expected ? FuseState.ENABLE : FuseState.DISABLE;
     if (actual !== expectedState) {
@@ -70,6 +88,10 @@ async function verifyFuses(executable) {
     }
   }
   return failures;
+}
+
+async function verifyFuses(executable) {
+  return compareFuses(await getCurrentFuseWire(executable));
 }
 
 function verifyAsarIntegrity(appPath, info) {
@@ -212,6 +234,8 @@ async function afterSign(context) {
 module.exports = afterSign;
 module.exports.default = afterSign;
 module.exports.ALLOWED_ENTITLEMENTS = ALLOWED_ENTITLEMENTS;
+module.exports.REQUIRED_FUSES = REQUIRED_FUSES;
+module.exports.compareFuses = compareFuses;
 module.exports.resolveMode = resolveMode;
 module.exports.verifyApp = verifyApp;
 
