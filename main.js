@@ -5,6 +5,7 @@ const {
   BrowserWindow,
   nativeTheme,
   powerMonitor,
+  protocol,
   safeStorage,
   session,
   systemPreferences,
@@ -23,6 +24,7 @@ const { createDialogs } = require("./src/main/dialogs");
 const { createClipboard } = require("./src/main/clipboard");
 const { createLock } = require("./src/main/lock");
 const { createWindowManager } = require("./src/main/window");
+const { registerAppScheme } = require("./src/main/app-protocol");
 const { createRegisterHandler } = require("./src/main/ipc/register");
 const { createUpdates } = require("./src/main/updates");
 const IPC_GROUPS = [
@@ -70,7 +72,7 @@ Object.assign(ctx, createLock(ctx));
 Object.assign(ctx, createWindowManager(ctx));
 Object.assign(ctx, createRegisterHandler(ctx));
 Object.assign(ctx, createUpdates(ctx));
-const { lockVault, createWindow, scheduleUpdateCheck } = ctx;
+const { lockVault, createWindow, registerAppProtocol, scheduleUpdateCheck } = ctx;
 
 if (launchedWithRemoteDebugging) {
   app.exit(1);
@@ -82,6 +84,9 @@ if (launchedWithRemoteDebugging) {
     if (state.mainWindow.isMinimized()) state.mainWindow.restore();
     state.mainWindow.focus();
   });
+
+  // Schemes get their privileges only before the app is ready.
+  registerAppScheme(protocol);
 
   app.whenReady().then(() => {
     // `npm start` runs the stock Electron.app; give its Dock tile Mnemo's
@@ -106,6 +111,9 @@ if (launchedWithRemoteDebugging) {
     // escapes webRequest (WebRTC TURN/STUN over TCP) to a closed local port.
     // The favicon fetcher uses Node's https module and is unaffected.
     void session.defaultSession.setProxy?.({ proxyRules: "socks5://127.0.0.1:9" });
+
+    // The page is served from app://mnemo/ (src/main/app-protocol.js).
+    registerAppProtocol();
 
     powerMonitor.on("lock-screen", () => lockVault(true));
     powerMonitor.on("suspend", () => lockVault(true));

@@ -13,8 +13,45 @@ test("release build disables Node entry points and enforces asar integrity", () 
   assert.equal(config.electronFuses.enableNodeOptionsEnvironmentVariable, false);
   assert.equal(config.electronFuses.onlyLoadAppFromAsar, true);
   assert.equal(config.electronFuses.enableEmbeddedAsarIntegrityValidation, true);
+  // The UI is served from app://mnemo/ (src/main/app-protocol.js).
+  assert.equal(config.electronFuses.grantFileProtocolExtraPrivileges, false);
   assert.equal(config.asar, true);
   assert.equal(config.files.some((pattern) => /test|support|\.md$/.test(pattern)), false);
+});
+
+test("release verification requires the security fuses whatever the config says", () => {
+  const { FuseState, FuseV1Options } = require("@electron/fuses");
+  const { REQUIRED_FUSES, compareFuses } = require("../scripts/verify-mac-release");
+  assert.equal(REQUIRED_FUSES.grantFileProtocolExtraPrivileges, false);
+  for (const [name, required] of Object.entries(REQUIRED_FUSES)) {
+    assert.equal(config.electronFuses[name], required, name);
+  }
+
+  const option = {
+    runAsNode: FuseV1Options.RunAsNode,
+    enableCookieEncryption: FuseV1Options.EnableCookieEncryption,
+    enableNodeOptionsEnvironmentVariable: FuseV1Options.EnableNodeOptionsEnvironmentVariable,
+    enableNodeCliInspectArguments: FuseV1Options.EnableNodeCliInspectArguments,
+    enableEmbeddedAsarIntegrityValidation: FuseV1Options.EnableEmbeddedAsarIntegrityValidation,
+    onlyLoadAppFromAsar: FuseV1Options.OnlyLoadAppFromAsar,
+    loadBrowserProcessSpecificV8Snapshot: FuseV1Options.LoadBrowserProcessSpecificV8Snapshot,
+    grantFileProtocolExtraPrivileges: FuseV1Options.GrantFileProtocolExtraPrivileges,
+  };
+  const wireFor = (fuses) => Object.fromEntries(Object.entries(fuses).map(
+    ([name, on]) => [option[name], on ? FuseState.ENABLE : FuseState.DISABLE],
+  ));
+
+  assert.deepEqual(compareFuses(wireFor(config.electronFuses)), []);
+  // A binary built with file:// privileges on fails.
+  assert.deepEqual(
+    compareFuses(wireFor({ ...config.electronFuses, grantFileProtocolExtraPrivileges: true })),
+    ["grantFileProtocolExtraPrivileges: expected DISABLE, found ENABLE"],
+  );
+  // So does a config that asks for them, even if the binary matches it.
+  const relaxed = { ...config.electronFuses, grantFileProtocolExtraPrivileges: true };
+  assert.deepEqual(compareFuses(wireFor(relaxed), relaxed), [
+    "grantFileProtocolExtraPrivileges: electron-builder.config.js sets true, releases require false",
+  ]);
 });
 
 test("release build is signed with the hardened runtime and notarized", async () => {

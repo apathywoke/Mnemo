@@ -39,7 +39,7 @@ producing an unsigned app.
 | `EnableEmbeddedAsarIntegrityValidation` | on | `app.asar` is checked against the hash in the signed `Info.plist`; a modified archive aborts startup with "ASAR Integrity Violation". |
 | `EnableCookieEncryption` | on | Defense in depth; the app stores no cookies it relies on. |
 | `LoadBrowserProcessSpecificV8Snapshot` | off | Not used. |
-| `GrantFileProtocolExtraPrivileges` | **on** | Required while the UI is loaded with `loadFile()`: with it off, `file://` cannot read from `app.asar`. Turn it off after moving the UI to a custom `app://` protocol. |
+| `GrantFileProtocolExtraPrivileges` | off | The UI is served from `app://mnemo/` by `protocol.handle` (`src/main/app-protocol.js`), which reads only HTML, JavaScript, and CSS files inside `app.asar`. `file://` pages get no extra privileges and cannot read `app.asar`. |
 
 Chromium's `--remote-debugging-port`/`--remote-debugging-pipe` switches have no
 fuse; `main.js` makes packaged builds exit immediately when either is present.

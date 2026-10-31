@@ -19,10 +19,10 @@ const electronFuses = Object.freeze({
   // Refuses to load app code from anything other than the verified app.asar.
   onlyLoadAppFromAsar: true,
   loadBrowserProcessSpecificV8Snapshot: false,
-  // Must stay enabled while index.html is loaded with loadFile(): with this
-  // fuse off, file:// cannot read from app.asar (ERR_FILE_NOT_FOUND). Turning
-  // it off requires serving the UI from a custom app:// protocol first.
-  grantFileProtocolExtraPrivileges: true,
+  // Off: the UI is served from app://mnemo/ (src/main/app-protocol.js), so
+  // file:// pages get no privileges beyond a browser's and cannot read
+  // app.asar.
+  grantFileProtocolExtraPrivileges: false,
 });
 
 module.exports = {
