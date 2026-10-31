@@ -174,6 +174,31 @@ too, so the version is whatever `package.json` says. GitHub shows the
 button only once this workflow, with `workflow_dispatch`, is on the default
 branch.
 
+### Releases that change the vault format
+
+An older Mnemo cannot open a vault or backup saved with a newer schema or
+file format.
+- **0.2.0 and later** recognize such files and ask for an update
+  (`errors.vaultFromNewerVersion`, `errors.backupFromNewerVersion`).
+- **Versions before 0.2.0** report a wrong passphrase instead.
+
+A release that changes the format (such as the planned schema 4, see
+`docs/design-notes-sealing.md` and `docs/design-rollback.md`):
+
+1. **Ships after a release that recognizes newer formats** is out. 0.2.0 is
+   that release.
+2. **Never writes the old format again.** The only way back to an older
+   version is restoring a backup made before the update.
+3. **Says so in its tag message, so users know the cost.** For example:
+
+   ```
+   This version changes the vault format. Once it has saved your vault,
+   earlier versions can no longer open it: 0.2.0 and later ask you to
+   update, older ones report a wrong passphrase. Going back to an earlier
+   version means restoring a backup made before this update, which loses
+   the changes made since. Make a backup before updating.
+   ```
+
 ### Ad-hoc release builds
 
 Without a Developer ID, the workflow signs ad hoc (`identity=-`), still with
