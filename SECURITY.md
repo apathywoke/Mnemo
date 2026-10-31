@@ -76,19 +76,28 @@ passwords until the design has received independent security review.
   and when the app exits.
 - Site icons require an explicit click on **Load site icon**. The main process
   first requests the saved domain's `/favicon.ico` endpoint. If that is missing or small,
-  it reads the homepage and tries at most five PNG, JPEG, or ICO icon links hosted
-  on that same domain. PNG-backed ICO files and uncompressed 24/32-bit ICO images
-  are supported.
+  it reads the homepage and tries at most five PNG or ICO icon links hosted
+  on that same domain. PNG files, PNG-backed ICO files, and uncompressed
+  24/32-bit ICO images are supported; JPEG, SVG, and other formats are
+  skipped.
   Requests carry no cookies or referrer and use no
   third-party favicon service. HTTPS redirects are followed only to the same
   host or its `www` variant, with a three-redirect limit. The site can see the
   device's IP address, and the domain may be visible to the configured DNS
   resolver. Only public HTTPS hosts are allowed; the app resolves and pins a
-  public IPv4 address, limits response size, checks image dimensions before
-  decoding, prefers higher-resolution variants without enlarging small icons,
-  preserves aspect ratio, converts the result to PNG, and saves it within the
-  encrypted vault. These requests are not repeated unless the user explicitly
-  loads or updates the icon.
+  public IPv4 address and limits response size. Each downloaded image is
+  decoded outside the main process, in a new Electron `utilityProcess`, by
+  plain JavaScript PNG and ICO decoders rather than native image codecs. That
+  process gets only a copy of the image bytes and an environment without the
+  app's variables, checks dimensions before decoding, caps decompressed data
+  near the size the image header declares, and is killed after its reply or
+  after five seconds. It returns only the icon's pixels: the main process
+  checks that they match the expected icon size and encodes the PNG itself.
+  A decoder crash or timeout ends that fetch with an error and does not
+  affect the app. The decoder process is not in Chromium's sandbox. The app
+  prefers higher-resolution variants without enlarging small icons, preserves
+  aspect ratio, and saves the icon within the encrypted vault. These requests
+  are not repeated unless the user explicitly loads or updates the icon.
 - Packaged builds have Electron fuses set: `RunAsNode`,
   `EnableNodeCliInspectArguments`, and `EnableNodeOptionsEnvironmentVariable`
   are off; `OnlyLoadAppFromAsar` and embedded asar integrity validation are on.

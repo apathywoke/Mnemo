@@ -115,8 +115,10 @@ format, crypto, and validation; `vault-store.js` only re-exports it.
 - This prototype has no telemetry or crash-reporting SDK. Site icons are only
   requested after you choose **Load site icon** for a login. The app contacts
   that login's HTTPS domain directly at `/favicon.ico` first. If unavailable or small,
-  it may read the homepage and try up to five PNG, JPEG, or ICO icon links on the
-  same domain. PNG-backed ICO files and uncompressed 24/32-bit ICO images are supported.
+  it may read the homepage and try up to five PNG or ICO icon links on the
+  same domain. PNG-backed ICO files and uncompressed 24/32-bit ICO images are
+  supported; JPEG and SVG icons are skipped. Images are decoded in a separate
+  process, not in the app's main process.
   It prefers larger variants, keeps their aspect ratio, and does not enlarge a
   small source image before saving it.
   It follows only HTTPS redirects to the same host or its `www` variant,
