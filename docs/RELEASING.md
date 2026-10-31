@@ -199,6 +199,12 @@ A release that changes the format (such as the planned schema 4, see
    the changes made since. Make a backup before updating.
    ```
 
+**0.2.0 itself changes the format.** It moves vaults from schema 2 to 3
+(folders, the trash, history, attachments), so it could not follow rule 1.
+0.1.1 reports a wrong passphrase for a schema 3 vault, and with Touch ID
+turns Touch ID off. So 0.2.0's tag message starts with the warning (draft
+in PR #25).
+
 ### Ad-hoc release builds
 
 Without a Developer ID, the workflow signs ad hoc (`identity=-`), still with
