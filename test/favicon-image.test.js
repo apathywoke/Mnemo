@@ -1,7 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { deflateSync } = require("node:zlib");
-const { encodeJpeg } = require("../support/jpeg");
 const { chunk, crc32, encodePng, makePng, makeIco, makeIcoBitmap } = require("../support/png");
 const {
   MAX_IMAGE_BYTES,
@@ -250,18 +249,17 @@ test("ICO bitmaps and PNG entries decode, and the sharpest entry wins", () => {
   assert.throws(() => decodeIco(makeIco([{ width: 16, height: 16, data: makePng(600, 16) }])), /unsupported size/);
 });
 
-test("only PNG, JPEG, and ICO are decoded", () => {
+test("only PNG and ICO are decoded", () => {
   assert.equal(decodeFaviconImage(makePng(2, 2)).width, 2);
-  assert.equal(decodeFaviconImage(encodeJpeg({ width: 3, height: 2, sample: () => [1, 2, 3] })).width, 3);
   assert.equal(decodeFaviconImage(makeIco([{ width: 2, height: 2, data: makePng(2, 2) }])).width, 2);
-  assert.throws(() => decodeFaviconImage(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46])), /JPEG/);
   for (const [label, bytes] of [
+    ["JPEG", Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00])],
     ["GIF", Buffer.from("GIF89a\x01\x00\x01\x00", "latin1")],
     ["WebP", Buffer.from("RIFF\x1a\x00\x00\x00WEBPVP8 ", "latin1")],
     ["SVG", Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')],
     ["empty", Buffer.alloc(0)],
   ]) {
-    assert.throws(() => decodeFaviconImage(bytes), /Not a PNG, JPEG, or ICO/, label);
+    assert.throws(() => decodeFaviconImage(bytes), /Not a PNG or ICO/, label);
   }
 });
 

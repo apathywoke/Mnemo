@@ -1,12 +1,10 @@
 // Site icons downloaded from websites. The decoding below runs only in the
-// favicon decoder process (favicon-decoder-process.js), never in main: PNG,
-// ICO, and sequential JPEG (favicon-jpeg.js) are decoded in plain JavaScript,
-// so no native image codec parses bytes from a website; other formats are
-// not supported. The decoder hands back RGBA pixels at icon size; main checks
-// their size with iconSize() and encodes the PNG it stores with
-// encodeRgbaPng().
+// favicon decoder process (favicon-decoder-process.js), never in main: PNG
+// and ICO are decoded in plain JavaScript, so no native image codec parses
+// bytes from a website; other formats, JPEG included, are not supported. The
+// decoder hands back RGBA pixels at icon size; main checks their size with
+// iconSize() and encodes the PNG it stores with encodeRgbaPng().
 const { deflateSync, inflateSync, constants: zlibConstants } = require("node:zlib");
-const { decodeJpeg } = require("./favicon-jpeg");
 
 const MAX_IMAGE_BYTES = 512 * 1024;
 const MAX_ICON_DIMENSION = 512;
@@ -475,13 +473,10 @@ function decodeIcoDib(icon) {
 
 function decodeFaviconImage(buffer) {
   if (buffer.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return decodePng(buffer);
-  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
-    return decodeJpeg(buffer, MAX_ICON_DIMENSION);
-  }
   if (buffer.length >= 4 && buffer.readUInt16LE(0) === 0 && buffer.readUInt16LE(2) === 1) {
     return decodeIco(buffer);
   }
-  throw invalidImage("Not a PNG, JPEG, or ICO image");
+  throw invalidImage("Not a PNG or ICO image");
 }
 
 // --- Resizing and PNG encoding ------------------------------------------------

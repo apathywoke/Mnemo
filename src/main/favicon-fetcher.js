@@ -281,7 +281,7 @@ async function downloadFavicon(hostname, address, requestPath = "/favicon.ico") 
     hostname,
     address,
     requestPath,
-    "image/png,image/x-icon,image/vnd.microsoft.icon,image/webp,image/jpeg,image/gif;q=0.8",
+    "image/png,image/x-icon,image/vnd.microsoft.icon,image/webp,image/gif;q=0.8",
     MAX_DOWNLOAD_BYTES,
   );
   if (
@@ -290,7 +290,7 @@ async function downloadFavicon(hostname, address, requestPath = "/favicon.ico") 
     response.contentType === "text/html"
   ) {
     response.data?.fill(0);
-    throw unsupportedFavicon("The site did not provide a supported PNG, JPEG, or ICO icon at this address.");
+    throw unsupportedFavicon("The site did not provide a supported PNG or ICO icon at this address.");
   }
   return {
     data: response.data,
@@ -435,7 +435,7 @@ async function discoverFavicon(hostname, address, bestIcon = null) {
   if (bestIcon) return bestIcon;
 
   throw new Error(
-    "No supported PNG, JPEG, or ICO icon was found. This site may only provide SVG, a progressive JPEG, or an unsupported ICO format.",
+    "No supported PNG or ICO icon was found. This site may only provide SVG, JPEG, or an unsupported ICO format.",
   );
 }
 
