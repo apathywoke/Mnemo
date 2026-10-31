@@ -3,7 +3,8 @@
 Status: draft for the prototype, written alongside the Electron hardening
 work (fuses, metadata-only renderer, signing and notarization). Review it
 again whenever a trigger at the end of this document applies. Updated
-2026-10-28 for in-app updates (B6, A8).
+2026-10-28 for in-app updates (B6, A8) and 2026-10-31 for the favicon
+decoder process (B7, A2).
 
 ## 1. What Mnemo protects
 
@@ -39,6 +40,7 @@ again whenever a trigger at the end of this document applies. Updated
  │    ── HTTPS (user-initiated only) ─── favicon; HIBP password ranges │  B4
  │    ── HTTPS (scheduled, can be off) ─ GitHub releases (updates)     │  B6
  │    ── native dialogs ──────────────── reveal password, file pickers │
+ │    ── utilityProcess (per image) ── favicon decoder, bytes → pixels │  B7
  └─────────────────────────────────────────────────────────────────────┘
    B5: GitHub Actions build → ad-hoc signature, hardened runtime → GitHub release → user's Mac
        (or: build machine → Developer ID signature → notarization)
@@ -68,6 +70,13 @@ again whenever a trigger at the end of this document applies. Updated
   running app, not on TLS or GitHub. The renderer only sees the version,
   release notes, and progress, and can only ask main to check, download,
   install, or open the release page.
+- **B7, main → favicon decoder.** Every downloaded icon is decoded in a new
+  `utilityProcess` running plain JavaScript PNG and ICO decoders. It gets an
+  exact copy of the image bytes and an environment without main's
+  variables, holds no vault data, and is killed after its reply or after 5
+  seconds. Main treats its reply as untrusted: it accepts only RGBA pixels
+  whose count matches the expected icon size and encodes the stored PNG
+  itself. The process runs Node.js without Chromium's sandbox.
 
 ## 3. Assumptions
 
@@ -114,7 +123,7 @@ again whenever a trigger at the end of this document applies. Updated
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
 | SSRF to the local network or loopback | Public HTTPS hosts only; DNS resolved and a public IPv4 address pinned; redirects only to the same host or its `www` variant, at most three | IPv6-only sites cannot provide icons. |
-| Image-parser exploit or decompression bomb | Response size limits; dimensions checked before decoding; only PNG, JPEG, and limited ICO accepted; re-encoded to PNG; stored PNG revalidated | Relies on Electron's `nativeImage` decoders. |
+| Image-parser exploit or decompression bomb | Response size limit (512 KB). Images are decoded outside main, in a new `utilityProcess` per image (B7), by plain JavaScript PNG and ICO decoders: no native image codec parses website data, and JPEG and other formats are skipped. Dimensions are checked before decoding; inflated data is capped near the size the header declares; a hang is killed after 5 seconds, and a crash fails only that fetch. Main accepts only RGBA pixels of the expected icon size and encodes the PNG itself; the vault validates it again | The decoder process is not in Chromium's sandbox: an image that took it over would run with the user's rights (the vault files are encrypted, the key is not there). The decoders are memory-safe JavaScript, so this needs a bug in V8 or in Node's zlib. |
 | Tracking | Requires an explicit click with a confirmation dialog; no cookies or referrer; no third-party favicon service | The site learns the user's IP address and that the icon was requested. |
 
 ### A3, compromised renderer
@@ -219,8 +228,11 @@ must not be used with real vaults on a shared machine.
    detected.
 5. **Profile deletion from the profile list** (vault locked) is confirmed
    only in the renderer; add a native confirmation there too.
-6. **Favicon decoding** runs in the main process; move it to a sandboxed
-   process.
+6. **Favicon decoding.** **Partly done.** Images are decoded in a separate
+   `utilityProcess` by plain JavaScript decoders, and main receives only
+   pixels (B7). That process runs Node.js without Chromium's sandbox;
+   decoding in a sandboxed hidden renderer (`createImageBitmap`) would
+   confine it further.
 7. **Touch ID binding.** Replace the `safeStorage` backend with a Secure
    Enclave key whose access control requires biometry (current set), so the
    Keychain itself refuses to release the key without a fingerprint and the
@@ -266,7 +278,7 @@ found no Critical or High issues.
 | 4 | Low | Restore read the global vault after awaiting dialogs and ignored the lock epoch; profile deletion is confirmed only in the renderer | **Mostly fixed.** Restore binds to the vault and epoch at the start and aborts if either changes. Deleting the open vault from Settings needs its passphrase and a native confirmation. Deleting a locked profile from the profile list still relies on the renderer's type-the-name dialog. |
 | 5 | Low | DevTools available in packaged builds (self-XSS through the console) | **Fixed.** `devTools` is disabled when packaged. |
 | 6 | Low/Info | `file://` origin with `GrantFileProtocolExtraPrivileges` makes CSP `'self'` cover any local file | **Fixed.** The page is served from `app://mnemo/`, so `'self'` covers only that origin; the fuse is off. See follow-up 1 in section 7. |
-| 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Open.** Move decoding to a sandboxed `utilityProcess` or to the renderer. |
+| 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Fixed.** Images are decoded in a separate `utilityProcess` by plain JavaScript PNG and ICO decoders with a 5-second limit; main receives only pixels and encodes the PNG itself. That process is not sandboxed by Chromium (section 7, item 6). |
 | 8 | Info | Release verification checked entitlements only on the outer app | **Fixed.** Every nested `.app`/`.framework` is checked, and `app.asar.unpacked` is rejected. |
 | 9 | Info | Clipboard text is not marked concealed or transient; vault rollback is not detected; 7-character passphrase minimum | **Partly fixed.** New passphrases need 12 characters and a Strong rating (section 7, item 8). Clipboard and rollback are still open; concealed clipboard types need a small native helper. |
 

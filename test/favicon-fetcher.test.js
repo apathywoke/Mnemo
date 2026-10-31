@@ -4,27 +4,18 @@ const Module = require("node:module");
 const test = require("node:test");
 const dns = require("node:dns/promises");
 const https = require("node:https");
-const { makePngHeader } = require("../support/helpers");
+const { makePng } = require("../support/png");
+const { createUtilityProcessStub } = require("../support/utility-process");
+
+// Images are decoded by the real decoder entry, run in this process by the
+// utilityProcess stand-in; a test can swap in another fork.
+const decoderProcesses = createUtilityProcessStub();
+let forkOverride = null;
+const utilityProcess = { fork: (...args) => (forkOverride ?? decoderProcesses.fork)(...args) };
 
 const originalModuleLoad = Module._load;
-const nativeImage = {
-  createFromBuffer(buffer) {
-    const width = buffer.readUInt32BE(16);
-    const height = buffer.readUInt32BE(20);
-    return {
-      isEmpty: () => false,
-      getSize: () => ({ width, height }),
-      resize(options) {
-        const outputWidth = options.width ?? Math.max(1, Math.round(width * options.height / height));
-        const outputHeight = options.height ?? Math.max(1, Math.round(height * options.width / width));
-        return { toPNG: () => makePngHeader(outputWidth, outputHeight) };
-      },
-    };
-  },
-};
-
 Module._load = function loadWithElectronStub(request, parent, isMain) {
-  if (request === "electron") return { nativeImage };
+  if (request === "electron") return { utilityProcess };
   return originalModuleLoad.call(this, request, parent, isMain);
 };
 const { fetchSiteFavicon, getFaviconHost } = require("../src/main/favicon-fetcher");
@@ -43,7 +34,7 @@ function installNetworkStubs(t, { route, lookup, resolve4 }) {
   dns.lookup = lookup ?? (async () => [{ address: "93.184.216.34", family: 4 }]);
   dns.resolve4 = resolve4 ?? (async () => ["93.184.216.34"]);
   https.get = (options, callback) => {
-    requested.push({ hostname: options.hostname, path: options.path });
+    requested.push({ hostname: options.hostname, path: options.path, accept: options.headers?.accept });
     const request = new EventEmitter();
     request.setTimeout = () => request;
     request.destroy = (error) => {
@@ -79,7 +70,7 @@ function installNetworkStubs(t, { route, lookup, resolve4 }) {
 }
 
 function pngResponse(width, height) {
-  return makeResponse(200, "image/png", makePngHeader(width, height));
+  return makeResponse(200, "image/png", makePng(width, height));
 }
 
 function makeBmpIco(width, height) {
@@ -238,4 +229,53 @@ test("cross-domain redirects and SVG-only sites are rejected safely", async (t) 
     },
   });
   await assert.rejects(fetchSiteFavicon("https://example.com"), /may only provide SVG/);
+});
+
+test("JPEG icons are skipped and are not asked for", async (t) => {
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
+  const html = '<html><head><link rel="icon" sizes="192x192" href="/icon.jpg"><link rel="icon" sizes="64x64" href="/icon.png"></head></html>';
+  const requested = installNetworkStubs(t, {
+    route: ({ path: requestPath }) => {
+      if (requestPath === "/favicon.ico" || requestPath === "/icon.jpg") return makeResponse(200, "image/jpeg", jpeg);
+      if (requestPath === "/") return makeResponse(200, "text/html", html);
+      if (requestPath === "/icon.png") return pngResponse(64, 64);
+      return makeResponse(404, "text/html");
+    },
+  });
+  const forksBefore = decoderProcesses.forks.length;
+
+  const favicon = await fetchSiteFavicon("https://example.com");
+  assert.deepEqual(pngDimensions(favicon.dataUrl), { width: 64, height: 64 });
+  assert.equal(requested.some(({ path: requestPath }) => requestPath === "/icon.jpg"), true);
+  for (const { accept } of requested.filter(({ path: requestPath }) => requestPath !== "/")) {
+    assert.doesNotMatch(accept, /jpeg/);
+  }
+  // One decoder process per downloaded image, each killed afterwards.
+  const forks = decoderProcesses.forks.slice(forksBefore);
+  assert.equal(forks.length, 3);
+  assert.ok(forks.every(({ killed }) => killed));
+});
+
+test("a decoder crash stops the fetch, but an icon already found is kept", async (t) => {
+  t.after(() => { forkOverride = null; });
+  installNetworkStubs(t, {
+    route: ({ path: requestPath }) => {
+      if (requestPath === "/favicon.ico") return pngResponse(16, 16);
+      if (requestPath === "/") return makeResponse(200, "text/html", '<html><head><link rel="icon" href="/icon.png"></head></html>');
+      if (requestPath === "/icon.png") return pngResponse(64, 64);
+      return makeResponse(404, "text/html");
+    },
+  });
+
+  forkOverride = createUtilityProcessStub({ behavior: (child) => child.emit("exit", 1) }).fork;
+  await assert.rejects(fetchSiteFavicon("https://example.com"), /^Error: The site icon could not be processed\.$/);
+
+  // A crash after a usable icon was found keeps that icon.
+  let calls = 0;
+  const crashOnSecond = createUtilityProcessStub({
+    behavior: (child) => child.emit("exit", 1),
+  });
+  forkOverride = (...args) => (calls++ === 0 ? decoderProcesses.fork : crashOnSecond.fork)(...args);
+  const kept = await fetchSiteFavicon("https://example.com");
+  assert.deepEqual(pngDimensions(kept.dataUrl), { width: 16, height: 16 });
 });

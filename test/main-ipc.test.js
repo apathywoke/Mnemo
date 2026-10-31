@@ -100,7 +100,6 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
         setProxy: async (config) => { proxyConfig = config; },
       },
     },
-    nativeImage: { createFromBuffer: () => ({ isEmpty: () => true }) },
     safeStorage: {
       isAsyncEncryptionAvailable: async () => true,
       encryptStringAsync: async (text) => Buffer.from(`sealed:${text}`),
