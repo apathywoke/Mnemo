@@ -1,7 +1,7 @@
 # Design: sealing notes per entry
 
-Status: proposal for review (stage 3, task 7). Nothing here is implemented.
-The decisions that need approval are listed in section 12.
+Status: approved plan (stage 3, task 7), not implemented. The owner
+approved the decisions in section 12 as recommended on 2026-10-31.
 
 ## 1. What happens today
 
@@ -283,7 +283,10 @@ Rollback:
   - a section 9 trigger for format changes.
 - **CLAUDE.md:** schema 4 and the AAD list.
 
-## 12. Decisions for approval
+## 12. Decisions (approved as recommended, 2026-10-31)
+
+Approved choices: D1 `entry-notes`; D2 seal a secure note's text too; D3a
+in this change, with D3b as a follow-up; D4 two releases.
 
 - **D1. AAD.** `local-vault:entry-notes:v4:<entryId>:notes`, rather than
   `item-notes`.
