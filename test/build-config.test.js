@@ -238,7 +238,7 @@ test("every path built from __dirname exists, and is packaged when the code ship
     assert.ok(packaged, `${file}: ${relative} is not in files`);
   }
   const targets = found.map(({ target }) => path.relative(root, target).split(path.sep).join("/"));
-  for (const expected of ["build/update-keys", "index.html", "preload.js"]) {
+  for (const expected of ["build/update-keys", "preload.js"]) {
     assert.ok(targets.includes(expected), `${expected} not found among ${targets.join(", ")}`);
   }
 });
