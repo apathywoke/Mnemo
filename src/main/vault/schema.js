@@ -39,6 +39,13 @@ function validateVaultData(value) {
   );
 }
 
+// Vault data written by a newer version of Mnemo, whose schema this version
+// does not know. Telling it apart from damaged data lets the user see that
+// the passphrase was right and Mnemo needs an update.
+function isFromNewerVersion(value) {
+  return Number.isSafeInteger(value?.schemaVersion) && value.schemaVersion > VAULT_SCHEMA_VERSION;
+}
+
 function upgradeVaultData(vaultData, dataKey) {
   let upgraded = vaultData;
   if (upgraded.schemaVersion === LEGACY_VAULT_SCHEMA_VERSION) {
@@ -61,5 +68,6 @@ function upgradeVaultData(vaultData, dataKey) {
 
 module.exports = {
   validateVaultData,
+  isFromNewerVersion,
   upgradeVaultData,
 };

@@ -109,6 +109,12 @@ async function makeEnvelope(vaultData, passphrase, dataKey) {
   }
 }
 
+// A vault file in a newer format than this version reads. It cannot be
+// decrypted here, but it is not a damaged file.
+function isNewerEnvelope(envelope) {
+  return envelope?.format === FORMAT && Number.isSafeInteger(envelope.version) && envelope.version > FORMAT_VERSION;
+}
+
 function isGcmRecord(value) {
   return hasExactKeys(value, ["name", "nonce", "tag", "ciphertext"]) &&
     value.name === "aes-256-gcm";
@@ -166,6 +172,7 @@ module.exports = {
   validatePassphrase,
   validateNewPassphrase,
   makeEnvelope,
+  isNewerEnvelope,
   isGcmRecord,
   parseEnvelope,
 };

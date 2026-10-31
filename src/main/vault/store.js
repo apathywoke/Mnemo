@@ -25,11 +25,24 @@ const {
   validatePassphrase,
   validateNewPassphrase,
   makeEnvelope,
+  isNewerEnvelope,
   parseEnvelope,
 } = require("./envelope");
 const { ATTACHMENT_OVERHEAD } = require("./attachments");
 const { pruneHistory } = require("./history");
-const { validateVaultData, upgradeVaultData } = require("./schema");
+const { validateVaultData, isFromNewerVersion, upgradeVaultData } = require("./schema");
+
+// A vault or backup saved by a newer version of Mnemo. Reported as such, not
+// as a wrong passphrase: the passphrase may be right, and the fix is an
+// update. Backups are read with `allowContainer`.
+function newerVersionError(isBackup) {
+  return Object.assign(
+    isBackup
+      ? new Error("This backup was made by a newer version of Mnemo. Update Mnemo to use it.")
+      : new Error("This vault was saved by a newer version of Mnemo. Update Mnemo to open it."),
+    { userFacing: true },
+  );
+}
 
 class VaultStore {
   constructor(filePath) {
@@ -242,6 +255,7 @@ class VaultStore {
       });
       rawFile = source.envelopeBytes ?? null;
       const envelope = source.container ? source.envelope : JSON.parse(rawFile.toString("utf8"));
+      if (isNewerEnvelope(envelope)) throw newerVersionError(allowContainer);
       const parsed = parseEnvelope(envelope);
       if (usingDataKey) {
         parsed.salt.fill(0);
@@ -279,6 +293,7 @@ class VaultStore {
         getAad("vault-data", parsed.header),
       );
       const vaultData = JSON.parse(plaintext.toString("utf8"));
+      if (isFromNewerVersion(vaultData)) throw newerVersionError(allowContainer);
       if (!validateVaultData(vaultData)) throw new Error("Invalid vault data");
 
       const opened = {
