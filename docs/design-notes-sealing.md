@@ -13,6 +13,11 @@ The decisions that need approval are listed in section 12.
   and historical, is a plain string in main-process memory.
 - **Secure notes.** The `note` item type keeps its text in `fields.body`
   (up to 65,536 characters), a plain field like a card's cardholder name.
+  - THREAT_MODEL's data table already records this: "Secure note text and
+    identity details are not sealed separately and reach the renderer when
+    the item is opened."
+  - Identity details (name, email, phone, address, birth date) are plain
+    fields too; of an identity, only the document number is sealed.
 - **What is sealed.** Passwords, one-time code settings, and secret item
   fields are each sealed with the vault key, with AAD that binds them to
   their entry, and are decrypted only in main, on copy or reveal:
@@ -287,6 +292,9 @@ Rollback:
   - Recommended: yes, in the same schema 4. Otherwise the item called
     "secure note" stays the least protected text in the vault.
   - The PR will describe how the item schema marks such a field.
+  - With D2, the THREAT_MODEL data row changes to match.
+  - Identity details stay as they are. Name and email are list and search
+    metadata; the other fields could follow the same pattern later.
 - **D3. Renderer exposure.** D3a now and D3b as a follow-up (recommended),
   or D3b in the same change.
 - **D4. Two releases.** N with the newer-schema message, then N+1 with
