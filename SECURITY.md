@@ -126,7 +126,11 @@ passwords until the design has received independent security review.
   back if the swap fails.
 - The private update key is held only in the GitHub Actions environment
   `release`, used by a job that installs no npm packages. Whoever holds it can
-  ship code to every installed copy that auto-updates.
+  ship code to every installed copy that auto-updates. That job publishes a
+  tag only if the tag's commit is on `main` (`git merge-base --is-ancestor`)
+  and fails before the key is used otherwise. Required reviewers for the
+  environment, its restriction to `v*` tags, and who may create those tags
+  are repository settings kept by the owner (`docs/RELEASING.md`).
 - Every new vault gets a recovery key: 256 random bits shown once as 14
   groups of Crockford Base32 with a 24-bit checksum. The vault key is wrapped
   a second time under a key derived from it with HKDF-SHA256 and a separate

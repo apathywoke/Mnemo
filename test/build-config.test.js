@@ -1,9 +1,11 @@
 const assert = require("node:assert/strict");
+const { execFileSync, spawnSync } = require("node:child_process");
 const { createPublicKey } = require("node:crypto");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const test = require("node:test");
 const config = require("../electron-builder.config");
+const { makeTempDirectory } = require("../support/helpers");
 
 test("release build disables Node entry points and enforces asar integrity", () => {
   assert.equal(config.electronFuses.runAsNode, false);
@@ -55,6 +57,71 @@ test("a manual run of the release workflow never publishes", async () => {
   assert.match(publish, /^ {4}if: github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/v'\)$/m);
   // The update key is only referenced by the publish job.
   assert.equal(workflow.indexOf("MNEMO_UPDATE_PRIVATE_KEY") > workflow.indexOf("\n  publish:\n"), true);
+});
+
+// A v* tag on a commit that is not on main must not be published
+// (docs/RELEASING.md, "GitHub settings").
+test("the publish job checks that the tag's commit is on main before using the key", async () => {
+  const workflow = await fs.readFile(path.join(__dirname, "..", ".github", "workflows", "release.yml"), "utf8");
+  const publish = workflow.slice(workflow.indexOf("\n  publish:\n"));
+  const checkoutAt = publish.indexOf("actions/checkout@");
+  assert.match(publish.slice(checkoutAt, publish.indexOf("\n\n", checkoutAt)), /^ {10}fetch-depth: 0$/m);
+  const checkAt = publish.indexOf("git merge-base --is-ancestor");
+  assert.ok(checkAt > checkoutAt, "no ancestry check after the checkout");
+  assert.match(publish, /git merge-base --is-ancestor "\$commit" origin\/main/);
+  assert.match(publish.slice(checkAt), /::error::[^\n]*not on main[^\n]*\n\s*exit 1/);
+  assert.ok(checkAt < publish.indexOf("MNEMO_UPDATE_PRIVATE_KEY"), "the check must run before the key is used");
+  assert.ok(checkAt < publish.indexOf("gh release create"), "the check must run before publishing");
+});
+
+// Runs that step's script against a temporary "origin": a tag on main passes,
+// a tag on a side branch fails with the error message.
+test("the tag check passes a tag on main and stops a tag that is not on main", async (t) => {
+  const workflow = await fs.readFile(path.join(__dirname, "..", ".github", "workflows", "release.yml"), "utf8");
+  const lines = workflow.split("\n");
+  const runAt = lines.findIndex((line, index) => line.trim() === "run: |" && /- name: Check the tag is on main/.test(lines[index - 1] ?? ""));
+  assert.ok(runAt > 0, "step not found");
+  const body = [];
+  for (const line of lines.slice(runAt + 1)) {
+    if (line.trim() && !line.startsWith(" ".repeat(10))) break;
+    body.push(line.slice(10));
+  }
+  const script = body.join("\n");
+
+  const directory = await makeTempDirectory(t, "mnemo-tag-check-");
+  // No user or system git configuration (signing, hooks, default branch).
+  const env = {
+    PATH: process.env.PATH,
+    HOME: directory,
+    GIT_CONFIG_GLOBAL: path.join(directory, "no-gitconfig"),
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_AUTHOR_NAME: "Test",
+    GIT_AUTHOR_EMAIL: "test@example.invalid",
+    GIT_COMMITTER_NAME: "Test",
+    GIT_COMMITTER_EMAIL: "test@example.invalid",
+  };
+  const git = (cwd, ...args) => execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const origin = path.join(directory, "origin.git");
+  const work = path.join(directory, "work");
+  git(directory, "init", "--quiet", "--bare", "--initial-branch=main", origin);
+  git(directory, "clone", "--quiet", origin, work);
+  git(work, "commit", "--quiet", "--allow-empty", "-m", "On main");
+  git(work, "tag", "-a", "v1.0.0", "-m", "On main");
+  git(work, "switch", "--quiet", "-c", "side");
+  git(work, "commit", "--quiet", "--allow-empty", "-m", "Only on a side branch");
+  git(work, "tag", "-a", "v1.0.1", "-m", "Not on main");
+  git(work, "push", "--quiet", "origin", "main", "side", "--tags");
+  // Like actions/checkout with fetch-depth: 0.
+  const ci = path.join(directory, "ci");
+  git(directory, "clone", "--quiet", origin, ci);
+
+  const runCheck = (tag) => spawnSync("bash", ["-e", "-c", script], { cwd: ci, env: { ...env, TAG: tag }, encoding: "utf8" });
+  const onMain = runCheck("v1.0.0");
+  assert.equal(onMain.status, 0, onMain.stderr);
+  assert.match(onMain.stdout, /Tag v1\.0\.0 \([0-9a-f]{40}\) is on main\./);
+  const offMain = runCheck("v1.0.1");
+  assert.equal(offMain.status, 1);
+  assert.match(offMain.stdout, /::error::Tag v1\.0\.1 points to [0-9a-f]{40}, which is not on main\./);
 });
 
 test("only ad-hoc builds may disable library validation", async () => {

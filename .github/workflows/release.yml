@@ -77,9 +77,24 @@ jobs:
     env:
       TAG: ${{ github.ref_name }}
     steps:
+      # Full history, so the next step can tell whether the tag is on main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      # Only commits that are on main are released. A v* tag on another
+      # branch, or on a commit that never reached main, stops here, before
+      # the update key is used.
+      - name: Check the tag is on main
+        run: |
+          git fetch --no-tags origin "+refs/tags/$TAG:refs/tags/$TAG" "+refs/heads/main:refs/remotes/origin/main"
+          commit="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          if ! git merge-base --is-ancestor "$commit" origin/main; then
+            echo "::error::Tag $TAG points to $commit, which is not on main. Tag a commit that is on main and push that tag instead."
+            exit 1
+          fi
+          echo "Tag $TAG ($commit) is on main."
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -90,7 +105,7 @@ jobs:
       # app's "What's new".
       - name: Release notes
         run: |
-          git fetch --no-tags --depth=1 origin "+refs/tags/$TAG:refs/tags/$TAG"
+          git fetch --no-tags origin "+refs/tags/$TAG:refs/tags/$TAG"
           git tag -l --format='%(contents:subject)%0a%0a%(contents:body)' "$TAG" > notes.txt
           cat notes.txt
 
