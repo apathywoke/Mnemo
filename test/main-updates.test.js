@@ -111,7 +111,7 @@ async function loadMain(t) {
   const originalLoad = Module._load;
   Module._load = function loadWithStubs(request, parent, isMain) {
     if (request === "electron") return electronStub;
-    if (request === "./updater" && parent?.filename?.endsWith(`${path.sep}main.js`)) return { Updater: FakeUpdater };
+    if (request === "./src/main/updater" && parent?.filename?.endsWith(`${path.sep}main.js`)) return { Updater: FakeUpdater };
     return originalLoad.call(this, request, parent, isMain);
   };
   const mainPath = require.resolve("../main");

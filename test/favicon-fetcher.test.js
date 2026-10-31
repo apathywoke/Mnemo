@@ -27,7 +27,7 @@ Module._load = function loadWithElectronStub(request, parent, isMain) {
   if (request === "electron") return { nativeImage };
   return originalModuleLoad.call(this, request, parent, isMain);
 };
-const { fetchSiteFavicon, getFaviconHost } = require("../favicon-fetcher");
+const { fetchSiteFavicon, getFaviconHost } = require("../src/main/favicon-fetcher");
 Module._load = originalModuleLoad;
 
 function makeResponse(statusCode, contentType, body = Buffer.alloc(0), location = null) {

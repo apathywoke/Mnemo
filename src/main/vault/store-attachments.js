@@ -6,7 +6,7 @@ const {
   randomUUID,
   randomBytes,
 } = require("node:crypto");
-const { readContainerFile } = require("../../../backup-file");
+const { readContainerFile } = require("../backup-file");
 const VaultStore = require("./store");
 const {
   KEY_BYTES,

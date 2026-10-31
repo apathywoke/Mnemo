@@ -6,7 +6,7 @@ const test = require("node:test");
 const {
   parseCsv,
   parseImportFile,
-} = require("../importers");
+} = require("../src/main/importers");
 const { makeTempDirectory } = require("../support/helpers");
 
 function makeZip(entries) {

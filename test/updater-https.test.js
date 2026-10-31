@@ -6,7 +6,7 @@ const https = require("node:https");
 const path = require("node:path");
 const { Readable } = require("node:stream");
 const test = require("node:test");
-const { httpsGet } = require("../updater");
+const { httpsGet } = require("../src/main/updater");
 const { makeTempDirectory } = require("../support/helpers");
 
 const BASE = "https://github.com/apathywoke/Mnemo/releases/download/v1.0.0";

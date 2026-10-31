@@ -4,7 +4,7 @@ const { createHash, generateKeyPairSync } = require("node:crypto");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const test = require("node:test");
-const { loadTrustedKeys, verifyManifest } = require("../updater");
+const { loadTrustedKeys, verifyManifest } = require("../src/main/updater");
 const { makeTempDirectory } = require("../support/helpers");
 
 const ROOT = path.join(__dirname, "..");
@@ -14,10 +14,11 @@ const ROOT = path.join(__dirname, "..");
 async function makeRepo(t, { version = "0.2.0" } = {}) {
   const root = await makeTempDirectory(t, "mnemo-manifest-");
   await fs.mkdir(path.join(root, "scripts"));
+  await fs.mkdir(path.join(root, "src", "main"), { recursive: true });
   await fs.mkdir(path.join(root, "build", "update-keys"), { recursive: true });
   await fs.mkdir(path.join(root, "release"));
   await fs.copyFile(path.join(ROOT, "scripts", "make-update-manifest.js"), path.join(root, "scripts", "make-update-manifest.js"));
-  await fs.copyFile(path.join(ROOT, "updater.js"), path.join(root, "updater.js"));
+  await fs.copyFile(path.join(ROOT, "src", "main", "updater.js"), path.join(root, "src", "main", "updater.js"));
   await fs.writeFile(path.join(root, "package.json"), JSON.stringify({ version }));
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   await fs.writeFile(path.join(root, "build", "update-keys", "test.pem"), publicKey.export({ type: "spki", format: "pem" }));

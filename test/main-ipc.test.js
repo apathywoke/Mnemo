@@ -108,7 +108,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   // The real updater, kept offline: if the automatic check runs (20 s after
   // launch, reached on a slow or busy machine), it finds no release instead
   // of contacting GitHub.
-  const { Updater: RealUpdater } = require("../updater");
+  const { Updater: RealUpdater } = require("../src/main/updater");
   class OfflineUpdater extends RealUpdater {
     constructor(options) {
       super({
@@ -123,7 +123,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   // since safeStorage elsewhere may use a weak backend). The stub Electron
   // offers Touch ID, so the test runs as on a Mac on any host, without
   // changing process.platform for the rest of main.
-  const RealBiometricUnlock = require("../biometric-unlock");
+  const RealBiometricUnlock = require("../src/main/biometric-unlock");
   class MacBiometricUnlock extends RealBiometricUnlock {
     constructor(directory, options) {
       super(directory, { ...options, platform: "darwin" });
@@ -136,10 +136,10 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   const originalLoad = Module._load;
   Module._load = function loadWithElectronStub(request, parent, isMain) {
     if (request === "electron") return electronStub;
-    if (request === "./updater" && parent?.filename?.endsWith(`${path.sep}main.js`)) {
+    if (request === "./src/main/updater" && parent?.filename?.endsWith(`${path.sep}main.js`)) {
       return { Updater: OfflineUpdater };
     }
-    if (request === "./biometric-unlock" && parent?.filename?.endsWith(`${path.sep}main.js`)) {
+    if (request === "./src/main/biometric-unlock" && parent?.filename?.endsWith(`${path.sep}main.js`)) {
       return MacBiometricUnlock;
     }
     return originalLoad.call(this, request, parent, isMain);

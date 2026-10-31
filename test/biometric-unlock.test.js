@@ -3,7 +3,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { randomBytes } = require("node:crypto");
 const test = require("node:test");
-const BiometricUnlock = require("../biometric-unlock");
+const BiometricUnlock = require("../src/main/biometric-unlock");
 const { makeTempDirectory } = require("../support/helpers");
 
 // Stand-ins for Electron's safeStorage (Keychain-backed) and Touch ID prompt.

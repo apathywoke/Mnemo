@@ -145,6 +145,67 @@ test("only ad-hoc builds may disable library validation", async () => {
   assert.throws(() => resolveMode({ env: { MNEMO_VERIFY_MODE: "adhoc" } }), /Unknown verification mode/);
 });
 
+// Files under a folder, as paths relative to the repository root.
+async function listFiles(root, folder) {
+  const entries = await fs.readdir(path.join(root, folder), { withFileTypes: true });
+  const nested = await Promise.all(entries.map((entry) => {
+    const relative = `${folder}/${entry.name}`;
+    return entry.isDirectory() ? listFiles(root, relative) : [relative];
+  }));
+  return nested.flat();
+}
+
+// Paths that only `npm start` uses; packaged builds do not need them.
+const DEVELOPMENT_ONLY_PATHS = new Set([
+  // The Dock icon for the stock Electron.app; a packaged app has its own.
+  "build/icon.png",
+]);
+
+// Paths built from __dirname are relative to the file's folder, which is the
+// same in the repository and inside app.asar (main.js's folder is the app
+// root in both). So each one must exist here and, for code that ships, match
+// `files`, or the packaged app would look in the wrong place. Moving a file
+// to another folder breaks one of these checks.
+test("every path built from __dirname exists, and is packaged when the code ships", async () => {
+  const root = path.join(__dirname, "..");
+  const shipped = ["main.js", "preload.js", ...(await listFiles(root, "src/main"))].filter((file) => file.endsWith(".js"));
+  const scripts = (await listFiles(root, "scripts")).filter((file) => file.endsWith(".js"));
+  const patterns = packagedPatterns();
+  const literals = (args) => Array.from(args.matchAll(/"([^"]*)"/g), ([, part]) => part);
+  const found = [];
+  for (const file of [...shipped, ...scripts]) {
+    const source = await fs.readFile(path.join(root, file), "utf8");
+    const folder = path.dirname(path.join(root, file));
+    // const NAME = path.join(__dirname, ...) can be used as a base later.
+    const bases = new Map([["__dirname", folder]]);
+    for (const [, name, args] of source.matchAll(/const ([A-Z_]+) = path\.join\(__dirname((?:, "[^"]*")*)\);/g)) {
+      bases.set(name, path.join(folder, ...literals(args)));
+    }
+    let checked = 0;
+    for (const [, base, args] of source.matchAll(/path\.join\((__dirname|[A-Z_]+)((?:, "[^"]*")+)\)/g)) {
+      if (!bases.has(base)) continue;
+      if (base === "__dirname") checked += 1;
+      found.push({ file, target: path.join(bases.get(base), ...literals(args)), ships: shipped.includes(file) });
+    }
+    assert.equal((source.match(/__dirname/g) ?? []).length, checked, `${file} uses __dirname in a form this test does not check`);
+  }
+
+  for (const { file, target, ships } of found) {
+    const relative = path.relative(root, target).split(path.sep).join("/");
+    const stats = await fs.stat(target).catch(() => null);
+    assert.ok(stats, `${file}: ${relative} does not exist`);
+    if (!ships || relative === "" || DEVELOPMENT_ONLY_PATHS.has(relative)) continue;
+    const packaged = stats.isDirectory()
+      ? (await fs.readdir(target)).some((name) => patterns.some((pattern) => pattern.test(`${relative}/${name}`)))
+      : patterns.some((pattern) => pattern.test(relative));
+    assert.ok(packaged, `${file}: ${relative} is not in files`);
+  }
+  const targets = found.map(({ target }) => path.relative(root, target).split(path.sep).join("/"));
+  for (const expected of ["build/update-keys", "index.html", "preload.js"]) {
+    assert.ok(targets.includes(expected), `${expected} not found among ${targets.join(", ")}`);
+  }
+});
+
 test("release builds ship only Ed25519 public update keys", async () => {
   const directory = path.join(__dirname, "..", "build", "update-keys");
   const names = (await fs.readdir(directory)).filter((name) => name.endsWith(".pem"));
@@ -187,7 +248,7 @@ test("release builds include every module that main and preload require", async 
   }
   const missing = [...seen].filter((file) => !patterns.some((pattern) => pattern.test(file)));
   assert.deepEqual(missing, []);
-  assert.ok(seen.has("backup-file.js") && seen.has("vault-store.js"));
+  assert.ok(seen.has("src/main/backup-file.js") && seen.has("vault-store.js"));
 });
 
 

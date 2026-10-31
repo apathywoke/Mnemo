@@ -9,10 +9,10 @@ const {
   session,
   systemPreferences,
 } = electron;
-const ProfileManager = require("./profile-manager");
-const SettingsStore = require("./settings-store");
-const BiometricUnlock = require("./biometric-unlock");
-const { Updater } = require("./updater");
+const ProfileManager = require("./src/main/profile-manager");
+const SettingsStore = require("./src/main/settings-store");
+const BiometricUnlock = require("./src/main/biometric-unlock");
+const { Updater } = require("./src/main/updater");
 const i18nCatalog = require("./src/renderer/shared/i18n/messages");
 const { createTranslator } = require("./src/renderer/shared/i18n/translate");
 const VaultStore = require("./vault-store");

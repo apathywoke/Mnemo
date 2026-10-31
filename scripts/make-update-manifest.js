@@ -25,7 +25,7 @@ const {
   loadTrustedKeys,
   parseVersion,
   verifyManifest,
-} = require("../updater");
+} = require("../src/main/updater");
 
 const ARCHES = ["arm64", "x64"];
 const KEYS_DIRECTORY = path.join(__dirname, "..", "build", "update-keys");
