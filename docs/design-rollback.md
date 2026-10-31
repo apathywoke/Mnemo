@@ -1,7 +1,7 @@
 # Design: detecting vault rollback
 
-Status: proposal for review (stage 3, task 8). Nothing here is implemented.
-The decisions that need approval are listed in section 12.
+Status: approved plan (stage 3, task 8), not implemented. The owner
+approved the decisions in section 12 as recommended on 2026-10-31.
 
 ## 1. The problem
 
@@ -243,7 +243,12 @@ backup then do not trip each other's checks.
     - restoring without the confirmation;
     - not raising the revision after a confirmed older copy.
 
-## 12. Decisions for approval
+## 12. Decisions (approved as recommended, 2026-10-31)
+
+Approved choices: R1 option A, the key inside the vault; R2 the same
+schema 4 as task 7; R3 an older copy opens after an explicit choice; R4 a
+confirmation prompt when the record is missing; R5 the Keychain item as a
+follow-up; R6 the remaining risk is accepted and recorded in THREAT_MODEL.
 
 - **R1. Integrity of the record:** a key inside the vault (A,
   recommended), safeStorage (B), or later a Keychain item (C, follow-up).
