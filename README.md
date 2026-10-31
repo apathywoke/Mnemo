@@ -64,6 +64,9 @@ registers the IPC handlers from `src/main/ipc/`, one file per feature. The
 vault store is in `src/main/vault/`: `store.js` holds the file lifecycle, the
 `store-*.js` files add feature methods, and the other files hold the file
 format, crypto, and validation; `vault-store.js` only re-exports it.
+`src/shared/` holds code that both processes load: `password-tools.js`, the
+password strength estimate that the renderer shows and the main process
+enforces for new master passphrases.
 
 ## Current security boundary
 

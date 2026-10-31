@@ -51,6 +51,7 @@ module.exports = {
     "styles.css",
     "src/main/**/*.js",
     "src/renderer/**/*.js",
+    "src/shared/**/*.js",
   ],
   electronFuses,
   // Fail the build instead of producing an unsigned app.

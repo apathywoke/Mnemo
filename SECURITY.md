@@ -21,7 +21,7 @@ passwords until the design has received independent security review.
 - A master passphrase that is being set (a new vault, recovery with the
   recovery key, restoring a backup with the recovery key) must be at least
   12 characters (counted in code points) and rated Strong by
-  `estimatePasswordStrength` (`src/renderer/shared/lib/password-tools.js`),
+  `estimatePasswordStrength` (`src/shared/password-tools.js`),
   checked in the main process; the forms show the same estimate while
   typing. The estimate counts letters and digits of any script, so a long
   phrase in Cyrillic rates like one in Latin letters. It is a heuristic,

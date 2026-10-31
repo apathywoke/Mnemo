@@ -4,7 +4,7 @@ const {
   estimateGeneratedPasswordStrength,
   estimatePasswordStrength,
   generatePassword,
-} = require("../password-tools");
+} = require("../src/shared/password-tools");
 
 test("password generation honors length and enabled character groups", () => {
   const password = generatePassword(32, {

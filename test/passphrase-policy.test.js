@@ -3,7 +3,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const test = require("node:test");
 const VaultStore = require("../vault-store");
-const { estimatePasswordStrength } = require("../password-tools");
+const { estimatePasswordStrength } = require("../src/shared/password-tools");
 const { makeLogin, makeTempDirectory } = require("../support/helpers");
 
 const STRONG = "correct horse battery staple";
