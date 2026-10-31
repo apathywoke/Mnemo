@@ -187,6 +187,10 @@ backup then do not trip each other's checks.
   detected. This needs an attacker with the user's file access who copied
   both earlier, or a restore of the whole user data folder. Option C would
   close it.
+
+  **This is an accepted risk (decision R6).** When the code lands,
+  THREAT_MODEL records it as such in the A4 row's residual risk and in
+  section 7, item 4, with option C as the way to close it.
 - **Deleting the record** turns the next open into a prompt. A user who
   chooses "Open" on an older copy accepts it; the prompt shows when the copy
   was saved, to help that choice.
@@ -252,6 +256,9 @@ backup then do not trip each other's checks.
   (recommended), or silently starting over.
 - **R5.** Keep the Keychain item (C) as a follow-up together with the native
   helper for Touch ID binding.
+- **R6. The remaining risk is accepted.** Old copies of both the vault and
+  its record, put back together, are not detected (section 10). THREAT_MODEL
+  states it as an accepted risk, not as an open gap.
 
 ## 13. Work plan
 
@@ -261,6 +268,10 @@ backup then do not trip each other's checks.
    - vault keys, the record store, the check on open, the prompts (en/de/ru),
      and the restore paths;
    - tests 1–12;
-   - SECURITY.md, and THREAT_MODEL (A4 row; section 7, item 4; review
-     finding 9).
+   - SECURITY.md;
+   - THREAT_MODEL:
+     - the A4 row: rollback is detected, and putting back both files is an
+       accepted risk;
+     - section 7, item 4, with the same accepted risk and option C;
+     - review finding 9.
 3. **Follow-up:** option C.
