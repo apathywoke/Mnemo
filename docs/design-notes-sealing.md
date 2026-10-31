@@ -205,9 +205,12 @@ call at a time, exactly as today.
 
   Going back from N+1 to N then gives the right message; versions before N
   still give the old one.
+- **Release N is 0.2.0** (PR #25).
 - **No automatic way back.** N+1 never writes schema 3. A user who must
   return to an older version can restore a backup made before the migration
-  (backups keep their schema) and loses the changes made since.
+  (backups keep their schema) and loses the changes made since. N+1's tag
+  message must say this plainly; `docs/RELEASING.md` ("Releases that change
+  the vault format") has the text.
 - **A failed migrating save** leaves the schema 3 file as it was (atomic
   write), and the next save tries again.
 - **Restoring an older backup into N+1:**
@@ -282,6 +285,8 @@ Rollback:
   - section 7, item 2: "Partly done" with D3a, "Done" with D3b;
   - a section 9 trigger for format changes.
 - **CLAUDE.md:** schema 4 and the AAD list.
+- **Already recorded** in THREAT_MODEL section 7: the accepted risks
+  (identity details stay plain; schema 3 note strings during the upgrade).
 
 ## 12. Decisions (approved as recommended, 2026-10-31)
 
@@ -310,5 +315,6 @@ in this change, with D3b as a follow-up; D4 two releases.
 2. **PR for release N+1, schema 4:**
    - helpers, migration, history, rekeying, import, and validation;
    - tests 1–10, 12, and 13;
-   - the documentation changes.
+   - the documentation changes;
+   - the tag message from `docs/RELEASING.md`.
 3. **Optional PR:** D3b.

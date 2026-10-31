@@ -4,13 +4,14 @@ Status: draft for the prototype, written alongside the Electron hardening
 work (fuses, metadata-only renderer, signing and notarization). Review it
 again whenever a trigger at the end of this document applies. Updated
 2026-10-28 for in-app updates (B6, A8) and 2026-10-31 for the favicon
-decoder process (B7, A2).
+decoder process (B7, A2) and for the risks accepted with the notes and
+rollback designs (section 7, items 2–4).
 
 ## 1. What Mnemo protects
 
 | Asset | Where it lives | Notes |
 | --- | --- | --- |
-| Card numbers, security codes, PINs, document numbers, SSH private keys | Vault file (encrypted, then sealed per item and field); main-process memory while unlocked; clipboard after a copy | Same protection as passwords; never sent to the renderer. Secure note text and identity details are not sealed separately and reach the renderer when the item is opened. |
+| Card numbers, security codes, PINs, document numbers, SSH private keys | Vault file (encrypted, then sealed per item and field); main-process memory while unlocked; clipboard after a copy | Same protection as passwords; never sent to the renderer. Secure note text and identity details are not sealed separately and reach the renderer when the item is opened. Identity details stay so by decision (section 7, item 2). |
 | One-time code (TOTP) secrets | Vault file (encrypted, then sealed per entry); main-process memory while unlocked | Same protection as passwords; only current codes reach the renderer. |
 | Entry passwords | Vault file (encrypted, then sealed per entry); main-process memory while unlocked; clipboard for up to 30 s after a copy | Highest value. |
 | Other entry fields: name, username, website, notes, site icon | Vault file (encrypted); main-process memory while unlocked; renderer memory and DOM for the visible list or selected entry | Usernames and websites reveal which accounts exist. |
@@ -219,13 +220,27 @@ must not be used with real vaults on a shared machine.
    by `protocol.handle` with a path traversal check, and
    `GrantFileProtocolExtraPrivileges` is off.
 2. **Notes are not sealed per entry.** They are decrypted with the vault index
-   and can be read by a compromised renderer one entry at a time. Seal them like
-   passwords if notes are expected to hold secrets.
+   and can be read by a compromised renderer one entry at a time.
+   - **Planned** in `docs/design-notes-sealing.md` (approved, not
+     implemented): schema 4 seals each note, and a secure note's text, per
+     entry. A reveal gated on real user input is a follow-up.
+   - **Accepted:** identity details (name, email, phone, address, birth date)
+     stay plain fields (decision D2); name and email are list and search
+     metadata.
 3. **Memory hygiene.** JavaScript strings (the passphrase in the renderer,
    decrypted passwords during copy, schema 1 vaults during upgrade) cannot be
    zeroized.
+   - **Accepted** for the planned schema 4 too: the plain notes parsed from
+     schema 3 data during the upgrade stay in memory until garbage collection.
+   - Once the vault is saved as schema 4, unlocking no longer creates them.
 4. **Rollback.** Replacing a vault with an older encrypted copy is not
    detected.
+   - **Planned** in `docs/design-rollback.md` (approved, not implemented): a
+     revision counter inside the vault, and a record per profile outside it,
+     authenticated with a key from the vault.
+   - **Accepted:** putting back old copies of both the vault and its record
+     together will still go undetected (decision R6). A Keychain item updated
+     in place would close this.
 5. **Profile deletion from the profile list** (vault locked) is confirmed
    only in the renderer; add a native confirmation there too.
 6. **Favicon decoding.** **Partly done.** Images are decoded in a separate
