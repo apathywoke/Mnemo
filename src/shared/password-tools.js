@@ -120,11 +120,32 @@
     /[^\p{L}\p{N}]/u,
   ];
 
+  // Smallest p such that the string repeats itself every p characters,
+  // from the KMP prefix function: 3 for "abcabcab", the length for "abcd".
+  function smallestPeriod(characters) {
+    const prefix = new Array(characters.length).fill(0);
+    for (let index = 1; index < characters.length; index += 1) {
+      let matched = prefix[index - 1];
+      while (matched > 0 && characters[index] !== characters[matched]) matched = prefix[matched - 1];
+      if (characters[index] === characters[matched]) matched += 1;
+      prefix[index] = matched;
+    }
+    return characters.length - prefix[characters.length - 1];
+  }
+
+  // Below this many different characters a password is weak at any length.
+  const MIN_DISTINCT_CHARACTERS = 8;
+
   function estimatePasswordStrength(password) {
     if (!password) return { level: "empty", value: 0, label: "Enter a password" };
 
     // Length in code points, so "пароль" or an emoji counts as typed.
-    const length = Array.from(password).length;
+    const characters = Array.from(password);
+    // One block repeated ("Ab1!Ab1!Ab1!") is only as long as the block, and
+    // is weak however often it repeats.
+    const period = smallestPeriod(characters);
+    const repeated = period <= characters.length / 2;
+    const length = repeated ? period : characters.length;
     let score = 0;
     if (length >= 8) score += 1;
     if (length >= 12) score += 1;
@@ -141,6 +162,9 @@
     if (/(.)\1{2,}/u.test(password)) score -= 2;
     if (hasObviousSequence(password)) score -= 2;
 
+    if (repeated || new Set(characters).size < MIN_DISTINCT_CHARACTERS) {
+      return { level: "weak", value: 1, label: "Weak" };
+    }
     if (score >= 5) return { level: "strong", value: 3, label: "Strong" };
     if (score >= 3) return { level: "fair", value: 2, label: "Fair" };
     return { level: "weak", value: 1, label: "Weak" };

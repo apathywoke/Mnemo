@@ -18,15 +18,18 @@ passwords until the design has received independent security review.
   reports.
 - The master passphrase is not persisted. Node's asynchronous scrypt derives a
   wrapping key using a fresh 16-byte salt and parameters N=2^17, r=8, p=1.
-- A master passphrase that is being set (a new vault, recovery with the
-  recovery key, restoring a backup with the recovery key) must be at least
-  12 characters (counted in code points) and rated Strong by
-  `estimatePasswordStrength` (`src/shared/password-tools.js`),
+- A master passphrase that is being set (a new vault, a change in Settings,
+  recovery with the recovery key, restoring a backup with the recovery key)
+  must be at least 12 characters (counted in code points) and rated Strong
+  by `estimatePasswordStrength` (`src/shared/password-tools.js`),
   checked in the main process; the forms show the same estimate while
   typing. The estimate counts letters and digits of any script, so a long
-  phrase in Cyrillic rates like one in Latin letters. It is a heuristic,
-  not a measure of entropy: it knows a few common words and keyboard runs
-  but no dictionary. Existing vaults with a passphrase of 7 or more
+  phrase in Cyrillic rates like one in Latin letters. One block repeated
+  (`Ab1!Ab1!Ab1!`: the smallest period, from the KMP prefix function, is at
+  most half the length) and anything with fewer than 8 different
+  characters is rated Weak at any length. It is a heuristic, not a measure
+  of entropy: it knows a few common words and keyboard runs but no
+  dictionary. Existing vaults with a passphrase of 7 or more
   characters keep opening; the stricter rule applies only when a passphrase
   is set.
 - A random 256-bit vault key is wrapped with AES-256-GCM; vault data is
