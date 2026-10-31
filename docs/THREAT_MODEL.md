@@ -70,8 +70,8 @@ decoder process (B7, A2).
   release notes, and progress, and can only ask main to check, download,
   install, or open the release page.
 - **B7, main → favicon decoder.** Every downloaded icon is decoded in a new
-  `utilityProcess` running plain JavaScript PNG and ICO decoders. It gets an
-  exact copy of the image bytes and an environment without main's
+  `utilityProcess` running plain JavaScript PNG, JPEG, and ICO decoders. It
+  gets an exact copy of the image bytes and an environment without main's
   variables, holds no vault data, and is killed after its reply or after 5
   seconds. Main treats its reply as untrusted: it accepts only RGBA pixels
   whose count matches the expected icon size and encodes the stored PNG
@@ -122,7 +122,7 @@ decoder process (B7, A2).
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
 | SSRF to the local network or loopback | Public HTTPS hosts only; DNS resolved and a public IPv4 address pinned; redirects only to the same host or its `www` variant, at most three | IPv6-only sites cannot provide icons. |
-| Image-parser exploit or decompression bomb | Response size limit (512 KB). Images are decoded outside main, in a new `utilityProcess` per image (B7), by plain JavaScript PNG and ICO decoders: no native image codec parses website data, and JPEG and other formats are skipped. Dimensions are checked before decoding; inflated data is capped near the size the header declares; a hang is killed after 5 seconds, and a crash fails only that fetch. Main accepts only RGBA pixels of the expected icon size and encodes the PNG itself; the vault validates it again | The decoder process is not in Chromium's sandbox: an image that took it over would run with the user's rights (the vault files are encrypted, the key is not there). The decoders are memory-safe JavaScript, so this needs a bug in V8 or in Node's zlib. |
+| Image-parser exploit or decompression bomb | Response size limit (512 KB). Images are decoded outside main, in a new `utilityProcess` per image (B7), by plain JavaScript PNG, sequential JPEG, and ICO decoders: no native image codec parses website data, and progressive JPEG and other formats are skipped. Dimensions are checked before decoding; inflated data is capped near the size the header declares; a hang is killed after 5 seconds, and a crash fails only that fetch. Main accepts only RGBA pixels of the expected icon size and encodes the PNG itself; the vault validates it again | The decoder process is not in Chromium's sandbox: an image that took it over would run with the user's rights (the vault files are encrypted, the key is not there). The decoders are memory-safe JavaScript, so this needs a bug in V8 or in Node's zlib. |
 | Tracking | Requires an explicit click with a confirmation dialog; no cookies or referrer; no third-party favicon service | The site learns the user's IP address and that the icon was requested. |
 
 ### A3, compromised renderer
@@ -272,7 +272,7 @@ found no Critical or High issues.
 | 4 | Low | Restore read the global vault after awaiting dialogs and ignored the lock epoch; profile deletion is confirmed only in the renderer | **Mostly fixed.** Restore binds to the vault and epoch at the start and aborts if either changes. Deleting the open vault from Settings needs its passphrase and a native confirmation. Deleting a locked profile from the profile list still relies on the renderer's type-the-name dialog. |
 | 5 | Low | DevTools available in packaged builds (self-XSS through the console) | **Fixed.** `devTools` is disabled when packaged. |
 | 6 | Low/Info | `file://` origin with `GrantFileProtocolExtraPrivileges` makes CSP `'self'` cover any local file | **Open.** See follow-up 1 in section 7. |
-| 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Fixed.** Images are decoded in a separate `utilityProcess` by plain JavaScript PNG and ICO decoders with a 5-second limit; main receives only pixels and encodes the PNG itself. That process is not sandboxed by Chromium (section 7, item 6). |
+| 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Fixed.** Images are decoded in a separate `utilityProcess` by plain JavaScript PNG, JPEG, and ICO decoders with a 5-second limit; main receives only pixels and encodes the PNG itself. That process is not sandboxed by Chromium (section 7, item 6). |
 | 8 | Info | Release verification checked entitlements only on the outer app | **Fixed.** Every nested `.app`/`.framework` is checked, and `app.asar.unpacked` is rejected. |
 | 9 | Info | Clipboard text is not marked concealed or transient; vault rollback is not detected; 7-character passphrase minimum | **Partly fixed.** New passphrases need 12 characters and a Strong rating (section 7, item 8). Clipboard and rollback are still open; concealed clipboard types need a small native helper. |
 

@@ -20,7 +20,7 @@ Module._load = originalLoad;
 const { MAX_IMAGE_BYTES, decodePng, prepareFaviconImage, readPngSize } = require("../src/main/favicon-image");
 
 const DECODER_PATH = path.join(__dirname, "..", "src", "main", "favicon-decoder-process.js");
-const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
+const GIF = Buffer.from("GIF89a\x01\x00\x01\x00\x00\x00\x00", "latin1");
 
 function validReply(width = 16, height = 16) {
   const { icon } = prepareFaviconImage(makePng(width, height));
@@ -66,7 +66,7 @@ test("each image is converted in a new process that gets the image and nothing e
 
 test("an image the decoder cannot use resolves to null", async () => {
   const processes = createUtilityProcessStub();
-  assert.equal(await decodeFavicon(JPEG, { fork: processes.fork }), null);
+  assert.equal(await decodeFavicon(GIF, { fork: processes.fork }), null);
   assert.equal(processes.forks[0].killed, true);
 });
 

@@ -4,8 +4,10 @@ const Module = require("node:module");
 const test = require("node:test");
 const dns = require("node:dns/promises");
 const https = require("node:https");
+const { encodeJpeg } = require("../support/jpeg");
 const { makePng } = require("../support/png");
 const { createUtilityProcessStub } = require("../support/utility-process");
+const { decodePng } = require("../src/main/favicon-image");
 
 // Images are decoded by the real decoder entry, run in this process by the
 // utilityProcess stand-in; a test can swap in another fork.
@@ -231,14 +233,15 @@ test("cross-domain redirects and SVG-only sites are rejected safely", async (t) 
   await assert.rejects(fetchSiteFavicon("https://example.com"), /may only provide SVG/);
 });
 
-test("JPEG icons are skipped and are not asked for", async (t) => {
-  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
-  const html = '<html><head><link rel="icon" sizes="192x192" href="/icon.jpg"><link rel="icon" sizes="64x64" href="/icon.png"></head></html>';
+test("JPEG icons are decoded and progressive ones are skipped", async (t) => {
+  const color = () => [30, 120, 200];
+  const html = '<html><head><link rel="icon" sizes="192x192" href="/progressive.jpg"><link rel="icon" sizes="64x64" href="/icon.jpg"></head></html>';
   const requested = installNetworkStubs(t, {
     route: ({ path: requestPath }) => {
-      if (requestPath === "/favicon.ico" || requestPath === "/icon.jpg") return makeResponse(200, "image/jpeg", jpeg);
+      if (requestPath === "/favicon.ico") return makeResponse(200, "image/jpeg", encodeJpeg({ width: 48, height: 48, sample: color }));
+      if (requestPath === "/progressive.jpg") return makeResponse(200, "image/jpeg", encodeJpeg({ width: 192, height: 192, sample: color, frameMarker: 0xc2 }));
+      if (requestPath === "/icon.jpg") return makeResponse(200, "image/jpeg", encodeJpeg({ width: 64, height: 64, sample: color, sampling: [[2, 2], [1, 1], [1, 1]] }));
       if (requestPath === "/") return makeResponse(200, "text/html", html);
-      if (requestPath === "/icon.png") return pngResponse(64, 64);
       return makeResponse(404, "text/html");
     },
   });
@@ -246,9 +249,12 @@ test("JPEG icons are skipped and are not asked for", async (t) => {
 
   const favicon = await fetchSiteFavicon("https://example.com");
   assert.deepEqual(pngDimensions(favicon.dataUrl), { width: 64, height: 64 });
-  assert.equal(requested.some(({ path: requestPath }) => requestPath === "/icon.jpg"), true);
+  const icon = decodePng(Buffer.from(favicon.dataUrl.slice("data:image/png;base64,".length), "base64"));
+  const pixel = [...icon.pixels.subarray(0, 4)];
+  assert.ok(pixel.every((value, channel) => Math.abs(value - [30, 120, 200, 255][channel]) <= 3), String(pixel));
+  assert.equal(requested.some(({ path: requestPath }) => requestPath === "/progressive.jpg"), true);
   for (const { accept } of requested.filter(({ path: requestPath }) => requestPath !== "/")) {
-    assert.doesNotMatch(accept, /jpeg/);
+    assert.match(accept, /image\/jpeg/);
   }
   // One decoder process per downloaded image, each killed afterwards.
   const forks = decoderProcesses.forks.slice(forksBefore);
