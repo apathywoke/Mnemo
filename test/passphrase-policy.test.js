@@ -3,7 +3,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const test = require("node:test");
 const VaultStore = require("../vault-store");
-const { estimatePasswordStrength } = require("../password-tools");
+const { estimatePasswordStrength } = require("../src/shared/password-tools");
 const { makeLogin, makeTempDirectory } = require("../support/helpers");
 
 const STRONG = "correct horse battery staple";
@@ -12,6 +12,9 @@ const CYRILLIC = "мой длинный пароль для сейфа";
 // and one login. It was created with the regular API; nothing bypasses the
 // policy to make it.
 const FIXTURE = path.join(__dirname, "fixtures", "seven-character-passphrase.vault");
+// A vault made before repeated blocks were rated weak, with the passphrase
+// "Ab1!Ab1!Ab1!" and one login, also with the regular API.
+const REPEATED_FIXTURE = path.join(__dirname, "fixtures", "repeated-passphrase.vault");
 
 async function storeIn(t, name = "policy.vault") {
   const directory = await makeTempDirectory(t);
@@ -85,6 +88,25 @@ test("a vault with an old 7-character passphrase still opens and works", async (
   await assert.rejects(store.recoverWithKey(recoveryKey, "seven88"), /at least 12 characters/);
   await store.recoverWithKey(recoveryKey, STRONG);
   store.lock();
+  await store.unlock(STRONG);
+  assert.equal(store.listEntries().length, 1);
+});
+
+test("a new passphrase cannot repeat one block; a vault that has one still opens", async (t) => {
+  const { store: fresh } = await storeIn(t, "fresh.vault");
+  for (const passphrase of ["Ab1!Ab1!Ab1!", "Mnemo-Mnemo-Mnemo", "Aa1!Aa1!aA1!"]) {
+    await assert.rejects(fresh.create(passphrase), /too easy to guess/, passphrase);
+  }
+
+  const { store } = await storeIn(t);
+  await fs.copyFile(REPEATED_FIXTURE, store.filePath);
+  await store.unlock("Ab1!Ab1!Ab1!");
+  assert.deepEqual(store.listEntries().map((entry) => entry.name), ["Old login"]);
+  assert.equal(store.revealPassword(store.listEntries()[0].id), "old-password");
+  await assert.rejects(store.changePassphrase("Ab1!Ab1!Ab1!", "Mnemo-Mnemo-Mnemo"), /too easy to guess/);
+  await store.changePassphrase("Ab1!Ab1!Ab1!", STRONG);
+  store.lock();
+  await assert.rejects(store.unlock("Ab1!Ab1!Ab1!"), /Could not open the vault/);
   await store.unlock(STRONG);
   assert.equal(store.listEntries().length, 1);
 });

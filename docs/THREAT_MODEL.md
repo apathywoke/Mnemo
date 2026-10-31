@@ -3,7 +3,8 @@
 Status: draft for the prototype, written alongside the Electron hardening
 work (fuses, metadata-only renderer, signing and notarization). Review it
 again whenever a trigger at the end of this document applies. Updated
-2026-10-28 for in-app updates (B6, A8).
+2026-10-28 for in-app updates (B6, A8) and 2026-10-31 for the favicon
+decoder process (B7, A2).
 
 ## 1. What Mnemo protects
 
@@ -39,6 +40,7 @@ again whenever a trigger at the end of this document applies. Updated
  │    ── HTTPS (user-initiated only) ─── favicon; HIBP password ranges │  B4
  │    ── HTTPS (scheduled, can be off) ─ GitHub releases (updates)     │  B6
  │    ── native dialogs ──────────────── reveal password, file pickers │
+ │    ── utilityProcess (per image) ── favicon decoder, bytes → pixels │  B7
  └─────────────────────────────────────────────────────────────────────┘
    B5: GitHub Actions build → ad-hoc signature, hardened runtime → GitHub release → user's Mac
        (or: build machine → Developer ID signature → notarization)
@@ -46,9 +48,10 @@ again whenever a trigger at the end of this document applies. Updated
 
 - **B1, renderer → main.** The renderer is treated as compromisable (for
   example by a future XSS bug or a malicious vault value). Every IPC handler
-  checks that the sender is the app's own main frame loaded from the packaged
-  `index.html`, and validates its arguments. The renderer cannot ask for a
-  password in plain text: copy and reveal are performed by the main process.
+  checks that the sender is the app's own main frame loaded from
+  `app://mnemo/index.html`, and validates its arguments. The renderer cannot
+  ask for a password in plain text: copy and reveal are performed by the main
+  process.
 - **B2, main → disk.** Everything secret is encrypted before it is written.
   Writes are atomic (temp file plus rename) with restrictive permissions.
 - **B3, main → clipboard.** Leaves the app's control once written.
@@ -67,6 +70,13 @@ again whenever a trigger at the end of this document applies. Updated
   running app, not on TLS or GitHub. The renderer only sees the version,
   release notes, and progress, and can only ask main to check, download,
   install, or open the release page.
+- **B7, main → favicon decoder.** Every downloaded icon is decoded in a new
+  `utilityProcess` running plain JavaScript PNG and ICO decoders. It gets an
+  exact copy of the image bytes and an environment without main's
+  variables, holds no vault data, and is killed after its reply or after 5
+  seconds. Main treats its reply as untrusted: it accepts only RGBA pixels
+  whose count matches the expected icon size and encodes the stored PNG
+  itself. The process runs Node.js without Chromium's sandbox.
 
 ## 3. Assumptions
 
@@ -113,7 +123,7 @@ again whenever a trigger at the end of this document applies. Updated
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
 | SSRF to the local network or loopback | Public HTTPS hosts only; DNS resolved and a public IPv4 address pinned; redirects only to the same host or its `www` variant, at most three | IPv6-only sites cannot provide icons. |
-| Image-parser exploit or decompression bomb | Response size limits; dimensions checked before decoding; only PNG, JPEG, and limited ICO accepted; re-encoded to PNG; stored PNG revalidated | Relies on Electron's `nativeImage` decoders. |
+| Image-parser exploit or decompression bomb | Response size limit (512 KB). Images are decoded outside main, in a new `utilityProcess` per image (B7), by plain JavaScript PNG and ICO decoders: no native image codec parses website data, and JPEG and other formats are skipped. Dimensions are checked before decoding; inflated data is capped near the size the header declares; a hang is killed after 5 seconds, and a crash fails only that fetch. Main accepts only RGBA pixels of the expected icon size and encodes the PNG itself; the vault validates it again | The decoder process is not in Chromium's sandbox: an image that took it over would run with the user's rights (the vault files are encrypted, the key is not there). The decoders are memory-safe JavaScript, so this needs a bug in V8 or in Node's zlib. |
 | Tracking | Requires an explicit click with a confirmation dialog; no cookies or referrer; no third-party favicon service | The site learns the user's IP address and that the icon was requested. |
 
 ### A3, compromised renderer
@@ -128,7 +138,8 @@ again whenever a trigger at the end of this document applies. Updated
 | Read or mint a recovery key | The key is shown in the renderer once, by design. Creating a new key requires the current master passphrase in main | A compromised renderer during vault creation, recovery, or key creation sees the recovery key, which is equivalent to the passphrase it can already see. |
 | Exfiltrate what it can read (metadata, notes, passphrase) | CSP `connect-src 'none'`; `webRequest` cancels HTTP(S) and WebSocket; WebRTC removed from the page, UDP restricted, and the session proxied to a closed port; DevTools disabled in packaged builds | DNS prefetch or other Chromium side channels not covered here. |
 | Escape to Node.js or the filesystem | `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`; narrow preload; no `webview`; window opening and navigation denied; strict CSP (`script-src 'self'`, `connect-src 'none'`); remote requests cancelled | Depends on Chromium's sandbox. |
-| Spoof IPC from another frame | Handlers accept only the main frame whose URL is the packaged `index.html` | None known. |
+| Spoof IPC from another frame | Handlers accept only the main frame whose URL is `app://mnemo/index.html`; `file://` and other origins are refused | None known. |
+| Read local files through the page's origin | The page is served from `app://mnemo/`, not `file://`; `GrantFileProtocolExtraPrivileges` is off; the `app://` handler serves only HTML, JavaScript, and CSS files inside the app folder and rejects traversal (percent-encoded `..`, backslashes, NUL) after normalizing the path and checking its prefix | In development (`npm start`) the app folder is the repository, so any `.html`, `.js`, or `.css` file in it, including `node_modules`, can be read by the page. Packaged builds serve only what is in `app.asar`. |
 | Destroy data through trash, history, or attachments | Deleting moves items to the trash (restorable for 30 days); deleting for good, emptying the trash, and deleting an attachment need a native confirmation in main; restoring a version keeps the replaced content as a version | It can move items to the trash, change folders and favorites, and restore older versions without a click. |
 | Read attachments or plant files | Files are chosen and saved only through native open and save dialogs in main; the renderer never sends a path and never receives contents | It can open those dialogs, which the user must still complete. |
 | Use Reports to learn about passwords | Main returns entry IDs, breach counts, and weak/reused flags only; fingerprints use a per-unlock HMAC key and never leave main | The renderer learns which entries share a password, which are weak, and (after a check) which are breached. It can start a breach check without a click, which sends 5-character SHA-1 prefixes to Have I Been Pwned. |
@@ -182,6 +193,7 @@ must not be used with real vaults on a shared machine.
 | --- | --- | --- |
 | Network or GitHub serves a modified archive | The archive's SHA-512 and size must match the Ed25519-signed manifest; the unpacked app must have Mnemo's bundle ID, the signed version, and a valid code signature | None known without the private key. |
 | Attacker publishes a release from a stolen GitHub account or token | The release still needs a manifest signed by a bundled key; the key is not in the repository or on a developer machine | A stolen key plus a release is a full compromise of every auto-updating copy (see below). |
+| A `v*` tag on a commit that never reached `main` (a side branch, an unreviewed commit) is published | The publish job checks out the full history and stops unless the tag's commit is an ancestor of `origin/main`, before the key is used; tests run that check against a temporary repository | Done in the workflow. Anyone who can push to `main` and create a `v*` tag can still release. Required reviewers on the `release` environment, its `v*`-only tag rule, and a tag ruleset that lets only the owner create `v*` tags are GitHub settings the workflow cannot enforce; `docs/RELEASING.md` lists them for the owner. |
 | Downgrade to an older, vulnerable signed release | Only versions newer than the running one are offered; the release tag must equal the signed version | — |
 | Freeze: withholding updates by serving an old "latest" release or blocking GitHub | — | Not detected. The manifest has `releasedAt` but the app does not require freshness. The user can compare with the release page. |
 | Update key leak or misuse | Key held only in the `release` environment, used by a job that installs no npm packages; build job has no secrets; actions pinned to commit SHAs; the signing script refuses keys the app does not trust | Anyone with repository admin rights can read the environment's secrets through a workflow. Recovering from a leak needs a release signed with the leaked key that drops it, which the attacker can race. Protect the environment with tag rules and required reviewers. |
@@ -203,9 +215,9 @@ must not be used with real vaults on a shared machine.
 
 ## 7. Known residual risks and follow-ups
 
-1. **`file://` privileges.** `GrantFileProtocolExtraPrivileges` stays on because
-   `loadFile()` from `app.asar` fails without it. Move the UI to a custom
-   `app://` protocol (`protocol.handle`) and then turn the fuse off.
+1. **`file://` privileges.** **Done.** The UI is served from `app://mnemo/`
+   by `protocol.handle` with a path traversal check, and
+   `GrantFileProtocolExtraPrivileges` is off.
 2. **Notes are not sealed per entry.** They are decrypted with the vault index
    and can be read by a compromised renderer one entry at a time. Seal them like
    passwords if notes are expected to hold secrets.
@@ -216,19 +228,25 @@ must not be used with real vaults on a shared machine.
    detected.
 5. **Profile deletion from the profile list** (vault locked) is confirmed
    only in the renderer; add a native confirmation there too.
-6. **Favicon decoding** runs in the main process; move it to a sandboxed
-   process.
+6. **Favicon decoding.** **Partly done.** Images are decoded in a separate
+   `utilityProcess` by plain JavaScript decoders, and main receives only
+   pixels (B7). That process runs Node.js without Chromium's sandbox;
+   decoding in a sandboxed hidden renderer (`createImageBitmap`) would
+   confine it further.
 7. **Touch ID binding.** Replace the `safeStorage` backend with a Secure
    Enclave key whose access control requires biometry (current set), so the
    Keychain itself refuses to release the key without a fingerprint and the
    key is invalidated when fingerprints change. Needs a native module, the
    data protection keychain, and a provisioning profile.
-8. **Passphrase strength.** New passphrases need 12 characters and a Strong
-   rating from a simple heuristic (length, character classes of any script,
-   a few common words and runs). Consider a dictionary-based estimate (such
-   as zxcvbn, which would be a new dependency) or a word-count rule, a way
-   to change the passphrase without the recovery key so old 7-character
-   vaults can be upgraded, and raising scrypt cost or moving to Argon2id.
+8. **Passphrase strength.** Partly done. New passphrases need 12
+   characters and a Strong rating from a simple heuristic: length,
+   character classes of any script, a few common words and runs, and since
+   then repeats (one block repeated, by its smallest period, or fewer than 8
+   different characters is Weak). The passphrase can be changed in Settings
+   with the current one, so old 7-character vaults can be upgraded; they are
+   not forced to. Still open: a dictionary-based estimate (such as zxcvbn,
+   which would be a new dependency) or a word-count rule, and raising scrypt
+   cost or moving to Argon2id.
 9. **Developer ID.** GitHub releases are ad-hoc signed. With a Developer ID,
    sign and notarize in the release workflow, drop
    `build/entitlements.adhoc.plist` so library validation is back, check the
@@ -259,8 +277,8 @@ found no Critical or High issues.
 | 3 | Low | No permission check handler, so checks report "granted" | **Fixed.** Permission checks and device permissions are denied; clipboard reads verified to fail in the running app. |
 | 4 | Low | Restore read the global vault after awaiting dialogs and ignored the lock epoch; profile deletion is confirmed only in the renderer | **Mostly fixed.** Restore binds to the vault and epoch at the start and aborts if either changes. Deleting the open vault from Settings needs its passphrase and a native confirmation. Deleting a locked profile from the profile list still relies on the renderer's type-the-name dialog. |
 | 5 | Low | DevTools available in packaged builds (self-XSS through the console) | **Fixed.** `devTools` is disabled when packaged. |
-| 6 | Low/Info | `file://` origin with `GrantFileProtocolExtraPrivileges` makes CSP `'self'` cover any local file | **Open.** See follow-up 1 in section 7. |
-| 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Open.** Move decoding to a sandboxed `utilityProcess` or to the renderer. |
+| 6 | Low/Info | `file://` origin with `GrantFileProtocolExtraPrivileges` makes CSP `'self'` cover any local file | **Fixed.** The page is served from `app://mnemo/`, so `'self'` covers only that origin; the fuse is off. See follow-up 1 in section 7. |
+| 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Fixed.** Images are decoded in a separate `utilityProcess` by plain JavaScript PNG and ICO decoders with a 5-second limit; main receives only pixels and encodes the PNG itself. That process is not sandboxed by Chromium (section 7, item 6). |
 | 8 | Info | Release verification checked entitlements only on the outer app | **Fixed.** Every nested `.app`/`.framework` is checked, and `app.asar.unpacked` is rejected. |
 | 9 | Info | Clipboard text is not marked concealed or transient; vault rollback is not detected; 7-character passphrase minimum | **Partly fixed.** New passphrases need 12 characters and a Strong rating (section 7, item 8). Clipboard and rollback are still open; concealed clipboard types need a small native helper. |
 

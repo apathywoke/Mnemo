@@ -3,8 +3,8 @@
 const {
   randomUUID,
 } = require("node:crypto");
-const { generateTotp, parseTotpInput, toOtpauthUri } = require("../../../totp");
-const { describeSshKey } = require("../../../ssh-keys");
+const { generateTotp, parseTotpInput, toOtpauthUri } = require("../totp");
+const { describeSshKey } = require("../ssh-keys");
 const { VAULT_SCHEMA_VERSION, MAX_ENTRIES, UUID_PATTERN } = require("./constants");
 const {
   sealTotp,

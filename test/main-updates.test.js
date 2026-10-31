@@ -2,7 +2,6 @@ const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
 const Module = require("node:module");
 const path = require("node:path");
-const { pathToFileURL } = require("node:url");
 const test = require("node:test");
 const { makeTempDirectory } = require("../support/helpers");
 
@@ -81,7 +80,7 @@ async function loadMain(t) {
           isDestroyed: () => false,
           send: (...args) => sent.push(args),
         });
-        this.loadFile = () => Promise.resolve();
+        this.loadURL = () => Promise.resolve();
         this.show = () => {};
         this.isDestroyed = () => false;
         window = this;
@@ -94,6 +93,7 @@ async function loadMain(t) {
     dialog: { showMessageBox: async () => ({ response: 0 }), showOpenDialog: async () => ({ canceled: true }), showSaveDialog: async () => ({ canceled: true }) },
     ipcMain: { handle: (channel, handler) => handlers.set(channel, handler), on() {} },
     powerMonitor: new EventEmitter(),
+    protocol: { registerSchemesAsPrivileged() {}, handle() {} },
     nativeTheme: { themeSource: "system" },
     session: {
       defaultSession: {
@@ -111,7 +111,7 @@ async function loadMain(t) {
   const originalLoad = Module._load;
   Module._load = function loadWithStubs(request, parent, isMain) {
     if (request === "electron") return electronStub;
-    if (request === "./updater" && parent?.filename?.endsWith(`${path.sep}main.js`)) return { Updater: FakeUpdater };
+    if (request === "./src/main/updater" && parent?.filename?.endsWith(`${path.sep}main.js`)) return { Updater: FakeUpdater };
     return originalLoad.call(this, request, parent, isMain);
   };
   const mainPath = require.resolve("../main");
@@ -126,7 +126,7 @@ async function loadMain(t) {
   // keep the run alive.
   t.after(() => app.emit("before-quit"));
 
-  const frame = { url: pathToFileURL(path.join(__dirname, "..", "index.html")).href };
+  const frame = { url: "app://mnemo/index.html" };
   const invoke = (channel, ...args) => handlers.get(channel)({ senderFrame: frame, sender: { mainFrame: frame } }, ...args);
   // Settings load from disk before the first check is planned.
   await new Promise((resolve) => setImmediate(resolve));

@@ -11,7 +11,7 @@ const {
   compareVersions,
   loadTrustedKeys,
   verifyManifest,
-} = require("../updater");
+} = require("../src/main/updater");
 const { makeTempDirectory } = require("../support/helpers");
 
 const isMac = process.platform === "darwin";
@@ -313,7 +313,7 @@ test("leftovers holding an app.asar are removed under Electron", { skip: !electr
       .cleanUpLeftovers()
       .catch((error) => { console.error(error); process.exitCode = 1; });
   `;
-  execFileSync(electronBinary(), ["-e", script, require.resolve("../updater"), path.join(installed, "Contents", "MacOS", "Mnemo")], {
+  execFileSync(electronBinary(), ["-e", script, require.resolve("../src/main/updater"), path.join(installed, "Contents", "MacOS", "Mnemo")], {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
     stdio: "pipe",
   });

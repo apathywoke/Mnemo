@@ -4,7 +4,7 @@ const {
   estimateGeneratedPasswordStrength,
   estimatePasswordStrength,
   generatePassword,
-} = require("../password-tools");
+} = require("../src/shared/password-tools");
 
 test("password generation honors length and enabled character groups", () => {
   const password = generatePassword(32, {
@@ -45,6 +45,19 @@ test("strength estimate distinguishes weak, fair, and strong passwords", () => {
   assert.equal(estimatePasswordStrength("password123!").level, "weak");
   assert.equal(estimatePasswordStrength("tealRiver82").level, "fair");
   assert.equal(estimatePasswordStrength("8T!cL4m@Q2v#n6Wx").level, "strong");
+});
+
+test("one block repeated, or fewer than 8 different characters, is weak", () => {
+  for (const password of ["Ab1!Ab1!Ab1!", "Mnemo-Mnemo-Mnemo", "abcabcabcabc"]) {
+    assert.equal(estimatePasswordStrength(password).level, "weak", password);
+  }
+  for (const password of ["correct horse battery staple", "Tr0ub4dor&3x", "корова летит над домом"]) {
+    assert.equal(estimatePasswordStrength(password).level, "strong", password);
+  }
+  // Each rule on its own: a repeated block with 11 different characters, and
+  // 4 different characters without a repeated block.
+  assert.equal(estimatePasswordStrength("Tr0ub4dor&3xTr0ub4dor&3x").level, "weak");
+  assert.equal(estimatePasswordStrength("Aa1!Aa1!aA1!").level, "weak");
 });
 
 test("generated password estimate reflects length and selected character groups", () => {

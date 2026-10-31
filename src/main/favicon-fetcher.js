@@ -1,300 +1,14 @@
 const dns = require("node:dns/promises");
 const https = require("node:https");
 const { isIP } = require("node:net");
-const { deflateSync } = require("node:zlib");
-const { nativeImage } = require("electron");
+const { decodeFavicon } = require("./favicon-decoder");
+const { MAX_ICON_DIMENSION, MAX_IMAGE_BYTES, OUTPUT_ICON_SIZE } = require("./favicon-image");
 
-const MAX_DOWNLOAD_BYTES = 512 * 1024;
+// Images are decoded in a separate process (favicon-decoder.js); this module
+// only finds and downloads them.
+const MAX_DOWNLOAD_BYTES = MAX_IMAGE_BYTES;
 const MAX_PAGE_BYTES = 1024 * 1024;
 const MAX_DISCOVERED_ICONS = 5;
-const MAX_ICON_DIMENSION = 512;
-const OUTPUT_ICON_SIZE = 96;
-const MAX_OUTPUT_BYTES = 64 * 1024;
-const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-function isWithinIconBounds(width, height) {
-  return (
-    Number.isInteger(width) &&
-    Number.isInteger(height) &&
-    width > 0 &&
-    height > 0 &&
-    width <= MAX_ICON_DIMENSION &&
-    height <= MAX_ICON_DIMENSION
-  );
-}
-
-function validatePngDimensions(buffer) {
-  if (
-    buffer.length < 24 ||
-    !buffer.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE) ||
-    buffer.toString("ascii", 12, 16) !== "IHDR"
-  ) {
-    throw new Error("The website did not provide a supported PNG or ICO favicon.");
-  }
-  const width = buffer.readUInt32BE(16);
-  const height = buffer.readUInt32BE(20);
-  if (!isWithinIconBounds(width, height)) {
-    throw new Error("The website's favicon dimensions are not supported.");
-  }
-}
-
-function validateIcoDimensions(buffer) {
-  if (buffer.length < 6 || buffer.readUInt16LE(0) !== 0 || buffer.readUInt16LE(2) !== 1) {
-    throw new Error("The website did not provide a supported PNG or ICO favicon.");
-  }
-
-  const imageCount = buffer.readUInt16LE(4);
-  const directoryEnd = 6 + imageCount * 16;
-  if (imageCount < 1 || imageCount > 64 || directoryEnd > buffer.length) {
-    throw new Error("The website did not provide a supported ICO favicon.");
-  }
-
-  let bestPng = null;
-  let bestPngQuality = 0;
-  let bestPngArea = 0;
-  let bestDib = null;
-  let bestDibQuality = 0;
-  let bestDibArea = 0;
-  for (let index = 0; index < imageCount; index += 1) {
-    const offset = 6 + index * 16;
-    const directoryWidth = buffer[offset] || 256;
-    const directoryHeight = buffer[offset + 1] || 256;
-    const imageBytes = buffer.readUInt32LE(offset + 8);
-    const imageOffset = buffer.readUInt32LE(offset + 12);
-    const imageEnd = imageOffset + imageBytes;
-
-    if (
-      !isWithinIconBounds(directoryWidth, directoryHeight) ||
-      imageBytes < 8 ||
-      imageOffset < directoryEnd ||
-      imageEnd > buffer.length
-    ) {
-      throw new Error("The website did not provide a supported ICO favicon.");
-    }
-
-    const image = buffer.subarray(imageOffset, imageEnd);
-    if (image.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
-      validatePngDimensions(image);
-      const width = image.readUInt32BE(16);
-      const height = image.readUInt32BE(20);
-      const quality = Math.min(width, height);
-      const area = width * height;
-      if (quality > bestPngQuality || (quality === bestPngQuality && area > bestPngArea)) {
-        bestPng = image;
-        bestPngQuality = quality;
-        bestPngArea = area;
-      }
-      continue;
-    }
-
-    if (image.length < 40) {
-      continue;
-    }
-    const headerSize = image.readUInt32LE(0);
-    const width = image.readInt32LE(4);
-    const storedHeight = image.readInt32LE(8);
-    const height = storedHeight / 2;
-    if (
-      headerSize < 40 ||
-      headerSize > image.length ||
-      width !== directoryWidth ||
-      height !== directoryHeight ||
-      !isWithinIconBounds(width, height) ||
-      image.readUInt16LE(12) !== 1
-    ) {
-      continue;
-    }
-
-    const bitDepth = image.readUInt16LE(14);
-    const compression = image.readUInt32LE(16);
-    if (![24, 32].includes(bitDepth) || compression !== 0) continue;
-
-    const xorStride = Math.ceil((width * bitDepth) / 32) * 4;
-    const maskStride = Math.ceil(width / 32) * 4;
-    const xorBytes = xorStride * height;
-    const maskBytes = maskStride * height;
-    if (headerSize + xorBytes > image.length) continue;
-    if (bitDepth === 24 && headerSize + xorBytes + maskBytes > image.length) continue;
-
-    const area = width * height;
-    const quality = Math.min(width, height);
-    if (quality > bestDibQuality || (quality === bestDibQuality && area > bestDibArea)) {
-      bestDib = { image, width, height, headerSize, bitDepth, xorStride, maskStride, xorBytes };
-      bestDibQuality = quality;
-      bestDibArea = area;
-    }
-  }
-
-  if (
-    bestPng &&
-    (bestPngQuality > bestDibQuality ||
-      (bestPngQuality === bestDibQuality && bestPngArea >= bestDibArea))
-  ) {
-    return bestPng;
-  }
-  if (bestDib) return decodeIcoDibToPng(bestDib);
-  return bestPng;
-}
-
-const PNG_CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let index = 0; index < table.length; index += 1) {
-    let value = index;
-    for (let bit = 0; bit < 8; bit += 1) {
-      value = (value & 1) ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
-    }
-    table[index] = value >>> 0;
-  }
-  return table;
-})();
-
-function pngCrc32(buffer) {
-  let crc = 0xffffffff;
-  for (const byte of buffer) {
-    crc = PNG_CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function createPngChunk(type, data) {
-  const typeBuffer = Buffer.from(type, "ascii");
-  const chunk = Buffer.allocUnsafe(12 + data.length);
-  chunk.writeUInt32BE(data.length, 0);
-  typeBuffer.copy(chunk, 4);
-  data.copy(chunk, 8);
-  chunk.writeUInt32BE(pngCrc32(chunk.subarray(4, 8 + data.length)), 8 + data.length);
-  return chunk;
-}
-
-function encodeRgbaPng(width, height, pixels) {
-  const scanlineLength = width * 4 + 1;
-  const scanlines = Buffer.alloc(scanlineLength * height);
-  for (let row = 0; row < height; row += 1) {
-    const rowOffset = row * scanlineLength;
-    scanlines[rowOffset] = 0;
-    pixels.copy(scanlines, rowOffset + 1, row * width * 4, (row + 1) * width * 4);
-  }
-
-  const header = Buffer.alloc(13);
-  header.writeUInt32BE(width, 0);
-  header.writeUInt32BE(height, 4);
-  header[8] = 8;
-  header[9] = 6;
-  const compressed = deflateSync(scanlines);
-  scanlines.fill(0);
-  const png = Buffer.concat([
-    PNG_SIGNATURE,
-    createPngChunk("IHDR", header),
-    createPngChunk("IDAT", compressed),
-    createPngChunk("IEND", Buffer.alloc(0)),
-  ]);
-  compressed.fill(0);
-  return png;
-}
-
-function decodeIcoDibToPng(icon) {
-  const { image, width, height, headerSize, bitDepth, xorStride, maskStride, xorBytes } = icon;
-  const maskOffset = headerSize + xorBytes;
-  const hasMask = maskOffset + maskStride * height <= image.length;
-  const pixels = Buffer.alloc(width * height * 4);
-  let alphaIsEmpty = bitDepth === 32;
-
-  for (let y = 0; y < height; y += 1) {
-    const sourceRow = height - 1 - y;
-    const sourceOffset = headerSize + sourceRow * xorStride;
-    const maskRowOffset = maskOffset + sourceRow * maskStride;
-    for (let x = 0; x < width; x += 1) {
-      const sourcePixelOffset = sourceOffset + x * (bitDepth / 8);
-      const pixelOffset = (y * width + x) * 4;
-      pixels[pixelOffset] = image[sourcePixelOffset + 2];
-      pixels[pixelOffset + 1] = image[sourcePixelOffset + 1];
-      pixels[pixelOffset + 2] = image[sourcePixelOffset];
-      const alpha = bitDepth === 32 ? image[sourcePixelOffset + 3] : 255;
-      pixels[pixelOffset + 3] = alpha;
-      if (alpha !== 0) alphaIsEmpty = false;
-    }
-  }
-
-  if (bitDepth === 32 && alphaIsEmpty) {
-    for (let y = 0; y < height; y += 1) {
-      const sourceRow = height - 1 - y;
-      const maskRowOffset = maskOffset + sourceRow * maskStride;
-      for (let x = 0; x < width; x += 1) {
-        const transparent = hasMask && (image[maskRowOffset + (x >> 3)] & (0x80 >> (x & 7))) !== 0;
-        pixels[(y * width + x) * 4 + 3] = transparent ? 0 : 255;
-      }
-    }
-  } else if (hasMask) {
-    for (let y = 0; y < height; y += 1) {
-      const sourceRow = height - 1 - y;
-      const maskRowOffset = maskOffset + sourceRow * maskStride;
-      for (let x = 0; x < width; x += 1) {
-        if ((image[maskRowOffset + (x >> 3)] & (0x80 >> (x & 7))) !== 0) {
-          pixels[(y * width + x) * 4 + 3] = 0;
-        }
-      }
-    }
-  }
-
-  const png = encodeRgbaPng(width, height, pixels);
-  pixels.fill(0);
-  return png;
-}
-
-function validateJpegDimensions(buffer) {
-  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) {
-    throw new Error("The website did not provide a supported PNG, JPEG, or ICO favicon.");
-  }
-
-  const startOfFrameMarkers = new Set([
-    0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7,
-    0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf,
-  ]);
-  let offset = 2;
-  while (offset < buffer.length) {
-    if (buffer[offset] !== 0xff) {
-      throw new Error("The website's JPEG favicon is malformed.");
-    }
-    while (buffer[offset] === 0xff) offset += 1;
-    const marker = buffer[offset];
-    offset += 1;
-    if (marker === 0xd9 || marker === 0xda) break;
-    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
-    if (offset + 2 > buffer.length) {
-      throw new Error("The website's JPEG favicon is incomplete.");
-    }
-
-    const segmentLength = buffer.readUInt16BE(offset);
-    if (segmentLength < 2 || offset + segmentLength > buffer.length) {
-      throw new Error("The website's JPEG favicon is malformed.");
-    }
-    if (startOfFrameMarkers.has(marker)) {
-      if (segmentLength < 7) throw new Error("The website's JPEG favicon is malformed.");
-      const height = buffer.readUInt16BE(offset + 3);
-      const width = buffer.readUInt16BE(offset + 5);
-      if (!isWithinIconBounds(width, height)) {
-        throw new Error("The website's favicon dimensions are not supported.");
-      }
-      return;
-    }
-    offset += segmentLength;
-  }
-  throw new Error("The website's JPEG favicon did not declare image dimensions.");
-}
-
-function extractSupportedImage(buffer) {
-  if (buffer.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
-    validatePngDimensions(buffer);
-    return buffer;
-  }
-  if (buffer[0] === 0xff && buffer[1] === 0xd8) {
-    validateJpegDimensions(buffer);
-    return buffer;
-  }
-  const pngFromIco = validateIcoDimensions(buffer);
-  if (pngFromIco) return pngFromIco;
-  throw new Error("This ICO contains no supported PNG or 24/32-bit uncompressed icon image.");
-}
 
 function unsupportedFavicon(message) {
   const error = new Error(message);
@@ -567,7 +281,7 @@ async function downloadFavicon(hostname, address, requestPath = "/favicon.ico") 
     hostname,
     address,
     requestPath,
-    "image/png,image/x-icon,image/vnd.microsoft.icon,image/webp,image/jpeg,image/gif;q=0.8",
+    "image/png,image/x-icon,image/vnd.microsoft.icon,image/webp,image/gif;q=0.8",
     MAX_DOWNLOAD_BYTES,
   );
   if (
@@ -576,7 +290,7 @@ async function downloadFavicon(hostname, address, requestPath = "/favicon.ico") 
     response.contentType === "text/html"
   ) {
     response.data?.fill(0);
-    throw unsupportedFavicon("The site did not provide a supported PNG, JPEG, or ICO icon at this address.");
+    throw unsupportedFavicon("The site did not provide a supported PNG or ICO icon at this address.");
   }
   return {
     data: response.data,
@@ -709,7 +423,7 @@ async function discoverFavicon(hostname, address, bestIcon = null) {
   for (const path of paths) {
     try {
       const downloaded = await downloadFavicon(page.hostname, page.address, path);
-      const converted = convertFavicon(downloaded.data);
+      const converted = await convertFavicon(downloaded.data);
       const candidate = { ...converted, hostname: downloaded.hostname };
       if (isHigherQualityIcon(candidate, bestIcon)) bestIcon = candidate;
     } catch (error) {
@@ -721,57 +435,15 @@ async function discoverFavicon(hostname, address, bestIcon = null) {
   if (bestIcon) return bestIcon;
 
   throw new Error(
-    "No supported PNG, JPEG, or ICO icon was found. This site may only provide SVG or an unsupported ICO format.",
+    "No supported PNG or ICO icon was found. This site may only provide SVG, JPEG, or an unsupported ICO format.",
   );
 }
 
-function convertFavicon(downloaded) {
-  let imageBuffer;
+async function convertFavicon(downloaded) {
   try {
-    // Check dimensions before decoding to prevent oversized image allocations.
-    try {
-      imageBuffer = extractSupportedImage(downloaded);
-    } catch (error) {
-      throw unsupportedFavicon(error.message);
-    }
-    let image;
-    try {
-      image = nativeImage.createFromBuffer(imageBuffer);
-    } catch {
-      throw unsupportedFavicon("The website's favicon image could not be decoded.");
-    }
-    if (image.isEmpty()) {
-      throw unsupportedFavicon("The website did not provide a supported image icon.");
-    }
-
-    const { width, height } = image.getSize();
-    if (
-      width < 1 ||
-      height < 1 ||
-      width > MAX_ICON_DIMENSION ||
-      height > MAX_ICON_DIMENSION
-    ) {
-      throw unsupportedFavicon("The website's favicon dimensions are not supported.");
-    }
-
-    const scale = Math.min(
-      1,
-      OUTPUT_ICON_SIZE / width,
-      OUTPUT_ICON_SIZE / height,
-    );
-    const outputWidth = Math.max(1, Math.round(width * scale));
-    const outputHeight = Math.max(1, Math.round(height * scale));
-    const resizeOptions = {
-      quality: "best",
-      ...(width >= height
-        ? { width: outputWidth }
-        : { height: outputHeight }),
-    };
-    const png = image.resize(resizeOptions).toPNG();
-    if (png.length > MAX_OUTPUT_BYTES) {
-      throw unsupportedFavicon("The processed favicon is too large.");
-    }
-
+    const decoded = await decodeFavicon(downloaded);
+    if (!decoded) throw unsupportedFavicon("The website's favicon image could not be decoded.");
+    const { png, width, height } = decoded;
     const encoded = png.toString("base64");
     png.fill(0);
     return {
@@ -782,7 +454,6 @@ function convertFavicon(downloaded) {
       area: width * height,
     };
   } finally {
-    if (imageBuffer && imageBuffer !== downloaded) imageBuffer.fill(0);
     downloaded.fill(0);
   }
 }
@@ -819,7 +490,7 @@ async function fetchSiteFavicon(value) {
   let bestIcon = null;
   try {
     const downloaded = await downloadFavicon(hostname, address);
-    bestIcon = { ...convertFavicon(downloaded.data), hostname: downloaded.hostname };
+    bestIcon = { ...(await convertFavicon(downloaded.data)), hostname: downloaded.hostname };
   } catch (error) {
     if (!error?.unsupportedFavicon) throw error;
   }

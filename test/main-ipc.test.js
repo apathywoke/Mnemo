@@ -22,6 +22,9 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   const nativeThemeStub = { themeSource: "system" };
   let holdDialogs = false;
   let webRtcPolicy;
+  let loadedUrl;
+  const privilegedSchemes = [];
+  const protocolHandlers = new Map();
   let proxyConfig;
   let openSelection = { canceled: true, filePaths: [] };
   let saveSelection = { canceled: true, filePath: undefined };
@@ -46,7 +49,10 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
         this.webContents.setWebRTCIPHandlingPolicy = (policy) => { webRtcPolicy = policy; };
         this.webContents.isDestroyed = () => false;
         this.webContents.send = (...args) => sentToRenderer.push(args);
-        this.loadFile = () => Promise.resolve();
+        this.loadURL = (url) => {
+          loadedUrl = url;
+          return Promise.resolve();
+        };
         this.show = () => {};
         this.isDestroyed = () => false;
         this.isMinimized = () => false;
@@ -79,6 +85,10 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
       on(channel, handler) { ipcEvents.set(channel, handler); },
     },
     powerMonitor,
+    protocol: {
+      registerSchemesAsPrivileged: (schemes) => privilegedSchemes.push(...schemes),
+      handle: (scheme, handler) => protocolHandlers.set(scheme, handler),
+    },
     nativeTheme: nativeThemeStub,
     session: {
       defaultSession: {
@@ -90,7 +100,6 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
         setProxy: async (config) => { proxyConfig = config; },
       },
     },
-    nativeImage: { createFromBuffer: () => ({ isEmpty: () => true }) },
     safeStorage: {
       isAsyncEncryptionAvailable: async () => true,
       encryptStringAsync: async (text) => Buffer.from(`sealed:${text}`),
@@ -108,7 +117,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   // The real updater, kept offline: if the automatic check runs (20 s after
   // launch, reached on a slow or busy machine), it finds no release instead
   // of contacting GitHub.
-  const { Updater: RealUpdater } = require("../updater");
+  const { Updater: RealUpdater } = require("../src/main/updater");
   class OfflineUpdater extends RealUpdater {
     constructor(options) {
       super({
@@ -123,7 +132,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   // since safeStorage elsewhere may use a weak backend). The stub Electron
   // offers Touch ID, so the test runs as on a Mac on any host, without
   // changing process.platform for the rest of main.
-  const RealBiometricUnlock = require("../biometric-unlock");
+  const RealBiometricUnlock = require("../src/main/biometric-unlock");
   class MacBiometricUnlock extends RealBiometricUnlock {
     constructor(directory, options) {
       super(directory, { ...options, platform: "darwin" });
@@ -136,10 +145,10 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   const originalLoad = Module._load;
   Module._load = function loadWithElectronStub(request, parent, isMain) {
     if (request === "electron") return electronStub;
-    if (request === "./updater" && parent?.filename?.endsWith(`${path.sep}main.js`)) {
+    if (request === "./src/main/updater" && parent?.filename?.endsWith(`${path.sep}main.js`)) {
       return { Updater: OfflineUpdater };
     }
-    if (request === "./biometric-unlock" && parent?.filename?.endsWith(`${path.sep}main.js`)) {
+    if (request === "./src/main/biometric-unlock" && parent?.filename?.endsWith(`${path.sep}main.js`)) {
       return MacBiometricUnlock;
     }
     return originalLoad.call(this, request, parent, isMain);
@@ -170,7 +179,41 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal(browserWindow.options.webPreferences.devTools, true);
   assert.equal(handlers.has("vault:fetch-site-icon"), true);
 
-  const trustedFrame = { url: pathToFileURL(path.join(__dirname, "..", "index.html")).href };
+  // The page is served from app://mnemo/ by the app's own handler, which
+  // reads only files inside the app folder.
+  assert.deepEqual(privilegedSchemes, [
+    { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  ]);
+  assert.equal(loadedUrl, "app://mnemo/index.html");
+  const serveAppFile = protocolHandlers.get("app");
+  const page = await serveAppFile(new Request("app://mnemo/index.html"));
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get("content-type"), /^text\/html/);
+  assert.match(await page.text(), /<title>Mnemo<\/title>/);
+  for (const url of [
+    "app://mnemo/..%2fpackage.json",
+    "app://mnemo/%2e%2e%2f%2e%2e%2fetc/passwd.js",
+    "app://mnemo/src/..%2f..%2f..%2fmain.js",
+    "app://elsewhere/index.html",
+  ]) {
+    assert.equal((await serveAppFile(new Request(url))).status, 404, url);
+  }
+
+  // Navigation away from the page is refused, including to the same page
+  // under file://.
+  const navigate = (url) => {
+    let prevented = false;
+    browserWindow.webContents.emit("will-navigate", { preventDefault: () => { prevented = true; } }, url);
+    return prevented;
+  };
+  assert.equal(navigate("https://attacker.example/"), true);
+  assert.equal(navigate("http://127.0.0.1:8080/index.html"), true);
+  assert.equal(navigate(pathToFileURL(path.join(__dirname, "..", "index.html")).href), true);
+  assert.equal(navigate("app://evil/index.html"), true);
+  assert.equal(navigate("app://mnemo/other.html"), true);
+  assert.equal(navigate("app://mnemo/index.html"), false);
+
+  const trustedFrame = { url: "app://mnemo/index.html" };
   const invoke = (channel, ...args) => handlers.get(channel)(
     { senderFrame: trustedFrame, sender: { mainFrame: trustedFrame } },
     ...args,
@@ -178,6 +221,12 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   const untrustedInvoke = (channel, ...args) => handlers.get(channel)(
     { senderFrame: { url: "https://attacker.example/" }, sender: { mainFrame: trustedFrame } },
     ...args,
+  );
+  // The page opened from file:// (as before app://) is not the app's page.
+  const fileFrame = { url: pathToFileURL(path.join(__dirname, "..", "index.html")).href };
+  await assert.rejects(
+    handlers.get("app:get-version")({ senderFrame: fileFrame, sender: { mainFrame: fileFrame } }),
+    /untrusted frame/,
   );
 
   assert.equal(await invoke("app:get-version"), "0.1.0-test");

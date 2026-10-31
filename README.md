@@ -61,9 +61,16 @@ The main process lives in `src/main/`. `main.js` is its entry point: it pins
 the data folder, creates the shared `state` object and a `ctx` with the
 helpers from `src/main/` (dialogs, clipboard, lock, window, updates), and
 registers the IPC handlers from `src/main/ipc/`, one file per feature. The
+other main-process modules (updater, importers, Touch ID, profiles, settings,
+backup files, favicons, TOTP, SSH keys, password reports) sit next to them in
+`src/main/`; only `main.js`, `preload.js`, and `vault-store.js` stay at the
+root. The
 vault store is in `src/main/vault/`: `store.js` holds the file lifecycle, the
 `store-*.js` files add feature methods, and the other files hold the file
 format, crypto, and validation; `vault-store.js` only re-exports it.
+`src/shared/` holds code that both processes load: `password-tools.js`, the
+password strength estimate that the renderer shows and the main process
+enforces for new master passphrases.
 
 ## Current security boundary
 
@@ -111,8 +118,10 @@ format, crypto, and validation; `vault-store.js` only re-exports it.
 - This prototype has no telemetry or crash-reporting SDK. Site icons are only
   requested after you choose **Load site icon** for a login. The app contacts
   that login's HTTPS domain directly at `/favicon.ico` first. If unavailable or small,
-  it may read the homepage and try up to five PNG, JPEG, or ICO icon links on the
-  same domain. PNG-backed ICO files and uncompressed 24/32-bit ICO images are supported.
+  it may read the homepage and try up to five PNG or ICO icon links on the
+  same domain. PNG-backed ICO files and uncompressed 24/32-bit ICO images are
+  supported; JPEG and SVG icons are skipped. Images are decoded in a separate
+  process, not in the app's main process.
   It prefers larger variants, keeps their aspect ratio, and does not enlarge a
   small source image before saving it.
   It follows only HTTPS redirects to the same host or its `www` variant,

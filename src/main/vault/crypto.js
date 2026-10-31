@@ -7,7 +7,7 @@ const {
   randomBytes,
   scrypt,
 } = require("node:crypto");
-const { parseTotpInput, toOtpauthUri } = require("../../../totp");
+const { parseTotpInput, toOtpauthUri } = require("../totp");
 const {
   SEALED_AAD_VERSION,
   KDF,

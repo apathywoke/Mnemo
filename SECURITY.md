@@ -18,15 +18,18 @@ passwords until the design has received independent security review.
   reports.
 - The master passphrase is not persisted. Node's asynchronous scrypt derives a
   wrapping key using a fresh 16-byte salt and parameters N=2^17, r=8, p=1.
-- A master passphrase that is being set (a new vault, recovery with the
-  recovery key, restoring a backup with the recovery key) must be at least
-  12 characters (counted in code points) and rated Strong by
-  `estimatePasswordStrength` (`src/renderer/shared/lib/password-tools.js`),
+- A master passphrase that is being set (a new vault, a change in Settings,
+  recovery with the recovery key, restoring a backup with the recovery key)
+  must be at least 12 characters (counted in code points) and rated Strong
+  by `estimatePasswordStrength` (`src/shared/password-tools.js`),
   checked in the main process; the forms show the same estimate while
   typing. The estimate counts letters and digits of any script, so a long
-  phrase in Cyrillic rates like one in Latin letters. It is a heuristic,
-  not a measure of entropy: it knows a few common words and keyboard runs
-  but no dictionary. Existing vaults with a passphrase of 7 or more
+  phrase in Cyrillic rates like one in Latin letters. One block repeated
+  (`Ab1!Ab1!Ab1!`: the smallest period, from the KMP prefix function, is at
+  most half the length) and anything with fewer than 8 different
+  characters is rated Weak at any length. It is a heuristic, not a measure
+  of entropy: it knows a few common words and keyboard runs but no
+  dictionary. Existing vaults with a passphrase of 7 or more
   characters keep opening; the stricter rule applies only when a passphrase
   is set.
 - A random 256-bit vault key is wrapped with AES-256-GCM; vault data is
@@ -65,7 +68,7 @@ passwords until the design has received independent security review.
   vault, and asks for confirmation first when a local vault already exists.
   When the vault has attachments, the backup is a container (`MNEMOBK1`) with
   the envelope and the attachment files exactly as they are stored, still
-  encrypted (see `backup-file.js`). Export decrypts every attachment once
+  encrypted (see `src/main/backup-file.js`). Export decrypts every attachment once
   first and refuses, naming the file, if one is missing or damaged. Restore
   checks that every attachment the vault refers to is present and decrypts;
   only then does it copy the files and replace the vault file in one rename.
@@ -76,22 +79,32 @@ passwords until the design has received independent security review.
   and when the app exits.
 - Site icons require an explicit click on **Load site icon**. The main process
   first requests the saved domain's `/favicon.ico` endpoint. If that is missing or small,
-  it reads the homepage and tries at most five PNG, JPEG, or ICO icon links hosted
-  on that same domain. PNG-backed ICO files and uncompressed 24/32-bit ICO images
-  are supported.
+  it reads the homepage and tries at most five PNG or ICO icon links hosted
+  on that same domain. PNG files, PNG-backed ICO files, and uncompressed
+  24/32-bit ICO images are supported; JPEG, SVG, and other formats are
+  skipped.
   Requests carry no cookies or referrer and use no
   third-party favicon service. HTTPS redirects are followed only to the same
   host or its `www` variant, with a three-redirect limit. The site can see the
   device's IP address, and the domain may be visible to the configured DNS
   resolver. Only public HTTPS hosts are allowed; the app resolves and pins a
-  public IPv4 address, limits response size, checks image dimensions before
-  decoding, prefers higher-resolution variants without enlarging small icons,
-  preserves aspect ratio, converts the result to PNG, and saves it within the
-  encrypted vault. These requests are not repeated unless the user explicitly
-  loads or updates the icon.
+  public IPv4 address and limits response size. Each downloaded image is
+  decoded outside the main process, in a new Electron `utilityProcess`, by
+  plain JavaScript PNG and ICO decoders rather than native image codecs. That
+  process gets only a copy of the image bytes and an environment without the
+  app's variables, checks dimensions before decoding, caps decompressed data
+  near the size the image header declares, and is killed after its reply or
+  after five seconds. It returns only the icon's pixels: the main process
+  checks that they match the expected icon size and encodes the PNG itself.
+  A decoder crash or timeout ends that fetch with an error and does not
+  affect the app. The decoder process is not in Chromium's sandbox. The app
+  prefers higher-resolution variants without enlarging small icons, preserves
+  aspect ratio, and saves the icon within the encrypted vault. These requests
+  are not repeated unless the user explicitly loads or updates the icon.
 - Packaged builds have Electron fuses set: `RunAsNode`,
   `EnableNodeCliInspectArguments`, and `EnableNodeOptionsEnvironmentVariable`
-  are off; `OnlyLoadAppFromAsar` and embedded asar integrity validation are on.
+  are off; `OnlyLoadAppFromAsar` and embedded asar integrity validation are on;
+  `GrantFileProtocolExtraPrivileges` is off.
   Packaged builds refuse to start with Chromium remote-debugging switches.
   `npm run dist:mac` signs with a Developer ID certificate and the hardened
   runtime and notarizes. Releases published on GitHub are currently
@@ -102,6 +115,11 @@ passwords until the design has received independent security review.
   an ad-hoc signature has no Team ID, these builds also carry
   `disable-library-validation`; without it they cannot load their own
   Electron framework. See `docs/RELEASING.md`.
+- The interface is served from `app://mnemo/index.html`, not `file://`. The
+  `app://` handler serves only HTML, JavaScript, and CSS files inside the app
+  folder (`app.asar` when packaged) and rejects paths that leave it, including
+  `..` hidden by percent-encoding. IPC handlers and navigation accept only
+  `app://mnemo/index.html`; the same page opened from `file://` is not trusted.
 - Updates come from this project's GitHub releases. About 20 seconds after
   launch and then on the schedule chosen in Settings → Updates (every 30
   minutes, hour, 6 hours, or day; daily by default; or never), and when the
@@ -123,7 +141,11 @@ passwords until the design has received independent security review.
   back if the swap fails.
 - The private update key is held only in the GitHub Actions environment
   `release`, used by a job that installs no npm packages. Whoever holds it can
-  ship code to every installed copy that auto-updates.
+  ship code to every installed copy that auto-updates. That job publishes a
+  tag only if the tag's commit is on `main` (`git merge-base --is-ancestor`)
+  and fails before the key is used otherwise. Required reviewers for the
+  environment, its restriction to `v*` tags, and who may create those tags
+  are repository settings kept by the owner (`docs/RELEASING.md`).
 - Every new vault gets a recovery key: 256 random bits shown once as 14
   groups of Crockford Base32 with a 24-bit checksum. The vault key is wrapped
   a second time under a key derived from it with HKDF-SHA256 and a separate

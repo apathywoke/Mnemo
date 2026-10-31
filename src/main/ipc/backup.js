@@ -1,6 +1,6 @@
 // IPC handlers. Backups, import, restoring, and deleting the open vault.
 const path = require("node:path");
-const { parseImportFile } = require("../../../importers");
+const { parseImportFile } = require("../importers");
 const VaultStore = require("../../../vault-store");
 
 const IMPORT_SOURCES = Object.freeze({

@@ -19,10 +19,10 @@ const electronFuses = Object.freeze({
   // Refuses to load app code from anything other than the verified app.asar.
   onlyLoadAppFromAsar: true,
   loadBrowserProcessSpecificV8Snapshot: false,
-  // Must stay enabled while index.html is loaded with loadFile(): with this
-  // fuse off, file:// cannot read from app.asar (ERR_FILE_NOT_FOUND). Turning
-  // it off requires serving the UI from a custom app:// protocol first.
-  grantFileProtocolExtraPrivileges: true,
+  // Off: the UI is served from app://mnemo/ (src/main/app-protocol.js), so
+  // file:// pages get no privileges beyond a browser's and cannot read
+  // app.asar.
+  grantFileProtocolExtraPrivileges: false,
 });
 
 module.exports = {
@@ -36,21 +36,12 @@ module.exports = {
     "main.js",
     "preload.js",
     "vault-store.js",
-    "profile-manager.js",
-    "settings-store.js",
-    "importers.js",
-    "biometric-unlock.js",
-    "totp.js",
-    "ssh-keys.js",
-    "updater.js",
-    "password-health.js",
-    "backup-file.js",
     "build/update-keys/*.pem",
-    "favicon-fetcher.js",
     "index.html",
     "styles.css",
     "src/main/**/*.js",
     "src/renderer/**/*.js",
+    "src/shared/**/*.js",
   ],
   electronFuses,
   // Fail the build instead of producing an unsigned app.

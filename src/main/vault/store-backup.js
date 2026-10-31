@@ -2,9 +2,9 @@
 // ./index.js.
 const fs = require("node:fs/promises");
 const path = require("node:path");
-const { toOtpauthUri } = require("../../../totp");
+const { toOtpauthUri } = require("../totp");
 const { ITEM_TYPES } = require("../../renderer/shared/item-types");
-const { readContainerFile, writeContainer } = require("../../../backup-file");
+const { readContainerFile, writeContainer } = require("../backup-file");
 const VaultStore = require("./store");
 const { MAX_FILE_BYTES } = require("./constants");
 const { hasExactKeys } = require("./records");

@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const { createHash } = require("node:crypto");
 const test = require("node:test");
-const { buildReport, checkPwnedHashes, collectPasswords, parseRange } = require("../password-health");
+const { buildReport, checkPwnedHashes, collectPasswords, parseRange } = require("../src/main/password-health");
 
 const sha1 = (text) => createHash("sha1").update(text).digest("hex").toUpperCase();
 const KEY = Buffer.alloc(32, 7);

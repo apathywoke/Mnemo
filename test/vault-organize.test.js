@@ -3,7 +3,7 @@ const { randomBytes, randomUUID } = require("node:crypto");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const test = require("node:test");
-const ProfileManager = require("../profile-manager");
+const ProfileManager = require("../src/main/profile-manager");
 const VaultStore = require("../vault-store");
 const { makeLogin, makeTempDirectory } = require("../support/helpers");
 

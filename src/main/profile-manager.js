@@ -1,7 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { randomUUID, randomBytes } = require("node:crypto");
-const VaultStore = require("./vault-store");
+const VaultStore = require("./vault/index");
 
 const REGISTRY_VERSION = 2;
 const MAX_REGISTRY_BYTES = 64 * 1024;

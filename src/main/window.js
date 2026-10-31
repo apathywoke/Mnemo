@@ -1,24 +1,29 @@
-// The app window and the check that a frame is the app's own page.
+// The app window, the app:// handler that serves its page, and the check
+// that a frame is the app's own page.
 const path = require("node:path");
-const { fileURLToPath } = require("node:url");
+const {
+  APP_SCHEME,
+  APP_PAGE_URL,
+  createAppFileHandler,
+  isAppPageUrl,
+} = require("./app-protocol");
 
 // main.js and index.html are two folders up.
 const APP_ROOT = path.join(__dirname, "..", "..");
-const APP_PAGE = path.join(APP_ROOT, "index.html");
 
 function createWindowManager(ctx) {
   const { state, lockVault, resetAutoLockTimer } = ctx;
-  const { app, BrowserWindow } = ctx.electron;
+  const { app, BrowserWindow, protocol } = ctx.electron;
 
+  // Serves app://mnemo/ from the app folder (app.asar when packaged). Called
+  // once the app is ready, before the first window.
+  function registerAppProtocol() {
+    protocol.handle(APP_SCHEME, createAppFileHandler(APP_ROOT));
+  }
+
+  // Only app://mnemo/index.html; the same page under file:// is not trusted.
   function isAppPage(frame) {
-    if (!frame) return false;
-
-    try {
-      const url = new URL(frame.url);
-      return url.protocol === "file:" && fileURLToPath(url) === APP_PAGE;
-    } catch {
-      return false;
-    }
+    return Boolean(frame) && isAppPageUrl(frame.url);
   }
 
   function createWindow() {
@@ -44,6 +49,8 @@ function createWindowManager(ctx) {
     state.mainWindow.webContents.setWebRTCIPHandlingPolicy?.("disable_non_proxied_udp");
     state.mainWindow.once("ready-to-show", () => state.mainWindow.show());
     state.mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    // The page never navigates; anything other than reloading itself (an
+    // external site, file://) is refused.
     state.mainWindow.webContents.on("will-navigate", (event, targetUrl) => {
       if (!isAppPage({ url: targetUrl })) event.preventDefault();
     });
@@ -57,11 +64,11 @@ function createWindowManager(ctx) {
 
     state.mainWindow.webContents.on("before-input-event", resetAutoLockTimer);
 
-    state.mainWindow.loadFile(APP_PAGE);
+    state.mainWindow.loadURL(APP_PAGE_URL);
     return state.mainWindow;
   }
 
-  return { isAppPage, createWindow };
+  return { isAppPage, createWindow, registerAppProtocol };
 }
 
 module.exports = { createWindowManager };
