@@ -1,135 +1,133 @@
-(() => {
-  const ns = window.mnemoRenderer;
-  const { $ } = ns.shared.dom;
+import { $ } from "../shared/lib/dom.js";
+import * as i18n from "../shared/lib/i18n.js";
 
-  function bind(ctx) {
-    async function goBack() {
-      if (ctx.state.ui.backNavigationInProgress) return;
-      ctx.state.ui.backNavigationInProgress = true;
-      try {
-        if (ctx.recoveryKey.isOpen) return;
-        if (ctx.importer.isOpen) {
-          ctx.importer.close();
-          return;
-        }
-        if ($("#settings-dialog").open) {
-          $("#settings-dialog").close();
-          return;
-        }
-        if ($("#entry-dialog").open) {
-          $("#entry-dialog").close();
-          return;
-        }
-        if ($("#item-dialog").open) {
-          $("#item-dialog").close();
-          return;
-        }
-        for (const id of ["#history-dialog", "#folders-dialog"]) {
-          if ($(id).open) {
-            $(id).close();
-            return;
-          }
-        }
-        if (ctx.pages.access.isProfileDeleteDialogOpen()) {
-          ctx.pages.access.closeProfileDeleteDialog();
-          return;
-        }
-        if (!$("#restore-panel").hidden) {
-          await ctx.pages.access.cancelRestore();
-          return;
-        }
-        if (!$("#recover-panel").hidden) {
-          await ctx.pages.access.cancelRecover();
-          return;
-        }
-        if (!$("#unlock-panel").hidden) {
-          await ctx.pages.access.chooseProfiles();
-          return;
-        }
-        if (!$("#setup-panel").hidden) {
-          if (ctx.state.access.availableProfiles.length > 0) {
-            await ctx.pages.access.chooseProfiles();
-          }
-          return;
-        }
-        if (!$("#open-panel").hidden) {
-          const search = $("#entry-search");
-          if (document.activeElement === search) {
-            if (search.value) {
-              search.value = "";
-              ctx.pages.vault.renderEntryList();
-            } else {
-              search.blur();
-            }
-            return;
-          }
-          if (ctx.state.vault.selectedEntryId) {
-            ctx.pages.vault.renderEntryDetail(null);
-            return;
-          }
-          if (search.value) {
-            search.value = "";
-            ctx.pages.vault.renderEntryList();
-            return;
-          }
-          await ctx.pages.access.lockVault();
-          return;
-        }
-        if (!$("#fatal-panel").hidden) await ctx.pages.access.chooseProfiles();
-      } finally {
-        ctx.state.ui.backNavigationInProgress = false;
+function bind(ctx) {
+  async function goBack() {
+    if (ctx.state.ui.backNavigationInProgress) return;
+    ctx.state.ui.backNavigationInProgress = true;
+    try {
+      if (ctx.recoveryKey.isOpen) return;
+      if (ctx.importer.isOpen) {
+        ctx.importer.close();
+        return;
       }
-    }
-
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        if (ctx.recoveryKey.isOpen) return;
-        const menu = $("#new-item-menu");
-        if (!menu.hidden) {
-          event.preventDefault();
-          menu.hidden = true;
-          $("#create-entry-button").setAttribute("aria-expanded", "false");
-          $("#create-entry-button").focus();
+      if ($("#settings-dialog").open) {
+        $("#settings-dialog").close();
+        return;
+      }
+      if ($("#entry-dialog").open) {
+        $("#entry-dialog").close();
+        return;
+      }
+      if ($("#item-dialog").open) {
+        $("#item-dialog").close();
+        return;
+      }
+      for (const id of ["#history-dialog", "#folders-dialog"]) {
+        if ($(id).open) {
+          $(id).close();
           return;
         }
-        const canGoBack =
-          ctx.importer.isOpen ||
-          $("#settings-dialog").open ||
-          $("#entry-dialog").open ||
-          $("#item-dialog").open ||
-          $("#history-dialog").open ||
-          $("#folders-dialog").open ||
-          ctx.pages.access.isProfileDeleteDialogOpen() ||
-          !$("#restore-panel").hidden ||
-          !$("#recover-panel").hidden ||
-          !$("#unlock-panel").hidden ||
-          (!$("#setup-panel").hidden && ctx.state.access.availableProfiles.length > 0) ||
-          !$("#open-panel").hidden ||
-          !$("#fatal-panel").hidden;
-        if (canGoBack) {
-          event.preventDefault();
-          void goBack();
+      }
+      if (ctx.pages.access.isProfileDeleteDialogOpen()) {
+        ctx.pages.access.closeProfileDeleteDialog();
+        return;
+      }
+      if (!$("#restore-panel").hidden) {
+        await ctx.pages.access.cancelRestore();
+        return;
+      }
+      if (!$("#recover-panel").hidden) {
+        await ctx.pages.access.cancelRecover();
+        return;
+      }
+      if (!$("#unlock-panel").hidden) {
+        await ctx.pages.access.chooseProfiles();
+        return;
+      }
+      if (!$("#setup-panel").hidden) {
+        if (ctx.state.access.availableProfiles.length > 0) {
+          await ctx.pages.access.chooseProfiles();
         }
         return;
       }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        if (document.body.classList.contains("is-unlocked")) $("#entry-search").focus();
+      if (!$("#open-panel").hidden) {
+        const search = $("#entry-search");
+        if (document.activeElement === search) {
+          if (search.value) {
+            search.value = "";
+            ctx.pages.vault.renderEntryList();
+          } else {
+            search.blur();
+          }
+          return;
+        }
+        if (ctx.state.vault.selectedEntryId) {
+          ctx.pages.vault.renderEntryDetail(null);
+          return;
+        }
+        if (search.value) {
+          search.value = "";
+          ctx.pages.vault.renderEntryList();
+          return;
+        }
+        await ctx.pages.access.lockVault();
+        return;
       }
-    });
-    document.addEventListener("pointerdown", () => ctx.reportActivity(), true);
-    document.addEventListener("keydown", () => ctx.reportActivity(), true);
-
-    ctx.api.onAutoLocked(() => {
-      ctx.clearVaultView();
-      ctx.clearSensitiveFields();
-      $("#unlock-error").textContent = ns.shared.i18n.t("unlock.autoLocked");
-      $("#unlock-error").hidden = false;
-      ctx.showPanel("unlock");
-    });
-
-    return { goBack };
+      if (!$("#fatal-panel").hidden) await ctx.pages.access.chooseProfiles();
+    } finally {
+      ctx.state.ui.backNavigationInProgress = false;
+    }
   }
 
-  ns.app.bindNavigation = bind;
-})();
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (ctx.recoveryKey.isOpen) return;
+      const menu = $("#new-item-menu");
+      if (!menu.hidden) {
+        event.preventDefault();
+        menu.hidden = true;
+        $("#create-entry-button").setAttribute("aria-expanded", "false");
+        $("#create-entry-button").focus();
+        return;
+      }
+      const canGoBack =
+        ctx.importer.isOpen ||
+        $("#settings-dialog").open ||
+        $("#entry-dialog").open ||
+        $("#item-dialog").open ||
+        $("#history-dialog").open ||
+        $("#folders-dialog").open ||
+        ctx.pages.access.isProfileDeleteDialogOpen() ||
+        !$("#restore-panel").hidden ||
+        !$("#recover-panel").hidden ||
+        !$("#unlock-panel").hidden ||
+        (!$("#setup-panel").hidden && ctx.state.access.availableProfiles.length > 0) ||
+        !$("#open-panel").hidden ||
+        !$("#fatal-panel").hidden;
+      if (canGoBack) {
+        event.preventDefault();
+        void goBack();
+      }
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      if (document.body.classList.contains("is-unlocked")) $("#entry-search").focus();
+    }
+  });
+  document.addEventListener("pointerdown", () => ctx.reportActivity(), true);
+  document.addEventListener("keydown", () => ctx.reportActivity(), true);
+
+  ctx.api.onAutoLocked(() => {
+    ctx.clearVaultView();
+    ctx.clearSensitiveFields();
+    $("#unlock-error").textContent = i18n.t("unlock.autoLocked");
+    $("#unlock-error").hidden = false;
+    ctx.showPanel("unlock");
+  });
+
+  return { goBack };
+}
+
+export { bind as bindNavigation };

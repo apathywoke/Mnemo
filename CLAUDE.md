@@ -31,10 +31,16 @@ Mnemo is a password manager: security beats convenience.
   packaged by `src/main/**/*.js`; a main-process file
   anywhere else goes into `files` in
   electron-builder.config.js.
+- Renderer slices are ES modules: import what you use with
+  a relative path ending in `.js`; never use a global
+  registry. index.html loads only app/index.js (and
+  theme.js in <head>).
 - Code that both the main process and the renderer load
-  (password-tools.js) lives in src/shared/, packaged by
-  `src/shared/**/*.js`. It must work as a CommonJS module
-  and as a plain <script>.
+  (i18n catalog, item types, card tools, password-tools)
+  lives in src/shared/ as ES modules, packaged by
+  `src/shared/**/*.js` and `src/shared/package.json`.
+  Main loads them with require(); they may use only what
+  both Node.js and the browser have.
 - Paths built from `__dirname` must exist and be
   packaged (test/build-config.test.js checks every one);
   moving a file changes what they point to.

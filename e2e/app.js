@@ -26,6 +26,9 @@ async function launchApp(userDataDir) {
   const app = await electron.launch({
     executablePath: electronBinary,
     args: [ROOT, `--user-data-dir=${userDataDir}`],
+    // No emulation: the theme comes from the app's own setting, through
+    // nativeTheme, as for a user.
+    colorScheme: null,
     env: { ...process.env, ELECTRON_ENABLE_LOGGING: "0" },
   });
   const page = await app.firstWindow();

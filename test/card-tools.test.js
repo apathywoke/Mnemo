@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const cards = require("../src/renderer/shared/lib/card-tools");
+const cards = require("../src/shared/card-tools.js");
 
 test("card numbers are grouped by brand and checked with the Luhn digit", () => {
   const cases = [

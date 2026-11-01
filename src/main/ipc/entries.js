@@ -1,6 +1,6 @@
 // IPC handlers. Entries: listing, saving, copying, and revealing values, and site icons.
-const { ITEM_TYPES } = require("../../../src/renderer/shared/item-types");
-const cardTools = require("../../../src/renderer/shared/lib/card-tools");
+const { ITEM_TYPES } = require("../../shared/item-types.js");
+const cardTools = require("../../shared/card-tools.js");
 const { fetchSiteFavicon, getFaviconHost } = require("../favicon-fetcher");
 
 const COPYABLE_ENTRY_FIELDS = new Set(["username", "password", "totp"]);

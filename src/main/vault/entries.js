@@ -1,8 +1,8 @@
 // Login and item entries: validation, input normalization, and the
 // summaries sent to the renderer.
-const { ITEM_TYPES } = require("../../renderer/shared/item-types");
+const { ITEM_TYPES } = require("../../shared/item-types.js");
 const { isPrivateKey } = require("../ssh-keys");
-const cardTools = require("../../renderer/shared/lib/card-tools");
+const cardTools = require("../../shared/card-tools.js");
 const {
   LEGACY_VAULT_SCHEMA_VERSION,
   MAX_FAVICON_BYTES,

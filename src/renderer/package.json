@@ -1,0 +1,4 @@
+{
+  "//": "Renderer files are ES modules loaded by index.html. This file tells Node-based tools (tsc, ESLint, tests) so.",
+  "type": "module"
+}

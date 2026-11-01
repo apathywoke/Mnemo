@@ -63,15 +63,20 @@ module.exports = [
       "no-useless-assignment": "off",
     },
   },
-  // Main process, preload, and Node.js tooling: CommonJS.
   {
     files: ["**/*.js"],
+    languageOptions: { ecmaVersion: 2025 },
+    rules: securityRules,
+  },
+  // Main process, preload, and Node.js tooling: CommonJS. Page code gets no
+  // Node.js globals, so a stray require() or process is reported.
+  {
+    files: ["**/*.js"],
+    ignores: ["src/renderer/**", "src/shared/**"],
     languageOptions: {
-      ecmaVersion: 2025,
       sourceType: "commonjs",
       globals: { ...globals.node },
     },
-    rules: securityRules,
   },
   {
     files: ["main.js", "preload.js", "vault-store.js", "src/main/**/*.js"],
@@ -82,27 +87,27 @@ module.exports = [
     files: ["preload.js"],
     languageOptions: { globals: { ...globals.node, window: "readonly" } },
   },
-  // Renderer slices are classic scripts that register on window.mnemoRenderer.
+  // Renderer slices are ES modules loaded by index.html.
   {
     files: ["src/renderer/**/*.js"],
     languageOptions: {
-      sourceType: "script",
+      sourceType: "module",
       globals: { ...globals.browser },
     },
     rules: appCodeRules,
   },
-  // Loaded both by the main process (require) and by the page (<script>).
+  // theme.js runs as a classic script in <head>.
   {
-    files: [
-      "src/shared/**/*.js",
-      "src/renderer/shared/i18n/messages.js",
-      "src/renderer/shared/i18n/translate.js",
-      "src/renderer/shared/item-types.js",
-      "src/renderer/shared/lib/card-tools.js",
-    ],
+    files: ["src/renderer/shared/lib/theme.js"],
+    languageOptions: { sourceType: "script" },
+  },
+  // ES modules imported by the page and required by the main process: only
+  // what both environments have.
+  {
+    files: ["src/shared/**/*.js"],
     languageOptions: {
-      sourceType: "script",
-      globals: { ...globals.browser, module: "readonly", globalThis: "readonly" },
+      sourceType: "module",
+      globals: { ...globals["shared-node-browser"] },
     },
     rules: appCodeRules,
   },

@@ -3,8 +3,8 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const test = require("node:test");
 const VaultStore = require("../vault-store");
-const catalog = require("../src/renderer/shared/i18n/messages");
-const { createTranslator } = require("../src/renderer/shared/i18n/translate");
+const { catalog } = require("../src/shared/i18n/messages.js");
+const { createTranslator } = require("../src/shared/i18n/translate.js");
 const { makeLogin, makeTempDirectory } = require("../support/helpers");
 
 const PASSPHRASE = "correct horse battery staple";
