@@ -14,10 +14,12 @@ const METHOD_GROUPS = [
 ];
 
 for (const group of METHOD_GROUPS) {
-  for (const [target, source, skip] of [
+  /** @type {Array<[object, object, string[]]>} */
+  const copies = [
     [VaultStore.prototype, group.prototype, ["constructor"]],
     [VaultStore, group, ["length", "name", "prototype"]],
-  ]) {
+  ];
+  for (const [target, source, skip] of copies) {
     for (const [name, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(source))) {
       if (skip.includes(name)) continue;
       assert.ok(!Object.hasOwn(target, name), `VaultStore already has ${name}`);

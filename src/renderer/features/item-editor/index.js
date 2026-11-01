@@ -31,7 +31,7 @@
       input.maxLength = field.max;
       input.autocomplete = "off";
       input.spellcheck = false;
-      if (multiline) input.rows = field.mono ? 6 : 4;
+      if (multiline) /** @type {HTMLTextAreaElement} */ (input).rows = field.mono ? 6 : 4;
       if (field.mono) input.classList.add("mono-input");
       if (field.inputMode) input.inputMode = field.inputMode;
       if (field.placeholder) input.placeholder = field.placeholder;
@@ -40,7 +40,7 @@
       if (field.kind !== "secret") input.value = details?.fields?.[field.key] ?? "";
 
       if (field.kind === "secret" && !multiline && !field.reveal) {
-        input.type = "password";
+        /** @type {HTMLInputElement} */ (input).type = "password";
         const row = document.createElement("div");
         row.className = "password-input-row";
         const toggle = document.createElement("button");
@@ -53,7 +53,7 @@
         row.append(input, toggle);
         return [label, row];
       }
-      if (!multiline) input.type = "text";
+      if (!multiline) /** @type {HTMLInputElement} */ (input).type = "text";
       return [label, input];
     }
 

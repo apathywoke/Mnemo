@@ -259,7 +259,7 @@ function httpsGet(value, { maxBytes, accept = "*/*", userAgent, toFile = null, o
       response.on("end", () => resolve({ buffer: Buffer.concat(chunks) }));
     });
     request.on("timeout", () => request.destroy(new Error("Could not reach the update server.")));
-    request.on("error", (error) => reject(
+    request.on("error", (/** @type {Error & { notFound?: boolean }} */ error) => reject(
       error.notFound || /too large|not allowed|reach/.test(error.message)
         ? error
         : new Error("Could not reach the update server."),

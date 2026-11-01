@@ -47,7 +47,7 @@ function readReply(message) {
 // decoder cannot start, does not reply in time, exits, or replies with
 // something else.
 function decodeFavicon(image, {
-  fork = (...args) => utilityProcess.fork(...args),
+  fork = (/** @type {Parameters<typeof utilityProcess.fork>} */ ...args) => utilityProcess.fork(...args),
   timeoutMs = DECODE_TIMEOUT_MS,
 } = {}) {
   if (!Buffer.isBuffer(image) || image.length === 0 || image.length > MAX_IMAGE_BYTES) {

@@ -30,6 +30,7 @@ function normalizeProfileName(value) {
   if (
     length < 1 ||
     length > MAX_PROFILE_NAME_CHARACTERS ||
+    // eslint-disable-next-line no-control-regex -- rejects control characters in names
     /[\u0000-\u001f\u007f]/.test(name)
   ) {
     throw new Error(`Vault names must be 1–${MAX_PROFILE_NAME_CHARACTERS} characters long.`);

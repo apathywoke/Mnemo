@@ -4,7 +4,14 @@ Mnemo is a password manager: security beats convenience.
 
 - Write code, comments, docs, and commit messages in English.
 - Add no dependencies: having none at runtime is a
-  security property of this project.
+  security property of this project. Development tools
+  go in devDependencies, pinned to exact versions.
+- Types are JSDoc checked by `tsc` (tsconfig.json; the
+  stricter tsconfig.strict.json covers src/main/vault/
+  and src/shared/). Methods in src/main/vault/store-*.js
+  carry `/** @this {Store} */`. Set innerHTML only from
+  constants (ESLint enforces it); build DOM with
+  textContent.
 - Keep the vault file format, AAD strings, and crypto
   parameters unless the task says otherwise.
 - Follow existing patterns: enqueueMutation; re-check
@@ -40,5 +47,7 @@ Mnemo is a password manager: security beats convenience.
   docs/THREAT_MODEL.md.
 - No `Co-Authored-By: Claude` or other Claude
   attribution in commits or pull requests.
-- Finish with `npm test` passing and a short summary
-  of what changed and what is left.
+- Finish with `npm run check` (lint, types, `npm test`)
+  passing, plus `npm run test:e2e` when the UI or startup
+  changed, and a short summary of what changed and what
+  is left.

@@ -1,6 +1,7 @@
-# Runs the test suite on every push and pull request, on Linux and macOS.
-# Tests stub Electron, so its binary is not downloaded. Actions are pinned
-# to commit SHAs, as in release.yml.
+# Runs the test suite on every push and pull request, on Linux and macOS,
+# plus lint, type checks, and end-to-end tests of the real app. Unit tests
+# stub Electron, so only the e2e job downloads its binary. Actions are
+# pinned to commit SHAs, as in release.yml.
 name: Test
 
 on:
@@ -36,3 +37,41 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
 
       - run: npm test
+
+  # Lint and type checks do not depend on the platform.
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+  # Drives the real app, so this job downloads the Electron binary.
+  e2e:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run test:e2e

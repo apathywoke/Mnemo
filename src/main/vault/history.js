@@ -21,6 +21,7 @@ const { isValidItemEntry, isValidLoginEntry } = require("./entries");
 function normalizeFolderName(input) {
   if (typeof input !== "string" || !input.trim()) throw new Error("Enter a folder name.");
   const name = input.normalize("NFC").trim();
+  // eslint-disable-next-line no-control-regex -- rejects control characters in names
   if (name.length > MAX_FOLDER_NAME || /[\u0000-\u001f\u007f]/.test(name)) {
     throw new Error("Folder names must be 1–100 characters long.");
   }
@@ -121,6 +122,7 @@ function isValidEntryMeta(meta, core, context) {
 }
 
 function metaOf(entry) {
+  /** @type {Record<string, any>} */
   const meta = {};
   for (const key of META_KEYS) {
     if (entry && Object.hasOwn(entry, key)) meta[key] = entry[key];
@@ -133,6 +135,7 @@ function metaOf(entry) {
 function withMeta(entry, source, changes = {}) {
   const result = { ...entry };
   for (const key of META_KEYS) delete result[key];
+  /** @type {Record<string, any>} */
   const meta = { ...metaOf(source), ...changes };
   if (meta.folderId) result.folderId = meta.folderId;
   if (meta.favorite === true) result.favorite = true;
@@ -151,6 +154,7 @@ function snapshotOf(entry, now) {
     notes: entry.notes,
   };
   if (entry.type === "login") {
+    /** @type {Record<string, any>} */
     const snapshot = { ...base, username: entry.username, url: entry.url, password: entry.password };
     if (entry.totp) snapshot.totp = entry.totp;
     return snapshot;

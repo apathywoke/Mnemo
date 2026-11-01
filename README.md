@@ -17,6 +17,19 @@ npm start
 Electron is pinned to version 45.0.0. Keep Electron and its bundled Chromium
 security updates current.
 
+## Checks
+
+```sh
+npm run check      # ESLint, TypeScript checks of the JSDoc types, unit tests
+npm run test:e2e   # drives the real app with Playwright (needs Electron's binary)
+```
+
+The app has no runtime dependencies; ESLint, TypeScript, and
+`playwright-core` are development tools only and are not packaged. Types are
+written as JSDoc in the `.js` files, so what `tsc` checks is exactly what
+ships. The end-to-end tests start the app from this checkout with a fresh
+data folder and update checks turned off.
+
 ## Release builds
 
 `npm run dist:mac` produces signed, notarized `.dmg` and `.zip` builds with

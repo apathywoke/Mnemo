@@ -64,6 +64,7 @@ test("vault lifecycle, encrypted entries, validation, icon storage, and locking"
     /Invalid login entry/,
   );
   await assert.rejects(
+    // eslint-disable-next-line no-script-url -- checks that script URLs are refused
     store.saveEntry(makeLogin({ url: "javascript:alert(1)" })),
     /valid website address/,
   );
@@ -394,6 +395,7 @@ test("imported logins are sealed, deduplicated, and validated", async (t) => {
     { name: "Existing", username: "user@example.com", password: "same", url: "example.com/login", notes: "" },
     { name: "New", username: "n", password: "new-pw", url: "new.example", notes: "x" },
     { name: "New", username: "n", password: "new-pw", url: "new.example", notes: "x" },
+    // eslint-disable-next-line no-script-url -- checks that script URLs are refused
     { name: "Bad", username: "", password: "pw", url: "javascript:alert(1)", notes: "" },
     { name: "Long", username: "", password: "x".repeat(5000), url: "", notes: "" },
   ]);

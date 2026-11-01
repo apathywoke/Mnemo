@@ -285,11 +285,11 @@
       options[(next + options.length) % options.length].focus();
     });
     document.addEventListener("pointerdown", (event) => {
-      if (!newItemMenu.hidden && !event.target.closest(".new-item")) setMenuOpen(false);
+      if (!newItemMenu.hidden && !/** @type {Element} */ (event.target).closest(".new-item")) setMenuOpen(false);
     });
 
     // Type filter above the list.
-    for (const option of document.querySelectorAll("[data-type-filter]")) {
+    for (const option of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("[data-type-filter]"))) {
       option.addEventListener("click", () => {
         state.typeFilter = option.dataset.typeFilter;
         for (const other of document.querySelectorAll("[data-type-filter]")) {

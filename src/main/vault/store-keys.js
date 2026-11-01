@@ -39,14 +39,18 @@ const {
   readFileWithLimit,
 } = require("./attachments");
 
+/** @typedef {import("./index").Instance} Store */
+
 class VaultStoreKeys {
   // The recovery key created with the vault, handed out once.
+  /** @this {Store} */
   takeIssuedRecoveryKey() {
     const recoveryKey = this.issuedRecoveryKey;
     this.issuedRecoveryKey = null;
     return recoveryKey;
   }
 
+  /** @this {Store} */
   hasRecoveryKey() {
     this.requireUnlocked();
     return this.envelope.version === FORMAT_VERSION;
@@ -55,6 +59,7 @@ class VaultStoreKeys {
   // Creates a new recovery key for the open vault; the previous one stops
   // working for this file. The passphrase is required again so that an
   // unattended unlocked app cannot be used to mint a key.
+  /** @this {Store} */
   async createRecoveryKey(passphrase) {
     return this.enqueueMutation(async () => {
       this.requireUnlocked();
@@ -66,6 +71,7 @@ class VaultStoreKeys {
   // Sets a new master passphrase. Like every change of credentials it also
   // replaces the vault key and the recovery key; the new recovery key is
   // returned.
+  /** @this {Store} */
   async changePassphrase(currentPassphrase, newPassphrase) {
     return this.enqueueMutation(async () => {
       this.requireUnlocked();
@@ -77,6 +83,7 @@ class VaultStoreKeys {
 
   // For the open vault, inside the mutation queue: checks the current
   // passphrase, then rotates the key under `newPassphrase`.
+  /** @this {Store} */
   async rotateOpenVault(currentPassphrase, newPassphrase) {
     const sessionEpoch = this.sessionEpoch;
     await this.verifyPassphrase(currentPassphrase);
@@ -100,6 +107,7 @@ class VaultStoreKeys {
     return rotated.recoveryKey;
   }
 
+  /** @this {Store} */
   async verifyPassphrase(passphrase) {
     const header = headerOf(this.envelope);
     const salt = decodeBase64(this.envelope.kdf.salt, SALT_BYTES, SALT_BYTES);
@@ -120,6 +128,7 @@ class VaultStoreKeys {
 
   // Opens the vault with its recovery key, sets a new master passphrase, and
   // replaces the recovery key, since the old one has now been typed in.
+  /** @this {Store} */
   async recoverWithKey(recoveryKeyText, newPassphrase) {
     return this.enqueueMutation(async () => {
       const sessionEpoch = this.sessionEpoch;
@@ -174,6 +183,7 @@ class VaultStoreKeys {
   // anything fails before the rename, the new files are removed and the old
   // vault and its files are untouched. Afterwards the caller removes the old
   // files (`replacedAttachmentIds`).
+  /** @this {Store} */
   async rekeyNow({ vaultData, oldKey, passphrase, readAttachment, sessionEpoch, interrupted }) {
     const newKey = randomBytes(KEY_BYTES);
     const resealed = new Map();
@@ -243,6 +253,7 @@ class VaultStoreKeys {
 
   // Decrypts one attachment with the old keys and writes it again under a
   // new file key and ID. Only this one file is held in memory.
+  /** @this {Store} */
   async rekeyAttachment(entry, attachment, oldKey, newKey, readAttachment, addedFiles) {
     const attachmentId = randomUUID();
     const fileKey = randomBytes(KEY_BYTES);
@@ -273,6 +284,7 @@ class VaultStoreKeys {
     }
   }
 
+  /** @this {Store} */
   readAttachmentFile(attachment) {
     return readFileWithLimit(this.attachmentPath(attachment.id), MAX_ATTACHMENT_BYTES + ATTACHMENT_OVERHEAD);
   }

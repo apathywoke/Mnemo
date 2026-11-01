@@ -18,6 +18,7 @@ class SettingsStore {
     // Update checks contact GitHub; daily by default because they deliver
     // security fixes, and adjustable or off in Settings.
     this.settings = { language: defaultLanguage, theme: DEFAULT_THEME, updateInterval: DEFAULT_UPDATE_INTERVAL };
+    /** @type {Promise<unknown>} */
     this.writeQueue = Promise.resolve();
   }
 

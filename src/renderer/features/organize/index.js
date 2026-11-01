@@ -115,6 +115,7 @@
 
     function renderScopeMenu() {
       const scope = state.scope;
+      /** @type {HTMLElement[]} */
       const items = [
         menuOption({
           label: t("vault.allItems"),
@@ -190,7 +191,7 @@
       options[(next + options.length) % options.length].focus();
     });
     document.addEventListener("pointerdown", (event) => {
-      if (!scopeMenu.hidden && !event.target.closest(".scope-picker")) setMenuOpen(false);
+      if (!scopeMenu.hidden && !/** @type {Element} */ (event.target).closest(".scope-picker")) setMenuOpen(false);
     });
 
     // --- Folders dialog -----------------------------------------------------

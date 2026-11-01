@@ -64,8 +64,15 @@ function publicBlobFromOpenSsh(privateKey) {
 // PEM keys (PKCS#8, PKCS#1, SEC1) through Node's crypto; encrypted PEM keys
 // cannot be read without their passphrase.
 function publicBlobFromPem(privateKey, passphrase) {
-  const key = createPublicKey({ key: privateKey, format: "pem", passphrase: passphrase || undefined });
-  const jwk = key.export({ format: "jwk" });
+  // Node derives the public key from a private one and accepts its
+  // passphrase here; @types/node does not list `passphrase` for this call.
+  const key = createPublicKey(/** @type {import("node:crypto").PublicKeyInput} */ ({
+    key: privateKey,
+    format: "pem",
+    passphrase: passphrase || undefined,
+  }));
+  /** @type {Record<string, string>} */
+  const jwk = /** @type {any} */ (key.export({ format: "jwk" }));
   if (jwk.kty === "OKP" && jwk.crv === "Ed25519") {
     return Buffer.concat([sshString(Buffer.from("ssh-ed25519")), sshString(Buffer.from(jwk.x, "base64url"))]);
   }

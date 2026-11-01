@@ -23,9 +23,12 @@ const {
 } = require("./entries");
 const { withMeta, historyAfterChange, contentChanged } = require("./history");
 
+/** @typedef {import("./index").Instance} Store */
+
 class VaultStoreEntries {
   // Returns display metadata only. Passwords and notes stay in the main process
   // until a caller asks for one entry explicitly.
+  /** @this {Store} */
   listEntries() {
     this.requireUnlocked();
     return this.vaultData.entries
@@ -34,10 +37,12 @@ class VaultStoreEntries {
       .map(toEntrySummary);
   }
 
+  /** @this {Store} */
   getEntry(id) {
     return toEntryDetails(this.findEntry(id));
   }
 
+  /** @this {Store} */
   revealPassword(id) {
     const entry = this.findEntry(id);
     if (entry.type !== "login") throw new Error("Invalid login entry.");
@@ -49,6 +54,7 @@ class VaultStoreEntries {
   }
 
   // A secret field of a card, identity, or SSH key, for copy or reveal.
+  /** @this {Store} */
   revealItemSecret(id, field) {
     const entry = this.findEntry(id);
     if (entry.type === "login" || !Object.hasOwn(entry.secrets, field)) {
@@ -63,6 +69,7 @@ class VaultStoreEntries {
 
   // Builds the stored form of an item from normalized input, keeping secrets
   // that were left blank and recomputing derived fields.
+  /** @this {Store} */
   buildItemEntry(normalized, existing, id, timestamp) {
     const secrets = {};
     const plainSecrets = {};
@@ -119,6 +126,7 @@ class VaultStoreEntries {
     };
   }
 
+  /** @this {Store} */
   async saveItem(input) {
     return this.enqueueMutation(async () => {
       this.requireUnlocked();
@@ -147,6 +155,7 @@ class VaultStoreEntries {
   }
 
   // The current one-time code for an entry. The secret stays here.
+  /** @this {Store} */
   getTotpCode(id, now = Date.now()) {
     const entry = this.findEntry(id);
     if (!entry.totp) throw new Error("This login has no one-time code.");
@@ -159,6 +168,7 @@ class VaultStoreEntries {
     return generateTotp(config, now);
   }
 
+  /** @this {Store} */
   findEntry(id) {
     this.requireUnlocked();
     if (typeof id !== "string" || !UUID_PATTERN.test(id)) {
@@ -169,6 +179,7 @@ class VaultStoreEntries {
     return entry;
   }
 
+  /** @this {Store} */
   async saveEntry(input) {
     return this.enqueueMutation(async () => {
       this.requireUnlocked();
@@ -234,6 +245,7 @@ class VaultStoreEntries {
   // Adds logins from an import ({ name, username, password, url, notes }) in
   // one save. Entries that fail validation or already exist with the same
   // name, username, website, and password are skipped and counted.
+  /** @this {Store} */
   async importLogins(logins) {
     return this.enqueueMutation(async () => {
       this.requireUnlocked();
@@ -334,6 +346,7 @@ class VaultStoreEntries {
     });
   }
 
+  /** @this {Store} */
   async saveFavicon(id, favicon) {
     return this.enqueueMutation(async () => {
       this.requireUnlocked();
@@ -370,6 +383,7 @@ class VaultStoreEntries {
 
   // --- Saving content ------------------------------------------------------------
 
+  /** @this {Store} */
   nextVaultData(changes) {
     return {
       schemaVersion: VAULT_SCHEMA_VERSION,
@@ -378,6 +392,7 @@ class VaultStoreEntries {
     };
   }
 
+  /** @this {Store} */
   async replaceEntry(entry, next) {
     const index = this.vaultData.entries.indexOf(entry);
     if (index === -1) throw new Error("This login no longer exists.");
@@ -388,6 +403,7 @@ class VaultStoreEntries {
 
   // Editor input to a folder: undefined keeps the current folder, null means
   // none, and an ID must name an existing folder.
+  /** @this {Store} */
   folderIdFor(folderId) {
     if (folderId === undefined || folderId === null) return folderId;
     if (!this.vaultData.folders.some((folder) => folder.id === folderId)) {
@@ -399,6 +415,7 @@ class VaultStoreEntries {
   // Combines saved content with the entry's metadata. A new entry gets the
   // chosen folder. An edit that changes nothing returns `existing` itself; a
   // real change puts the previous content into the history.
+  /** @this {Store} */
   withSavedContent(existing, content, folderId, now) {
     if (!existing) return withMeta(content, null, folderId ? { folderId } : {});
     const changed = contentChanged(existing, content);
@@ -411,6 +428,7 @@ class VaultStoreEntries {
   }
 
   // Typing the same password again keeps the sealed record (not a change).
+  /** @this {Store} */
   resealedPassword(existing, id, password) {
     if (existing) {
       try {
@@ -422,6 +440,7 @@ class VaultStoreEntries {
     return sealPassword(password, this.dataKey, id);
   }
 
+  /** @this {Store} */
   resealedTotp(existing, id, config) {
     if (existing?.totp) {
       try {
