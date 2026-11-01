@@ -1,0 +1,23 @@
+/* Vault dashboard frame and header. Loaded by styles.css, in order. */
+
+.vault-dashboard {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  align-self: stretch;
+  padding: 0;
+}
+
+.vault-dashboard:not([hidden]) {
+  animation: dashboard-enter 480ms 90ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 70px;
+  padding: 0 14px 16px;
+  border-bottom: 1px solid var(--line);
+}

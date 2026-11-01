@@ -41,6 +41,8 @@ module.exports = {
     "styles.css",
     "src/main/**/*.js",
     "src/renderer/**/*.js",
+    // Stylesheets that styles.css imports, next to their slices.
+    "src/renderer/**/*.css",
     "src/shared/**/*.js",
     // Marks src/shared/ as ES modules for the main process.
     "src/shared/package.json",

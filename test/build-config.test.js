@@ -299,9 +299,10 @@ test("release builds include every module that main and preload require", async 
 });
 
 
-// The page loads one module script, which imports the rest; theme.js and the
-// stylesheet are linked directly. Every file in that graph must exist and be
-// packaged, and imports are relative paths only (no bare package names).
+// The page loads one module script, which imports the rest, and one
+// stylesheet, which @imports the rest; theme.js is linked directly. Every
+// file in those graphs must exist and be packaged, and imports are relative
+// paths only (no bare package names).
 test("every script and stylesheet the page loads exists and is packaged", async () => {
   const root = path.join(__dirname, "..");
   const html = await fs.readFile(path.join(root, "index.html"), "utf8");
@@ -321,8 +322,14 @@ test("every script and stylesheet the page loads exists and is packaged", async 
     const file = queue.shift();
     if (seen.has(file)) continue;
     seen.add(file);
-    if (!file.endsWith(".js")) continue;
     const source = await fs.readFile(path.join(root, file), "utf8");
+    if (file.endsWith(".css")) {
+      for (const [, specifier] of source.matchAll(/@import\s+"([^"]+)";/g)) {
+        assert.match(specifier, /^\.{1,2}\/.+\.css$/, `${file} imports ${specifier}`);
+        queue.push(path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier)));
+      }
+      continue;
+    }
     for (const [, specifier] of source.matchAll(/^\s*(?:import|export)\b[^;]*?\bfrom\s+"([^"]+)";/gm)) {
       assert.match(specifier, /^\.{1,2}\/.+\.js$/, `${file} imports ${specifier}`);
       queue.push(path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier)));
@@ -331,7 +338,8 @@ test("every script and stylesheet the page loads exists and is packaged", async 
   }
 
   assert.ok(seen.has("src/shared/password-tools.js") && seen.has("styles.css"), [...seen].join(", "));
-  assert.ok(seen.size > 40);
+  assert.ok(seen.has("src/renderer/app/styles/tokens.css"));
+  assert.ok(seen.size > 90);
   const patterns = packagedPatterns();
   for (const file of seen) {
     await fs.access(path.join(root, file));

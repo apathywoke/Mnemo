@@ -1,0 +1,22 @@
+/* Dialog frame and per-dialog sizes. Loaded by styles.css, in order. */
+
+.app-dialog {
+  width: min(92vw, 460px);
+  max-height: min(90vh, 760px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--c-333333);
+  border-radius: 15px;
+  background: var(--c-111111);
+  color: var(--c-eeeeee);
+  box-shadow: 0 24px 80px var(--c-rgb-0-0-0-70);
+}
+
+#entry-dialog {
+  width: min(92vw, 560px);
+}
+
+#settings-dialog {
+  width: min(94vw, 680px);
+  min-height: 210px;
+}

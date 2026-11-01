@@ -1,0 +1,63 @@
+/* Backup reminder banner. Loaded by styles.css, in order. */
+
+.backup-recovery-warning {
+  margin: 12px 14px 0;
+  padding: 8px 10px;
+  gap: 8px;
+}
+
+.backup-recovery-warning[hidden] {
+  display: none;
+}
+
+.backup-recovery-warning > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.backup-recovery-warning .recovery-warning-mark {
+  width: 17px;
+  height: 17px;
+  flex-basis: 17px;
+  font-size: 10px;
+}
+
+.backup-recovery-warning p {
+  margin-top: 1px;
+}
+
+.backup-warning-dismiss {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  align-self: center;
+  place-items: center;
+  margin-right: -3px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-ab9d74);
+  cursor: pointer;
+}
+
+.backup-warning-dismiss:hover {
+  border-color: var(--c-554721);
+  background: var(--c-211c10);
+  color: var(--c-e3d5a9);
+}
+
+.backup-warning-dismiss:focus-visible {
+  outline: 1px solid var(--c-e3d5a9);
+  outline-offset: 2px;
+}
+
+.backup-warning-dismiss svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}

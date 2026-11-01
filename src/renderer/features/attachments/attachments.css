@@ -1,0 +1,87 @@
+/* Detail: attachments. Loaded by styles.css, in order. */
+
+/* Detail: attachments. */
+.detail-attachments {
+  margin-top: 30px;
+}
+
+.detail-attachments[hidden] {
+  display: none;
+}
+
+.detail-attachments-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.detail-section-label {
+  color: var(--c-777777);
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+}
+
+.add-attachment-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.add-attachment-button[hidden] {
+  display: none;
+}
+
+.add-attachment-button svg {
+  width: 13px;
+  height: 13px;
+}
+
+.attachment-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attachment-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  border-bottom: 1px solid var(--c-292929);
+}
+
+.attachment-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--c-9a9a9a);
+}
+
+.attachment-name {
+  overflow: hidden;
+  color: var(--c-dedede);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-size {
+  color: var(--c-777777);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.attachments-empty {
+  margin: 4px 0 0;
+  color: var(--c-777777);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.attachments-empty[hidden] {
+  display: none;
+}

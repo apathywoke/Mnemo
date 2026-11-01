@@ -1,0 +1,111 @@
+/* Import dialog. Loaded by styles.css, in order. */
+
+/* Import dialog */
+#import-dialog {
+  width: min(92vw, 520px);
+}
+
+.import-content {
+  padding: 25px 28px 24px;
+}
+
+.import-step[hidden] {
+  display: none;
+}
+
+.import-sources {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.import-sources legend {
+  margin-bottom: 10px;
+  padding: 0;
+}
+
+.import-source {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--c-333333);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.import-source:hover {
+  border-color: var(--c-4b4b4b);
+}
+
+.import-source:has(input:checked) {
+  border-color: var(--c-eeeeee);
+  background: var(--c-161616);
+}
+
+.import-source input {
+  grid-row: span 2;
+  margin: 0;
+  accent-color: var(--c-eeeeee);
+}
+
+.import-source-name {
+  color: var(--c-eeeeee);
+  font-size: 14px;
+}
+
+.import-source-hint {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.import-instructions {
+  margin-top: 14px;
+}
+
+.import-mnemo-fields {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.import-mnemo-fields[hidden] {
+  display: none;
+}
+
+.import-mnemo-fields label {
+  color: var(--c-bcbcbc);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.import-file-name {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.import-summary {
+  margin: 10px 0 0;
+  color: var(--c-eeeeee);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.import-skipped {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+#import-done-step .recovery-warning {
+  margin-top: 16px;
+}

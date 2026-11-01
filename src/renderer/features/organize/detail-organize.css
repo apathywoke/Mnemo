@@ -1,0 +1,110 @@
+/* Detail: trash banner and organize bar. Loaded by styles.css, in order. */
+
+/* Detail: trash banner, organize bar (favorite, folder, history). */
+.trash-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  margin-top: 16px;
+  padding: 11px 12px;
+  border: 1px solid var(--c-554721);
+  border-radius: 10px;
+  background: var(--c-17140d);
+  color: var(--c-d6c58f);
+}
+
+.trash-banner[hidden] {
+  display: none;
+}
+
+.trash-banner-text {
+  display: grid;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.trash-banner-text strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trash-banner-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.trash-banner .detail-action {
+  color: var(--c-d6c58f);
+}
+
+.detail-organize {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.organize-chip {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--c-2a2a2a);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--c-aaaaaa);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease;
+}
+
+.organize-chip[hidden] {
+  display: none;
+}
+
+.organize-chip:hover,
+.organize-chip:focus-within {
+  border-color: var(--c-4b4b4b);
+  color: var(--c-f2f2f2);
+}
+
+.organize-chip svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.favorite-toggle[aria-pressed="true"] {
+  border-color: var(--c-554721);
+  background: var(--c-17140d);
+  color: var(--c-d6c58f);
+}
+
+.favorite-toggle[aria-pressed="true"] svg {
+  fill: currentColor;
+}
+
+.folder-chip {
+  padding-right: 4px;
+}
+
+.folder-select {
+  max-width: 180px;
+  padding: 4px 18px 4px 0;
+  border: 0;
+  appearance: none;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23999' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 2px center / 10px 10px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-overflow: ellipsis;
+}
+
+.folder-select:focus-visible {
+  outline: none;
+}

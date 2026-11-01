@@ -1,0 +1,128 @@
+/* Toast notifications. Loaded by styles.css, in order. */
+
+.toast-region {
+  position: fixed;
+  z-index: 1000;
+  right: 26px;
+  bottom: 24px;
+  width: min(340px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast-notification {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 13px;
+  border: 1px solid var(--c-373737);
+  border-radius: 13px;
+  background: var(--c-rgb-24-24-24-96);
+  box-shadow: 0 12px 36px var(--c-rgb-0-0-0-40);
+  color: var(--c-d5d5d5);
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0;
+  transform: translateY(9px);
+  transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: auto;
+  backdrop-filter: blur(14px);
+}
+
+.toast-notification::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--c-rgb-255-255-255-12);
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: toast-background-countdown 2500ms cubic-bezier(0.35, 0.2, 0.65, 0.8) forwards;
+  pointer-events: none;
+}
+
+.toast-error::before {
+  background: var(--c-rgb-232-120-120-12);
+}
+
+.toast-info::before {
+  background: var(--c-rgb-230-230-230-8);
+}
+
+.toast-icon,
+.toast-message,
+.toast-dismiss {
+  position: relative;
+  z-index: 1;
+}
+
+.toast-notification.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes toast-background-countdown {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.toast-icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--c-70c58b);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.toast-error .toast-icon {
+  color: var(--c-e87878);
+}
+
+.toast-info .toast-icon {
+  color: var(--c-aaaaaa);
+}
+
+.toast-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast-dismiss {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-888888);
+  cursor: pointer;
+}
+
+.toast-dismiss:hover {
+  border-color: var(--c-444444);
+  color: var(--c-eeeeee);
+}
+
+.toast-dismiss:focus-visible {
+  outline: 1px solid var(--c-eeeeee);
+  outline-offset: 2px;
+}
+
+.toast-dismiss svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}

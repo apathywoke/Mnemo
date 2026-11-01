@@ -1,0 +1,85 @@
+/* Settings categories (tabs and panes). Loaded by styles.css, in order. */
+
+/* Settings categories: a vertical list beside the panes, tabs on top when
+   the dialog is narrow. */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 28px;
+  margin-top: 22px;
+}
+
+.settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-tab {
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--c-9a9a9a);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.settings-tab:hover {
+  color: var(--c-dddddd);
+}
+
+.settings-tab[aria-selected="true"] {
+  background: var(--c-1d1d1d);
+  color: var(--c-f2f2f2);
+}
+
+.settings-tab:focus-visible {
+  outline: 1px solid var(--white);
+  outline-offset: 0;
+}
+
+.settings-panes {
+  min-width: 0;
+  min-height: 300px;
+}
+
+.settings-pane[hidden],
+.settings-pane-body[hidden],
+.settings-pane-locked[hidden] {
+  display: none;
+}
+
+.settings-pane > .settings-section:first-child,
+.settings-pane-body > .settings-section:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settings-pane-locked {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .settings-tabs {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .settings-tab {
+    white-space: nowrap;
+  }
+
+  .settings-panes {
+    min-height: 0;
+  }
+}

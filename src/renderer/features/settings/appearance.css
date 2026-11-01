@@ -1,0 +1,200 @@
+/* Header gear and the appearance (theme) picker. Loaded by styles.css, in order. */
+
+/* The gear's holes take the header background so they read in both themes. */
+.settings-gear-hole {
+  fill: var(--c-101010);
+}
+
+/* Appearance picker. Previews use fixed palettes so each card shows its own
+   theme whatever the current one is. */
+.settings-field-label {
+  color: var(--c-8b8b8b);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.theme-option {
+  display: grid;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.theme-preview {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  outline: 1px solid var(--c-333333);
+  outline-offset: 0;
+  transition: outline-color 140ms ease, outline-offset 140ms ease;
+}
+
+.theme-option:hover .theme-preview {
+  outline-color: var(--c-555555);
+}
+
+.theme-option:has(input:checked) .theme-preview {
+  outline: 2px solid var(--c-eeeeee);
+  outline-offset: 3px;
+}
+
+.theme-option:has(input:focus-visible) .theme-preview {
+  outline: 2px solid var(--c-eeeeee);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px var(--c-2a2a2a);
+}
+
+.theme-option-name {
+  color: var(--c-9a9a9a);
+  font-size: 12px;
+  text-align: center;
+}
+
+.theme-option:has(input:checked) .theme-option-name {
+  color: var(--c-f2f2f2);
+}
+
+.theme-mock {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(145deg, var(--mock-outer-a), var(--mock-outer-b));
+}
+
+.theme-mock-dark {
+  --mock-outer-a: #1c1c1c;
+  --mock-outer-b: #0e0e0e;
+  --mock-window: #161616;
+  --mock-panel: #1f1f1f;
+  --mock-line: #3d3d3d;
+  --mock-tile: #2c2c2c;
+}
+
+.theme-mock-light {
+  --mock-outer-a: #d9d9d9;
+  --mock-outer-b: #c4c4c4;
+  --mock-window: #ececec;
+  --mock-panel: #ffffff;
+  --mock-line: #d4d4d4;
+  --mock-tile: #eeeeee;
+}
+
+/* "System": dark on the left, light on the right. */
+.theme-option input[value="system"] ~ .theme-preview .theme-mock-light {
+  clip-path: polygon(62% 0, 100% 0, 100% 100%, 38% 100%);
+}
+
+.theme-mock-window {
+  position: absolute;
+  top: 22%;
+  right: -8%;
+  bottom: -8%;
+  left: 14%;
+  display: grid;
+  grid-template-columns: 30% 1fr;
+  border-radius: 7px;
+  background: var(--mock-window);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 25%);
+}
+
+.theme-mock-dots {
+  position: absolute;
+  top: 7%;
+  left: 5%;
+  display: flex;
+  gap: 3px;
+}
+
+.theme-mock i,
+.theme-mock b {
+  display: block;
+  border-radius: 2px;
+  background: var(--mock-line);
+}
+
+.theme-mock-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}
+
+.theme-mock-side {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 28% 14% 0;
+}
+
+.theme-mock-side i {
+  height: 3px;
+}
+
+.theme-mock-side i:nth-child(2) {
+  width: 75%;
+}
+
+.theme-mock-side i:nth-child(3) {
+  width: 45%;
+}
+
+.theme-mock-side b {
+  width: 9px;
+  height: 9px;
+  margin-top: auto;
+  margin-bottom: 18%;
+  border-radius: 50%;
+}
+
+.theme-mock-main {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14% 0 0 10%;
+  border-radius: 7px 0 0 0;
+  background: var(--mock-panel);
+}
+
+.theme-mock-main > i {
+  width: 22%;
+  height: 3px;
+}
+
+.theme-mock-main > .theme-mock-short {
+  width: 38%;
+}
+
+.theme-mock-tiles {
+  display: flex;
+  gap: 6%;
+  margin-top: 10%;
+}
+
+.theme-mock-tiles i {
+  width: 30%;
+  aspect-ratio: 4 / 3;
+  border-radius: 4px;
+  background: var(--mock-tile);
+}
+
+@media (max-width: 640px) {
+  .theme-options {
+    gap: 8px;
+  }
+}
+
+/* The cards are labels inside .settings-field; undo the field-label style. */
+.settings-field .theme-option {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+}

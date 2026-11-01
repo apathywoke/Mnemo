@@ -30,6 +30,18 @@ written as JSDoc in the `.js` files, so what `tsc` checks is exactly what
 ships. The end-to-end tests start the app from this checkout with a fresh
 data folder and update checks turned off.
 
+For a change that should not alter how the app looks (moving CSS, for
+example), capture the main screens in both themes before and after it and
+compare them pixel by pixel. Rendering can differ by a pixel between runs,
+so capture each side a few times; a screen passes when some "after" image
+equals some "before" image:
+
+```sh
+node e2e/capture-screens.js /tmp/before-1   # old code; repeat for -2 and -3
+node e2e/capture-screens.js /tmp/after-1    # new code; repeat for -2 and -3
+node e2e/compare-screens.js /tmp/before-* -- /tmp/after-* --diff /tmp/diff
+```
+
 ## Release builds
 
 `npm run dist:mac` produces signed, notarized `.dmg` and `.zip` builds with
@@ -67,8 +79,10 @@ document entry point. Every slice is a native ES module; there is no bundler.
 `index.html` loads one module script, `src/renderer/app/index.js`, whose
 imports pull in the rest, so what ships is exactly the source.
 `src/renderer/shared/lib/theme.js` is the only classic script: it runs in
-`<head>` to pick the light or dark palette before the first paint. The
-renderer has no Node.js access; sensitive
+`<head>` to pick the light or dark palette before the first paint. Styles
+live next to the slices that use them (`*.css` under `src/renderer/`); the
+root `styles.css` only `@import`s them, and its order is the cascade order.
+The renderer has no Node.js access; sensitive
 operations still go through the narrow `vaultApp` preload API. `main.js` and
 `preload.js` remain outside the renderer feature layers because they belong to
 separate Electron processes.

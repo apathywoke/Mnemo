@@ -1,0 +1,73 @@
+/* Primary, secondary, and text buttons; form errors. Loaded by styles.css, in order. */
+
+.primary-button,
+.secondary-button {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.primary-button {
+  width: 74px;
+  height: 74px;
+  justify-self: end;
+  margin-top: 54px;
+  padding: 9px;
+  border: 1px solid var(--white);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--c-090909);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.primary-button:hover:not(:disabled) {
+  transform: scale(1.045);
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.text-button {
+  align-self: flex-start;
+  margin-top: 14px;
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  color: var(--c-969696);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--c-484848);
+  text-underline-offset: 4px;
+}
+
+.text-button:hover {
+  color: var(--white);
+  text-decoration-color: var(--c-a0a0a0);
+}
+
+.form-error {
+  margin: 5px 0 0;
+  color: var(--error);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.form-error[hidden] {
+  display: none;
+}

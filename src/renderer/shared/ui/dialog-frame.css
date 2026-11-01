@@ -1,0 +1,54 @@
+/* Dialog opening, backdrop, heading, and close button. Loaded by styles.css, in order. */
+
+.app-dialog[open] {
+  animation: dialog-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-dialog::backdrop {
+  background: var(--c-rgb-0-0-0-72);
+  backdrop-filter: blur(3px);
+}
+
+.app-dialog[open]::backdrop {
+  animation: backdrop-enter 220ms ease both;
+}
+
+.entry-form,
+.confirm-content {
+  display: flex;
+  flex-direction: column;
+  padding: 25px 28px 24px;
+}
+
+.dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 13px;
+}
+
+.dialog-heading h3,
+.confirm-content h3 {
+  margin: 8px 0 0;
+  color: var(--c-f1f1f1);
+  font-size: 25px;
+  font-weight: 450;
+  letter-spacing: -0.04em;
+}
+
+.settings-button:focus-visible,
+.dialog-close:focus-visible {
+  outline-offset: 2px;
+}
+
+.dialog-close {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--c-333333);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-aaaaaa);
+  cursor: pointer;
+  font-size: 19px;
+}

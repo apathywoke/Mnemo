@@ -1,0 +1,28 @@
+/* Reset and base element styles. Loaded by styles.css, in order. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 600px;
+  min-height: 100vh;
+  background: var(--c-050505);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 1px solid var(--white);
+  outline-offset: 4px;
+}

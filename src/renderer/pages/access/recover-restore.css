@@ -1,0 +1,27 @@
+/* Recover and restore panels. Loaded by styles.css, in order. */
+
+/* Three fields plus a description: tighten the gaps so the submit button
+   fits in the default window height. */
+.restore-mode-fields {
+  display: contents;
+}
+
+.restore-mode-fields[hidden] {
+  display: none;
+}
+
+.restore-mode-button {
+  margin-top: 2px;
+}
+
+#recover-panel h2 {
+  margin-top: 6px;
+}
+
+#recover-panel .vault-form {
+  margin-top: 14px;
+}
+
+#recover-panel .primary-button {
+  margin-top: 18px;
+}

@@ -1,0 +1,64 @@
+/* Payment card entry. Loaded by styles.css, in order. */
+
+/* Card entry */
+.card-number-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--c-3c3c3c);
+  transition: border-color 140ms ease;
+}
+
+.card-number-row:focus-within {
+  border-color: var(--c-eeeeee);
+}
+
+.item-fields .card-number-row > input {
+  flex: 1;
+  min-width: 0;
+  min-height: 37px;
+  padding: 8px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--c-eeeeee);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.card-brand {
+  flex: none;
+  color: var(--c-9a9a9a);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.item-fields .has-error,
+.item-fields > input[aria-invalid="true"] {
+  border-color: var(--c-e87878);
+}
+
+.field-message {
+  margin: 6px 0 0;
+  color: var(--c-f0b4b4);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.field-message[hidden] {
+  display: none;
+}
+
+.field-message[data-kind="warning"] {
+  color: var(--c-e0c66f);
+}
+
+.item-fields > #item-field-expiry,
+.item-fields #item-field-cvv,
+.item-fields #item-field-pin {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
