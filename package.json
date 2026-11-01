@@ -1,5 +1,5 @@
 {
-  "name": "local-vault-prototype",
+  "name": "mnemo",
   "version": "0.2.1",
   "private": true,
   "description": "Mnemo — local-first encrypted password manager prototype",

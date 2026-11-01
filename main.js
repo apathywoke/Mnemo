@@ -10,6 +10,17 @@ const {
   session,
   systemPreferences,
 } = electron;
+
+// The internal app name, set before anything else runs. It names the
+// Keychain item that safeStorage creates ("<name> Safe Storage"), which
+// holds the key of the Touch ID files, and Electron reads it once per launch,
+// after this top level. package.json "name" is "mnemo"; without this line
+// the item would change and Touch ID would stop unlocking existing vaults.
+// Users see "Mnemo" (productName in electron-builder.config.js and the About
+// panel below). See docs/RELEASING.md before changing it.
+const INTERNAL_APP_NAME = "local-vault-prototype";
+app.setName(INTERNAL_APP_NAME);
+
 const ProfileManager = require("./src/main/profile-manager");
 const SettingsStore = require("./src/main/settings-store");
 const BiometricUnlock = require("./src/main/biometric-unlock");
@@ -46,11 +57,9 @@ const launchedWithRemoteDebugging =
   app.isPackaged === true &&
   REMOTE_DEBUGGING_SWITCHES.some((name) => app.commandLine.hasSwitch(name));
 // The data folder (vaults, settings, Touch ID files) is fixed instead of
-// following package.json "name"/"productName", so renaming the package
-// cannot strand existing vaults. Set before the single-instance lock, which
-// lives in this folder. --user-data-dir (used for test builds) still wins.
-// The Keychain item of safeStorage still follows the app name; see
-// docs/RELEASING.md before renaming.
+// following the app name, so a rename cannot strand existing vaults. Set
+// before the single-instance lock, which lives in this folder.
+// --user-data-dir (used for test builds) still wins.
 const USER_DATA_FOLDER = "local-vault-prototype";
 if (!app.commandLine?.hasSwitch("user-data-dir")) {
   app.setPath("userData", path.join(app.getPath("appData"), USER_DATA_FOLDER));
@@ -92,6 +101,8 @@ if (launchedWithRemoteDebugging) {
     // `npm start` runs the stock Electron.app; give its Dock tile Mnemo's
     // icon. Packaged builds carry the icon (and the name) in the bundle.
     if (!app.isPackaged) app.dock?.setIcon?.(path.join(__dirname, "build", "icon.png"));
+    // The About panel would show the internal name.
+    app.setAboutPanelOptions({ applicationName: "Mnemo", applicationVersion: app.getVersion() });
 
     // Keep remote access disabled in the renderer; favicon retrieval is a separate,
     // explicit user action handled by the main process with host validation.

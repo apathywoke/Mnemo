@@ -354,9 +354,14 @@ if called, otherwise `productName`, otherwise `name` from the packaged
 `package.json`. Electron reads it once per launch, in
 `ElectronBrowserMainParts::PostCreateMainMessageLoop`
 (`shell/browser/electron_browser_main_parts.cc`). The top level of
-`main.js` runs earlier (`PostEarlyInitialization` → `LoadEnvironment`). Today
-the item is **"local-vault-prototype Safe Storage"**; `productName: "Mnemo"`
-in `electron-builder.config.js` only names the bundle and does not change it.
+`main.js` runs earlier (`PostEarlyInitialization` → `LoadEnvironment`). The
+item is **"local-vault-prototype Safe Storage"**, and it stays so:
+`package.json` is named `mnemo`, and the first statement after `main.js`
+reads Electron is `app.setName("local-vault-prototype")`
+(`INTERNAL_APP_NAME`). `productName: "Mnemo"` in
+`electron-builder.config.js` only names the bundle (electron-builder does
+not copy it into the packaged `package.json`, checked in the 0.2.x builds)
+and does not change the item.
 
 **Async API.** Electron 45 deprecates `safeStorage.isEncryptionAvailable`,
 `encryptString`, and `decryptString`; `src/main/biometric-unlock.js` uses
@@ -370,23 +375,27 @@ previous release, update, and unlock with Touch ID. When
 rewritten (that could race with turning Touch ID off); if a file ever stops
 decrypting, the user turns Touch ID on again.
 
-Changing `name` in `package.json` or adding `productName` there therefore
-changes the Keychain item. Electron then creates a new key, the existing
-`biometric/<profile>.key` files no longer decrypt, and Touch ID unlock stops
-("Touch ID can no longer unlock this vault…"). Vaults, backups, and
-passphrases are not affected.
+Changing the app name therefore changes the Keychain item. Electron then
+creates a new key, the existing `biometric/<profile>.key` files no longer
+decrypt, and Touch ID unlock stops ("Touch ID can no longer unlock this
+vault…"). Vaults, backups, and passphrases are not affected. Without the
+`setName()` call, renaming `package.json` or adding `productName` there would
+do exactly that.
 
-**Renaming safely.** Keep the internal name and change only what users see:
+**How the package was renamed.** `package.json` went from
+`local-vault-prototype` to `mnemo` while the internal name stayed:
 
-1. In the same change as the rename, call
-   `app.setName("local-vault-prototype")` at the top of `main.js`, before
-   anything else runs. The Keychain item and every other name-derived value
-   stay as they are.
-2. Set the visible name separately: the bundle name already comes from
-   `productName` in `electron-builder.config.js`; the About panel can use
+1. `main.js` calls `app.setName("local-vault-prototype")` before anything
+   else runs, so the Keychain item and every other name-derived value stay as
+   they are. `test/main-startup.test.js` checks that it comes first whatever
+   `package.json` says; `e2e/smoke.e2e.js` checks `app.getName()` in the
+   running app.
+2. The visible name is set separately: the bundle name comes from
+   `productName` in `electron-builder.config.js`, and the About panel from
    `app.setAboutPanelOptions({ applicationName: "Mnemo" })`.
-3. Before releasing, test on a Mac with Touch ID turned on: install the
-   previous release, turn on Touch ID, update, and unlock with Touch ID.
+3. **Before the first release with the rename**, test on a Mac with Touch ID
+   turned on: install the previous release, turn on Touch ID, update, and
+   unlock with Touch ID.
 
 If the internal name must change after all, there is no way to read the old
 item with `safeStorage` once the name has changed (it is read once per
