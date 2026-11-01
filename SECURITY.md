@@ -84,7 +84,10 @@ passwords until the design has received independent security review.
   24/32-bit ICO images are supported; JPEG, SVG, and other formats are
   skipped.
   Requests carry no cookies or referrer and use no
-  third-party favicon service. HTTPS redirects are followed only to the same
+  third-party favicon service. Their User-Agent is `Mnemo (site icon)`,
+  without the app version (earlier versions sent `LocalVault/0.1 favicon
+  fetch`), so the site can tell that Mnemo asked but not which release, and
+  so not which fixes, the user has. HTTPS redirects are followed only to the same
   host or its `www` variant, with a three-redirect limit. The site can see the
   device's IP address, and the domain may be visible to the configured DNS
   resolver. Only public HTTPS hosts are allowed; the app resolves and pins a

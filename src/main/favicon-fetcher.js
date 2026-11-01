@@ -9,6 +9,9 @@ const { MAX_ICON_DIMENSION, MAX_IMAGE_BYTES, OUTPUT_ICON_SIZE } = require("./fav
 const MAX_DOWNLOAD_BYTES = MAX_IMAGE_BYTES;
 const MAX_PAGE_BYTES = 1024 * 1024;
 const MAX_DISCOVERED_ICONS = 5;
+// Names the app but not its version, so a site cannot tell which release
+// (and which fixes) a visitor has. The site learns that Mnemo asked.
+const FAVICON_USER_AGENT = "Mnemo (site icon)";
 
 function unsupportedFavicon(message) {
   return Object.assign(new Error(message), { unsupportedFavicon: true });
@@ -134,7 +137,7 @@ function downloadResourceOnce(hostname, address, requestPath, accept, maxBytes) 
         path: requestPath,
         headers: {
           accept,
-          "user-agent": "LocalVault/0.1 favicon fetch",
+          "user-agent": FAVICON_USER_AGENT,
         },
         agent: false,
         lookup: (_host, options, callback) => {
@@ -511,4 +514,4 @@ async function fetchSiteFavicon(value) {
   };
 }
 
-module.exports = { fetchSiteFavicon, getFaviconHost };
+module.exports = { FAVICON_USER_AGENT, fetchSiteFavicon, getFaviconHost };
