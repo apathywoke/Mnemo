@@ -24,6 +24,7 @@ app.setName(INTERNAL_APP_NAME);
 const ProfileManager = require("./src/main/profile-manager");
 const SettingsStore = require("./src/main/settings-store");
 const BiometricUnlock = require("./src/main/biometric-unlock");
+const { createTouchIdHelper } = require("./src/main/touch-id-helper");
 const { Updater } = require("./src/main/updater");
 const { catalog: i18nCatalog } = require("./src/shared/i18n/messages.js");
 const { createTranslator } = require("./src/shared/i18n/translate.js");
@@ -133,9 +134,15 @@ if (launchedWithRemoteDebugging) {
 
     state.profileManager = new ProfileManager(app.getPath("userData"));
     state.vaultStore = new VaultStore(state.profileManager.legacyVaultPath);
+    // The Touch ID helper sits next to app.asar when packaged and in
+    // build/native/ for `npm start` (scripts/build-touch-id.js).
+    const touchIdHelperPath = app.isPackaged
+      ? path.join(process.resourcesPath, "mnemo-touch-id")
+      : path.join(app.getAppPath(), "build", "native", "mnemo-touch-id");
     state.biometricUnlock = new BiometricUnlock(app.getPath("userData"), {
       safeStorage,
       systemPreferences,
+      helper: createTouchIdHelper(touchIdHelperPath),
     });
 
     state.settingsStore = new SettingsStore(app.getPath("userData"), {

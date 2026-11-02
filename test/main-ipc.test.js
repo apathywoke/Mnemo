@@ -32,6 +32,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
     requestSingleInstanceLock: () => true,
     setName: () => {},
     setAboutPanelOptions: () => {},
+    getAppPath: () => "/tmp/mnemo-app",
     whenReady: () => Promise.resolve(),
     // Paths behave like Electron's: setPath() changes what getPath() returns.
     paths: { appData: directory },
@@ -287,12 +288,12 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   await invoke("recovery:dismiss");
 
   // Touch ID: enabling needs the passphrase; unlocking releases the key.
-  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false });
+  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false, backend: null });
   await assert.rejects(invoke("biometric:enable", "wrong passphrase"), /\[mnemo:errors\.passphraseIncorrect\]/);
   assert.deepEqual(await invoke("biometric:enable", "correct horse battery staple"), { enabled: true });
   assert.equal((await invoke("vault:lock")).unlocked, false);
   assert.equal((await invoke("vault:unlock-biometric")).unlocked, true);
-  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: true });
+  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: true, backend: "keychain" });
 
   const saved = await invoke("vault:save-entry", makeLogin());
   assert.equal(Object.hasOwn(saved, "password"), false);
@@ -484,7 +485,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal((await invoke("biometric:status")).enabled, true);
   const changed = await invoke("vault:change-passphrase", "new passphrase 123", "a brand new long passphrase 4");
   assert.match(changed.recoveryKey, /^[0-9A-Z]{4}(-[0-9A-Z]{4})+$/);
-  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false });
+  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false, backend: null });
   await invoke("recovery:copy");
   assert.equal(clipboardText, changed.recoveryKey);
   await invoke("recovery:dismiss");

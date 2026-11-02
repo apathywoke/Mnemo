@@ -60,6 +60,7 @@ async function loadMain(t) {
     requestSingleInstanceLock: () => true,
     setName: () => {},
     setAboutPanelOptions: () => {},
+    getAppPath: () => "/tmp/mnemo-app",
     whenReady: () => Promise.resolve(),
     // Paths behave like Electron's: setPath() changes what getPath() returns.
     paths: { appData: directory },

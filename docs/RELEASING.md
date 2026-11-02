@@ -81,6 +81,19 @@ npm run dist:mac
 
 Output goes to `release/`: a `.dmg` and a `.zip` for `arm64` and `x64`.
 
+### Touch ID helper
+
+Every build script (`dist:mac`, `dist:mac:adhoc`, `pack:mac:local`) first
+runs `node scripts/build-touch-id.js`, which compiles
+`native/touch-id/main.swift` into a universal `build/native/mnemo-touch-id`
+(macOS 13 or later) with Xcode's command line tools (`swiftc`, `lipo`).
+electron-builder copies it to `Contents/Resources/mnemo-touch-id` and signs
+it with the app and the hardened runtime; `scripts/verify-mac-release.js`
+fails the build if it is missing or is not a Mach-O executable. The release
+runner's Xcode provides the tools. `npm run build:touch-id` builds it alone,
+for `npm start`; without it, Touch ID falls back to the Keychain backend.
+The protocol is in `docs/THREAT_MODEL.md` ("Touch ID helper").
+
 If the notarization variables are missing, electron-builder skips notarization
 with a warning, and the `afterSign` verification then fails the build because
 no ticket is stapled.
@@ -296,11 +309,13 @@ page instead.
   user opens it once, then allows it in System Settings → Privacy & Security
   → **Open Anyway**. Updates installed by the app are not quarantined and do
   not ask again.
-- **After each update**, if Touch ID unlock is on, macOS may ask to let
-  Mnemo use its "Safe Storage" Keychain item, because an ad-hoc signature is
+- **After each update**, if Touch ID unlock is on with a key file from
+  before the Secure Enclave helper (version 1), macOS may ask to let Mnemo
+  use its "Safe Storage" Keychain item, because an ad-hoc signature is
   different for every build. **Always Allow** keeps Touch ID working; denying
   it means unlocking with the master passphrase until Touch ID is turned on
-  again.
+  again. Turning Touch ID off and on again moves the vault to the Secure
+  Enclave, which uses no Keychain item and does not ask.
 
 Both go away with a Developer ID signature.
 
@@ -346,8 +361,9 @@ It no longer follows `name` or `productName` in `package.json`, so renaming
 the package cannot point the app at an empty folder. `--user-data-dir`
 still overrides it, for test builds.
 
-**Keychain.** Touch ID unlock stores each vault key encrypted with
-`safeStorage`, whose key lives in the login Keychain as the generic
+**Keychain.** Touch ID files from before the Secure Enclave helper
+(version 1), and new ones where the helper does not run (macOS 12), store
+each vault key encrypted with `safeStorage`, whose key lives in the login Keychain as the generic
 password **"<app name> Safe Storage"** (account "<app name>"). In
 Electron 45 the app name is `app.getName()`: the value of `app.setName()`
 if called, otherwise `productName`, otherwise `name` from the packaged
@@ -376,8 +392,8 @@ rewritten (that could race with turning Touch ID off); if a file ever stops
 decrypting, the user turns Touch ID on again.
 
 Changing the app name therefore changes the Keychain item. Electron then
-creates a new key, the existing `biometric/<profile>.key` files no longer
-decrypt, and Touch ID unlock stops ("Touch ID can no longer unlock this
+creates a new key, the existing version 1 `biometric/<profile>.key` files no
+longer decrypt, and Touch ID unlock stops ("Touch ID can no longer unlock this
 vault…"). Vaults, backups, and passphrases are not affected. Without the
 `setName()` call, renaming `package.json` or adding `productName` there would
 do exactly that.

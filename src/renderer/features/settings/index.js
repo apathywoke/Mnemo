@@ -163,7 +163,9 @@ function bind(ctx) {
       ? ""
       : i18n.t(!touchId.available
         ? "touchId.unavailable"
-        : touchId.enabled ? "touchId.enabled" : "touchId.disabled");
+        : touchId.enabled
+          ? touchId.backend === "secureEnclave" ? "touchId.enabledSecureEnclave" : "touchId.enabled"
+          : "touchId.disabled");
     touchIdEnable.hidden = !touchId?.available || touchId.enabled;
     touchIdDisable.hidden = !touchId?.available || !touchId.enabled;
     if (pendingAction) {

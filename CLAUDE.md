@@ -49,6 +49,13 @@ Mnemo is a password manager: security beats convenience.
   cascade order, so keep it. A change meant to keep the
   look must leave e2e/compare-screens.js with identical
   screens (README, Checks).
+- Native code is the Touch ID helper only
+  (native/touch-id/main.swift, a separate process with a
+  JSON protocol, no native Node modules). Changing its
+  protocol: update the helper's header comment,
+  src/main/touch-id-helper.js, and "Touch ID helper" in
+  docs/THREAT_MODEL.md; its tests never prompt
+  ("interactive": false).
 - Code that both the main process and the renderer load
   (i18n catalog, item types, card tools, password-tools)
   lives in src/shared/ as ES modules, packaged by

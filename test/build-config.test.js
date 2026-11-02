@@ -70,6 +70,19 @@ test("release build is signed with the hardened runtime and notarized", async ()
 
 // The GitHub workflow publishes ad-hoc builds. They have no Developer ID, but
 // they must still have the hardened runtime (docs/THREAT_MODEL.md, A4 and A5).
+// Every build first compiles the Touch ID helper, which ships next to
+// app.asar; release verification fails without it.
+test("every build includes the Touch ID helper", async () => {
+  const root = path.join(__dirname, "..");
+  const { scripts } = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"));
+  for (const name of ["dist:mac", "dist:mac:adhoc", "pack:mac:local"]) {
+    assert.match(scripts[name], /^node scripts\/build-touch-id\.js && /, name);
+  }
+  assert.deepEqual(config.extraResources, [{ from: "build/native/mnemo-touch-id", to: "mnemo-touch-id" }]);
+  const verify = await fs.readFile(path.join(root, "scripts", "verify-mac-release.js"), "utf8");
+  assert.match(verify, /verifyTouchIdHelper\(appPath\)/);
+});
+
 test("the release workflow builds with the hardened runtime", async () => {
   const root = path.join(__dirname, "..");
   const workflow = await fs.readFile(path.join(root, ".github", "workflows", "release.yml"), "utf8");
@@ -81,7 +94,7 @@ test("the release workflow builds with the hardened runtime", async () => {
     assert.doesNotMatch(text, /MNEMO_LOCAL_TEST_BUILD/);
   }
   assert.match(workflow, /^\s*run: npm run dist:mac:adhoc$/m);
-  assert.match(adhoc, /^MNEMO_VERIFY_MODE=adhoc-release electron-builder --mac /);
+  assert.match(adhoc, /^node scripts\/build-touch-id\.js && MNEMO_VERIFY_MODE=adhoc-release electron-builder --mac /);
   assert.match(adhoc, /-c\.mac\.entitlements=build\/entitlements\.adhoc\.plist/);
   assert.match(adhoc, /-c\.mac\.entitlementsInherit=build\/entitlements\.adhoc\.plist/);
   assert.equal(scripts["dist:mac:local"], "npm run dist:mac:adhoc");
