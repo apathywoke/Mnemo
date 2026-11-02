@@ -148,13 +148,16 @@ function bind(ctx) {
   const touchIdEnable = $("#settings-touchid-enable");
   const touchIdDisable = $("#settings-touchid-disable");
   let recoveryEnabled = null;
+  let recoveryConfirmed = true;
   let touchId = null;
   let pendingAction = null;
 
   function renderVault() {
     recoveryStatus.textContent = recoveryEnabled === null
       ? ""
-      : i18n.t(recoveryEnabled ? "settings.recoveryEnabled" : "settings.recoveryMissing");
+      : i18n.t(!recoveryEnabled
+        ? "settings.recoveryMissing"
+        : recoveryConfirmed ? "settings.recoveryEnabled" : "settings.recoveryUnconfirmed");
     recoveryButton.hidden = recoveryEnabled === null;
     recoveryButton.textContent = i18n.t(
       recoveryEnabled ? "settings.recoveryReplace" : "settings.recoveryCreate",
@@ -201,10 +204,10 @@ function bind(ctx) {
     touchId = null;
     renderVault();
     try {
-      [recoveryEnabled, touchId] = await Promise.all([
-        ctx.api.getRecoveryStatus().then((status) => status.enabled),
-        ctx.api.getTouchIdStatus(),
-      ]);
+      let recovery;
+      [recovery, touchId] = await Promise.all([ctx.api.getRecoveryStatus(), ctx.api.getTouchIdStatus()]);
+      recoveryEnabled = recovery.enabled;
+      recoveryConfirmed = recovery.confirmed !== false || recovery.pending === true;
       renderVault();
     } catch {
       showVaultLocked();
@@ -234,18 +237,22 @@ function bind(ctx) {
   }
 
   async function runAction(action, passphrase) {
+    // Both replace the recovery key after a native warning in main;
+    // cancelling it leaves the form as it was.
     if (action === "passphrase") {
-      const { recoveryKey } = await ctx.api.changePassphrase(passphrase, newPassphrase.value);
+      const result = await ctx.api.changePassphrase(passphrase, newPassphrase.value);
+      if (result.canceled) return;
       resetVaultActions();
       dialog.close();
       // The vault key changed, so Touch ID was turned off in main.
-      await ctx.recoveryKey.show(recoveryKey);
+      await ctx.recoveryKey.show(result.recoveryKey, { replaced: recoveryEnabled === true });
       showToast(i18n.t("toast.passphraseChanged"));
     } else if (action === "recovery") {
-      const { recoveryKey } = await ctx.api.createRecoveryKey(passphrase);
+      const result = await ctx.api.createRecoveryKey(passphrase);
+      if (result.canceled) return;
       resetVaultActions();
       dialog.close();
-      await ctx.recoveryKey.show(recoveryKey);
+      await ctx.recoveryKey.show(result.recoveryKey, { replaced: recoveryEnabled === true });
       showToast(i18n.t("toast.recoveryKeyCreated"));
     } else if (action === "touchid") {
       await ctx.api.enableTouchId(passphrase);

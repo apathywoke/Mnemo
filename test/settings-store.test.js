@@ -29,7 +29,7 @@ test("settings default to the system language and persist a chosen language", as
   await store.setUpdateInterval("1d");
 
   const filePath = path.join(directory, "settings.json");
-  assert.deepEqual(JSON.parse(await fs.readFile(filePath, "utf8")), { version: 1, language: "de", theme: "light", updateInterval: "1d", backupReminder: true });
+  assert.deepEqual(JSON.parse(await fs.readFile(filePath, "utf8")), { version: 1, language: "de", theme: "light", updateInterval: "1d", backupReminder: true, unconfirmedRecoveryKeys: [] });
   if (process.platform !== "win32") {
     assert.equal((await fs.stat(filePath)).mode & 0o777, 0o600);
   }
@@ -77,4 +77,34 @@ test("the backup reminder is shown until closed, and the choice is kept", async 
     await fs.writeFile(filePath, JSON.stringify({ version: 1, language: "de", backupReminder: value }));
     assert.equal((await new SettingsStore(directory, options).load()).backupReminder, true);
   }
+});
+
+test("vaults with an unconfirmed recovery key are remembered, and kept out of get()", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new SettingsStore(directory, options);
+  await store.load();
+  const vault = "0f8fad5b-d9cb-469f-a165-70867728950e";
+  assert.equal(store.isRecoveryKeyConfirmed(vault), true);
+  await store.setRecoveryKeyConfirmed(vault, false);
+  await store.setRecoveryKeyConfirmed(vault, false);
+  assert.equal(store.isRecoveryKeyConfirmed(vault), false);
+  assert.equal(Object.hasOwn(store.get(), "unconfirmedRecoveryKeys"), false);
+
+  // Other settings changes keep the record, and it survives a relaunch.
+  await store.setTheme("dark");
+  const reloaded = new SettingsStore(directory, options);
+  await reloaded.load();
+  assert.equal(reloaded.isRecoveryKeyConfirmed(vault), false);
+  assert.deepEqual(reloaded.unconfirmedRecoveryKeys, [vault]);
+
+  await reloaded.setRecoveryKeyConfirmed(vault, true);
+  assert.equal(reloaded.isRecoveryKeyConfirmed(vault), true);
+  await assert.rejects(store.setRecoveryKeyConfirmed("../x", false), /Could not save the settings/);
+
+  // Bad entries in the file are dropped.
+  const filePath = path.join(directory, "settings.json");
+  await fs.writeFile(filePath, JSON.stringify({ version: 1, unconfirmedRecoveryKeys: [vault, 7, "../x", ""] }));
+  const fromFile = new SettingsStore(directory, options);
+  await fromFile.load();
+  assert.deepEqual(fromFile.unconfirmedRecoveryKeys, [vault]);
 });

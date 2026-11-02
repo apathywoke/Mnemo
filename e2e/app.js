@@ -49,21 +49,29 @@ async function visiblePanel(page) {
 
 // From the first launch to an open, empty vault. The recovery key dialog
 // and the backup offer that follow vault creation are dismissed.
+// Confirms the recovery key shown in its dialog by typing its last 4
+// characters, as a user does, and skips the backup offer that follows.
+async function confirmRecoveryKey(page) {
+  await page.locator("#recovery-key-dialog[open]").waitFor();
+  const key = await page.textContent("#recovery-key-value");
+  await page.fill("#recovery-key-confirm", key.trim().slice(-4));
+  await page.click("#recovery-key-done");
+  await page.locator("#recovery-backup-later").click();
+  await page.locator("#recovery-key-dialog").waitFor({ state: "hidden" });
+}
+
 async function createVault(page, { name = "Test vault", passphrase = TEST_PASSPHRASE } = {}) {
   await page.locator("#setup-panel:not([hidden])").waitFor();
   await page.fill("#profile-name", name);
   await page.fill("#create-passphrase", passphrase);
   await page.fill("#confirm-passphrase", passphrase);
   await page.click("#create-form button[type='submit']");
-  await page.locator("#recovery-key-dialog[open]").waitFor();
-  await page.check("#recovery-key-confirm");
-  await page.click("#recovery-key-done");
-  const later = page.locator("#recovery-backup-later");
-  if (await later.isVisible()) await later.click();
+  await confirmRecoveryKey(page);
   await page.locator("#open-panel:not([hidden])").waitFor();
 }
 
 module.exports = {
+  confirmRecoveryKey,
   ROOT,
   TEST_PASSPHRASE,
   createDataFolder,

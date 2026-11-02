@@ -263,21 +263,45 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
 
   // The recovery key is returned once and can be copied until dismissed.
   assert.match(created.recoveryKey, /^([0-9A-Z]{4}-){13}[0-9A-Z]{4}$/);
-  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true });
+  // Until the user types its last characters, it counts as unconfirmed.
+  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: false, pending: true });
   await invoke("recovery:copy");
   assert.equal(clipboardText, created.recoveryKey);
-  // Saving a new recovery key brings the backup reminder back.
+  for (const typed of ["", "!!!!", created.recoveryKey.slice(-5, -1), created.recoveryKey]) {
+    await assert.rejects(invoke("recovery:confirm-saved", typed), /\[mnemo:errors\.recoveryKeyMismatch\]/);
+  }
+  assert.equal((await invoke("vault:get-recovery-status")).confirmed, false);
+  // Confirming it brings the backup reminder back.
   assert.equal((await invoke("settings:get")).backupReminder, false);
-  await invoke("recovery:dismiss");
+  assert.deepEqual(
+    await invoke("recovery:confirm-saved", ` ${created.recoveryKey.slice(-4).toLowerCase()} `),
+    { confirmed: true },
+  );
+  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: true, pending: true });
   assert.equal((await invoke("settings:get")).backupReminder, true);
+  await invoke("recovery:dismiss");
   await assert.rejects(invoke("recovery:copy"), /\[mnemo:errors\.copyValue\]/);
+  await assert.rejects(invoke("recovery:confirm-saved", created.recoveryKey.slice(-4)), /\[mnemo:errors\./);
   await assert.rejects(
     invoke("vault:create-recovery-key", "wrong passphrase"),
     /\[mnemo:errors\.passphraseIncorrect\]/,
   );
+  // Replacing the key is confirmed in a native dialog first; Cancel changes
+  // nothing.
+  const boxesBefore = messageBoxes.length;
+  assert.deepEqual(await invoke("vault:create-recovery-key", "correct horse battery staple"), { canceled: true });
+  assert.equal(messageBoxes.length, boxesBefore + 1);
+  assert.equal(messageBoxes.at(-1).title, "Replace the recovery key?");
+  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: true, pending: false });
+  messageResponse = 1;
   const rotated = await invoke("vault:create-recovery-key", "correct horse battery staple");
+  messageResponse = 0;
+  assert.equal(rotated.canceled, false);
   assert.notEqual(rotated.recoveryKey, created.recoveryKey);
-  await invoke("recovery:dismiss");
+  // A key the user never confirmed stays flagged after the vault locks.
+  assert.equal((await invoke("vault:lock")).unlocked, false);
+  await invoke("vault:unlock", "correct horse battery staple");
+  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: false, pending: false });
 
   // Touch ID: enabling needs the passphrase; unlocking releases the key.
   assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false });
@@ -475,7 +499,19 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
     /\[mnemo:errors\.passphraseWeak\]/,
   );
   assert.equal((await invoke("biometric:status")).enabled, true);
+  // A wrong or weak passphrase is refused before the native warning, and
+  // cancelling the warning keeps the old passphrase.
+  const boxesBeforeChange = messageBoxes.length;
+  assert.deepEqual(
+    await invoke("vault:change-passphrase", "new passphrase 123", "a brand new long passphrase 4"),
+    { canceled: true },
+  );
+  assert.equal(messageBoxes.length, boxesBeforeChange + 1);
+  assert.equal(messageBoxes.at(-1).message, "Changing the master passphrase also replaces the recovery key.");
+  assert.equal((await invoke("biometric:status")).enabled, true);
+  messageResponse = 1;
   const changed = await invoke("vault:change-passphrase", "new passphrase 123", "a brand new long passphrase 4");
+  messageResponse = 0;
   assert.match(changed.recoveryKey, /^[0-9A-Z]{4}(-[0-9A-Z]{4})+$/);
   assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false });
   await invoke("recovery:copy");

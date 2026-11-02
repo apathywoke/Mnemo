@@ -235,3 +235,44 @@ test("a login's notes are revealed by Show, by Edit, and by opening a version", 
     await app.close();
   }
 });
+
+// A new recovery key is confirmed by typing its last characters, which main
+// checks; a vault that locks first keeps a reminder until a new key is saved.
+test("a new recovery key is confirmed by its last characters", async (t) => {
+  const userDataDir = await createDataFolder();
+  t.after(() => removeDataFolder(userDataDir));
+
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    await page.locator("#setup-panel:not([hidden])").waitFor();
+    await page.fill("#profile-name", "Test vault");
+    await page.fill("#create-passphrase", TEST_PASSPHRASE);
+    await page.fill("#confirm-passphrase", TEST_PASSPHRASE);
+    await page.click("#create-form button[type='submit']");
+    await page.locator("#recovery-key-dialog[open]").waitFor();
+    assert.equal(await page.locator("#recovery-key-replaced").isHidden(), true);
+    const key = (await page.textContent("#recovery-key-value")).trim();
+
+    await page.fill("#recovery-key-confirm", key.slice(-4, -1));
+    assert.equal(await page.isDisabled("#recovery-key-done"), true);
+    const wrong = key.slice(-4) === "AAAA" ? "BBBB" : "AAAA";
+    await page.fill("#recovery-key-confirm", wrong);
+    await page.click("#recovery-key-done");
+    await page.locator("#recovery-key-confirm-error:not([hidden])").waitFor();
+    assert.equal(await page.locator("#recovery-backup-step").isHidden(), true);
+
+    // Locking now leaves the key unconfirmed: the vault shows a reminder
+    // that cannot be closed, in place of the backup reminder.
+    // The Mac's screen locks (the app locks the vault and tells the page).
+    await app.evaluate(({ powerMonitor }) => powerMonitor.emit("lock-screen"));
+    await page.locator("#recovery-key-dialog").waitFor({ state: "hidden" });
+    await page.locator("#unlock-panel:not([hidden])").waitFor();
+    await page.fill("#unlock-passphrase", TEST_PASSPHRASE);
+    await page.click("#unlock-form button[type='submit']");
+    await page.locator("#open-panel:not([hidden])").waitFor();
+    await page.locator("#recovery-unconfirmed-warning:not([hidden])").waitFor();
+    assert.equal(await page.locator("#backup-recovery-warning").isHidden(), true);
+  } finally {
+    await app.close();
+  }
+});

@@ -109,7 +109,8 @@ function bind(ctx, access) {
       );
       ctx.clearSensitiveFields();
       await access.refreshState();
-      await ctx.recoveryKey.show(result.recoveryKey);
+      // The key typed in to recover stops working.
+      await ctx.recoveryKey.show(result.recoveryKey, { replaced: true });
       showToast(t("toast.vaultRecovered"));
     } catch (cause) {
       $("#recover-passphrase").value = "";

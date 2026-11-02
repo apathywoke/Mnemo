@@ -1,5 +1,6 @@
 // IPC handlers. Unlocking and locking, recovery keys, passphrase changes, and Touch ID.
 const fs = require("node:fs/promises");
+const { validatePassphrase, validateNewPassphrase } = require("../vault/envelope");
 
 function register(ctx) {
   const {
@@ -10,6 +11,9 @@ function register(ctx) {
     lockVault,
     resetAutoLockTimer,
     isAppPage,
+    showVaultDialog,
+    issueRecoveryKey,
+    confirmRecoveryKeySaved,
     registerHandler,
   } = ctx;
   const { dialog, ipcMain } = ctx.electron;
@@ -45,20 +49,58 @@ function register(ctx) {
     if (state.activeProfileId !== null) {
       await state.profileManager.markOpened(state.activeProfileId).catch(() => {});
     }
-    state.pendingRecoveryKey = { key: result.recoveryKey, profileName: await activeProfileName() };
+    await issueRecoveryKey(result.recoveryKey);
     return result;
   });
 
-  registerHandler("vault:get-recovery-status", () => ({
-    enabled: state.vaultStore.hasRecoveryKey(),
-  }));
+  // `confirmed`: false while the newest key was not confirmed as saved.
+  // `pending`: that key is still on screen, waiting for the confirmation;
+  // otherwise it was lost (the vault locked or the app quit first).
+  registerHandler("vault:get-recovery-status", async () => {
+    await state.settingsLoaded;
+    const profileId = state.activeProfileId;
+    return {
+      enabled: state.vaultStore.hasRecoveryKey(),
+      confirmed: profileId === null || state.settingsStore.isRecoveryKeyConfirmed(profileId),
+      pending: profileId !== null && state.pendingRecoveryKey?.profileId === profileId,
+    };
+  });
+
+  // Replacing a recovery key is confirmed in a native dialog, after the
+  // passphrase is checked: the old key stops opening this vault, and a user
+  // who kept it on paper must know. Resolves false if the user cancels.
+  async function confirmReplacingRecoveryKey(store, message) {
+    if (!store.hasRecoveryKey()) return true;
+    const epoch = state.lockEpoch;
+    const confirmation = await showVaultDialog({
+      type: "warning",
+      title: tr("dialog.replaceRecoveryTitle"),
+      message,
+      detail: tr("dialog.replaceRecoveryDetail"),
+      buttons: [tr("common.cancel"), tr("dialog.replaceRecoveryConfirm")],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    if (confirmation.response !== 1) return false;
+    if (store !== state.vaultStore || state.lockEpoch !== epoch) throw new Error("Unlock the vault first.");
+    return true;
+  }
 
   registerHandler("vault:create-recovery-key", async (passphrase) => {
+    const store = state.vaultStore;
     const profileId = state.activeProfileId;
-    const recoveryKey = await state.vaultStore.createRecoveryKey(passphrase);
+    store.requireUnlocked();
+    validatePassphrase(passphrase);
+    await store.verifyPassphrase(passphrase);
+    if (!(await confirmReplacingRecoveryKey(store, tr("dialog.replaceRecoveryMessage")))) {
+      return { canceled: true };
+    }
+    const recoveryKey = await store.createRecoveryKey(passphrase);
     await forgetTouchIdKey(profileId);
-    state.pendingRecoveryKey = { key: recoveryKey, profileName: await activeProfileName() };
-    return { recoveryKey };
+    if (store !== state.vaultStore) throw new Error("Unlock the vault first.");
+    await issueRecoveryKey(recoveryKey);
+    return { canceled: false, recoveryKey };
   });
 
   // A new master passphrase comes with a new recovery key, shown and
@@ -66,12 +108,22 @@ function register(ctx) {
   registerHandler("vault:change-passphrase", async (currentPassphrase, newPassphrase) => {
     const store = state.vaultStore;
     const profileId = state.activeProfileId;
+    store.requireUnlocked();
+    validatePassphrase(currentPassphrase);
+    await store.verifyPassphrase(currentPassphrase);
+    validateNewPassphrase(newPassphrase);
+    if (!(await confirmReplacingRecoveryKey(store, tr("dialog.changePassphraseRecoveryMessage")))) {
+      return { canceled: true };
+    }
     const recoveryKey = await store.changePassphrase(currentPassphrase, newPassphrase);
     await forgetTouchIdKey(profileId);
     if (store !== state.vaultStore) throw new Error("Unlock the vault first.");
-    state.pendingRecoveryKey = { key: recoveryKey, profileName: await activeProfileName() };
-    return { recoveryKey };
+    await issueRecoveryKey(recoveryKey);
+    return { canceled: false, recoveryKey };
   });
+
+  // The user typed the end of the new key: it was written down or saved.
+  registerHandler("recovery:confirm-saved", (typed) => confirmRecoveryKeySaved(typed));
 
   registerHandler("recovery:copy", () => {
     if (!state.pendingRecoveryKey) throw new Error("Could not copy this value.");
@@ -111,15 +163,8 @@ function register(ctx) {
     return { canceled: false };
   });
 
-  // A new recovery key brings back the backup reminder: backups made before
-  // it still open only with the old key.
-  registerHandler("recovery:dismiss", async () => {
-    const issued = state.pendingRecoveryKey !== null;
+  registerHandler("recovery:dismiss", () => {
     state.pendingRecoveryKey = null;
-    if (issued) {
-      await state.settingsLoaded;
-      await state.settingsStore.setBackupReminder(true).catch(() => {});
-    }
     return { dismissed: true };
   });
 
