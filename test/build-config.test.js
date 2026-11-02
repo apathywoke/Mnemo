@@ -211,6 +211,12 @@ const DEVELOPMENT_ONLY_PATHS = new Set([
   "build/icon.png",
 ]);
 
+// Paths a build script writes. They are not in the repository (.gitignore),
+// so only their folder's place is checked.
+const BUILD_OUTPUTS = new Set([
+  "build/native/mnemo-touch-id",
+]);
+
 // Paths built from __dirname are relative to the file's folder, which is the
 // same in the repository and inside app.asar (main.js's folder is the app
 // root in both). So each one must exist here and, for code that ships, match
@@ -242,6 +248,11 @@ test("every path built from __dirname exists, and is packaged when the code ship
 
   for (const { file, target, ships } of found) {
     const relative = path.relative(root, target).split(path.sep).join("/");
+    if (BUILD_OUTPUTS.has(relative) && !ships) {
+      const ignored = (await fs.readFile(path.join(root, ".gitignore"), "utf8")).split("\n");
+      assert.ok(ignored.includes(`/${path.posix.dirname(relative)}/`), `${relative} is not ignored by git`);
+      continue;
+    }
     const stats = await fs.stat(target).catch(() => null);
     assert.ok(stats, `${file}: ${relative} does not exist`);
     if (!ships || relative === "" || DEVELOPMENT_ONLY_PATHS.has(relative)) continue;
