@@ -11,11 +11,12 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.strict.json",
     "test:e2e": "node --test --test-concurrency=1 --test-timeout=120000 \"e2e/**/*.e2e.js\"",
     "check": "npm run lint && npm run typecheck && npm test",
-    "dist:mac": "electron-builder --mac --config electron-builder.config.js",
-    "pack:mac:local": "MNEMO_LOCAL_TEST_BUILD=1 electron-builder --mac dir --config electron-builder.config.js -c.forceCodeSigning=false -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false",
+    "dist:mac": "node scripts/build-touch-id.js && electron-builder --mac --config electron-builder.config.js",
+    "pack:mac:local": "node scripts/build-touch-id.js && MNEMO_LOCAL_TEST_BUILD=1 electron-builder --mac dir --config electron-builder.config.js -c.forceCodeSigning=false -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false",
     "verify:mac": "node scripts/verify-mac-release.js",
     "icon": "electron scripts/make-icon.js",
-    "dist:mac:adhoc": "MNEMO_VERIFY_MODE=adhoc-release electron-builder --mac --config electron-builder.config.js --publish never -c.forceCodeSigning=false -c.mac.identity=- -c.mac.notarize=false -c.mac.entitlements=build/entitlements.adhoc.plist -c.mac.entitlementsInherit=build/entitlements.adhoc.plist",
+    "build:touch-id": "node scripts/build-touch-id.js",
+    "dist:mac:adhoc": "node scripts/build-touch-id.js && MNEMO_VERIFY_MODE=adhoc-release electron-builder --mac --config electron-builder.config.js --publish never -c.forceCodeSigning=false -c.mac.identity=- -c.mac.notarize=false -c.mac.entitlements=build/entitlements.adhoc.plist -c.mac.entitlementsInherit=build/entitlements.adhoc.plist",
     "dist:mac:local": "npm run dist:mac:adhoc"
   },
   "devDependencies": {

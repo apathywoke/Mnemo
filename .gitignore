@@ -21,6 +21,8 @@ vaults/
 *.pem
 # Public update keys ship with the app; private keys never go here.
 !build/update-keys/*.pem
+# Built by scripts/build-touch-id.js.
+/build/native/
 *.key
 *.p12
 *.pfx

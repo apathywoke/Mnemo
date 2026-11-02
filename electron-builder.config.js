@@ -47,6 +47,9 @@ module.exports = {
     // Marks src/shared/ as ES modules for the main process.
     "src/shared/package.json",
   ],
+  // The Touch ID helper, built by scripts/build-touch-id.js before every
+  // build; signed with the app (hardened runtime, inherited entitlements).
+  extraResources: [{ from: "build/native/mnemo-touch-id", to: "mnemo-touch-id" }],
   electronFuses,
   // Fail the build instead of producing an unsigned app.
   forceCodeSigning: true,

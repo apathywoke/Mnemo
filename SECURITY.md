@@ -203,8 +203,8 @@ passwords until the design has received independent security review.
   the new files are removed and the old vault keeps working. A new recovery
   key is issued and the Touch ID key file is removed, since it holds the old
   vault key. Someone who once obtained the old vault key (an old recovery
-  key with an old copy of the file, or the Touch ID file with Keychain
-  access) cannot read anything saved afterwards. Old backups and copies of
+  key with an old copy of the file, or an old Touch ID file) cannot read
+  anything saved afterwards. Old backups and copies of
   the file are not changed and still open with the credentials they had.
   Restoring a backup with its passphrase keeps the backup's key.
 - The recovery key is shown in the app window once and can be copied (cleared
@@ -260,16 +260,34 @@ passwords until the design has received independent security review.
   passwords and second factors in one vault means a single compromised vault
   exposes both; users who want them separate can keep codes elsewhere.
 - Touch ID unlock is opt-in per vault and needs the master passphrase plus a
-  successful Touch ID check to turn on. The vault key is then encrypted with
-  Electron `safeStorage`, whose key lives in the macOS login Keychain under
-  the app's signature, and stored in `biometric/<profile>.key` (`0600`). It
-  is released only in the main process after `promptTouchID` succeeds. This
-  is a convenience trade-off: Touch ID is enforced by the app rather than by
-  the Keychain item, and someone who can unlock your macOS login keychain
-  (for example, with your Mac login password) could recover the vault key
-  without the master passphrase. Restoring a backup into the vault, deleting
-  the vault, or any change of credentials (which replaces the vault key)
-  removes the stored key.
+  successful Touch ID check to turn on. The check is made by the Secure
+  Enclave, not by the app: a small helper (`native/touch-id/main.swift`,
+  shipped in `Contents/Resources/mnemo-touch-id`) creates a P-256 key in the
+  Secure Enclave that can only be used after a touch of a finger enrolled at
+  that time. The vault key is encrypted (AES-256-GCM) under a key derived
+  from an ECDH agreement between that key and a one-time key, and stored in
+  `biometric/<profile>.key` (`0600`) with the Secure Enclave's key blob,
+  which works only on this Mac. Unlocking asks the Secure Enclave for the
+  agreement again, which needs a new touch. Adding or removing a fingerprint
+  invalidates the key; unlock with the master passphrase and turn Touch ID
+  on again. Without a Developer ID the key is not tied to Mnemo: another
+  program running as you that can read the key file can show its own Touch
+  ID prompt for it, and touching the sensor for a prompt that is not
+  Mnemo's gives that program the vault key. It cannot get the key without
+  a touch. The protocol and this case are described in
+  `docs/THREAT_MODEL.md` ("Touch ID helper").
+- Touch ID files from earlier versions, and new ones on macOS 12 where the
+  helper does not run, use the previous backend: the vault key is encrypted
+  with Electron `safeStorage`, whose key lives in the macOS login Keychain
+  under the app's signature, and released after `promptTouchID` succeeds.
+  There Touch ID is enforced by the app rather than by the Keychain item,
+  and someone who can unlock your macOS login keychain (for example, with
+  your Mac login password) could recover the vault key without the master
+  passphrase or a touch. These files are not converted; turn Touch ID off
+  and on again in Settings to move a vault to the Secure Enclave. Settings
+  shows which one a vault uses.
+- Restoring a backup into the vault, deleting the vault, or any change of
+  credentials (which replaces the vault key) removes the stored Touch ID key.
 - Items can be organized in folders (one per item) and marked as favorites.
   Both are stored inside the encrypted vault data; changing them does not
   change an item's date or history.

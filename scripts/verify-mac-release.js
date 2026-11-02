@@ -210,12 +210,23 @@ function resolveMode({ flags = [], env = process.env } = {}) {
   return mode;
 }
 
+// The Touch ID helper (native/touch-id/main.swift) ships next to app.asar.
+// Without it, Touch ID would quietly use the Keychain-based unlock.
+function verifyTouchIdHelper(appPath) {
+  const helper = path.join(appPath, "Contents", "Resources", "mnemo-touch-id");
+  if (!fs.existsSync(helper) || !isMachExecutable(helper) || (fs.statSync(helper).mode & 0o111) === 0) {
+    return ["Contents/Resources/mnemo-touch-id is missing or not an executable"];
+  }
+  return [];
+}
+
 async function verifyApp(appPath, { mode = "release" } = {}) {
   if (!MODES.includes(mode)) throw new Error(`Unknown verification mode "${mode}"`);
   const { info, executable } = findExecutable(appPath);
   const failures = [
     ...(await verifyFuses(executable)),
     ...verifyAsarIntegrity(appPath, info),
+    ...verifyTouchIdHelper(appPath),
     ...verifySignature(appPath, mode),
   ];
   if (failures.length > 0) {

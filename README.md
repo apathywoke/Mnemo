@@ -51,7 +51,10 @@ certificate and App Store Connect API key; see `docs/RELEASING.md`.
 `npm run dist:mac:local` builds exactly what the release workflow publishes
 (ad-hoc signed, hardened runtime, `.dmg` and `.zip`) in `release/`;
 `npm run pack:mac:local` makes an unpacked debug build without the hardened
-runtime. The app icon is drawn in `build/icon.svg`; `npm run icon`
+runtime. Each of them first builds the Touch ID helper
+(`native/touch-id/main.swift`, needs Xcode's command line tools);
+`npm run build:touch-id` builds it alone, so `npm start` uses it too. The
+app icon is drawn in `build/icon.svg`; `npm run icon`
 regenerates `build/icon.png` and `build/icon.icns` from it.
 
 Pushing a version tag (`v0.2.0`) runs `.github/workflows/release.yml`, which
