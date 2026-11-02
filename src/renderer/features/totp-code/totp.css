@@ -1,0 +1,86 @@
+/* One-time codes: timer and editor field. Loaded by styles.css, in order. */
+
+/* One-time codes */
+.totp-code {
+  flex: 0 1 auto;
+  color: var(--c-f2f2f2);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+}
+
+.totp-timer {
+  position: relative;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  margin-right: auto;
+  margin-left: 10px;
+  place-items: center;
+}
+
+.totp-timer svg {
+  position: absolute;
+  inset: 0;
+  width: 24px;
+  height: 24px;
+  transform: rotate(-90deg);
+  fill: none;
+  stroke-width: 2;
+}
+
+.totp-timer-track {
+  stroke: var(--c-2a2a2a);
+}
+
+.totp-timer-ring {
+  stroke: var(--c-9fd3ad);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 480ms linear, stroke 200ms ease;
+}
+
+.totp-timer.is-ending .totp-timer-ring {
+  stroke: var(--c-e8a07a);
+}
+
+.totp-timer-seconds {
+  position: relative;
+  color: var(--c-9a9a9a);
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.entry-form > .totp-input {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.entry-form > .totp-input:disabled {
+  opacity: 0.4;
+}
+
+.field-hint {
+  margin: 6px 0 0;
+  color: var(--c-777777);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.entry-form > .entry-remove-totp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--c-c9c9c9);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.entry-form > .entry-remove-totp[hidden] {
+  display: none;
+}
+
+.entry-remove-totp input {
+  margin: 0;
+  accent-color: var(--c-eeeeee);
+}

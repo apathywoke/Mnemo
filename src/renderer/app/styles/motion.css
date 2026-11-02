@@ -1,0 +1,114 @@
+/* Entrance animations, small windows, and reduced motion. Loaded by styles.css, in order. */
+
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dashboard-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes detail-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(9px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .is-unlocked .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .is-unlocked .workspace {
+    grid-column: 1;
+  }
+
+  .brand-panel {
+    display: none;
+  }
+
+  .workspace {
+    padding-right: clamp(20px, 6vw, 44px);
+    padding-left: clamp(20px, 6vw, 44px);
+  }
+}
+
+@media (max-height: 640px) {
+  .app-shell {
+    min-height: 500px;
+  }
+
+  .workspace {
+    padding-top: 16px;
+  }
+
+  .vault-panel {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .vault-form {
+    margin-top: 24px;
+  }
+
+  .primary-button {
+    width: 62px;
+    height: 62px;
+    margin-top: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

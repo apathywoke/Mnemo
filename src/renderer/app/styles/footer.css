@@ -1,0 +1,27 @@
+/* Version line and workspace footer. Loaded by styles.css, in order. */
+
+.version {
+  position: absolute;
+  bottom: 8px;
+  left: clamp(10px, 3.5vw, 42px);
+  margin: 0;
+  color: var(--c-686868);
+  font-size: 9px;
+}
+
+.version #app-version {
+  color: var(--c-9a9a9a);
+}
+
+.workspace-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 26px;
+  align-items: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid var(--c-252525);
+  color: var(--c-707070);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}

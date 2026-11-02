@@ -1,0 +1,82 @@
+/* Folders dialog. Loaded by styles.css, in order. */
+
+/* Folders dialog. */
+.folder-create {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.folder-create input,
+.folder-rename input {
+  min-width: 0;
+  flex: 1;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--c-333333);
+  border-radius: 9px;
+  background: var(--c-0b0b0b);
+  color: var(--white);
+  font: inherit;
+  font-size: 13px;
+}
+
+.folder-create input:focus-visible,
+.folder-rename input:focus-visible {
+  border-color: var(--white);
+  outline: none;
+}
+
+.folder-create .secondary-button {
+  margin-top: 0;
+}
+
+.folder-list {
+  display: grid;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folder-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border-bottom: 1px solid var(--line);
+}
+
+.folder-row:has(.folder-rename) {
+  grid-template-columns: 16px minmax(0, 1fr);
+}
+
+.folder-row-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--c-9a9a9a);
+}
+
+.folder-row-name {
+  overflow: hidden;
+  color: var(--c-dedede);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-row-count {
+  min-width: 18px;
+  color: var(--c-777777);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.folder-rename {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 0;
+}

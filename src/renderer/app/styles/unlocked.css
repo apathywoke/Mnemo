@@ -1,0 +1,24 @@
+/* Shell changes while a vault is open. Loaded by styles.css, in order. */
+
+.is-unlocked .content {
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 14px 0 22px;
+}
+
+.is-unlocked .app-shell {
+  grid-template-columns: minmax(0, 0fr) minmax(0, 1fr);
+}
+
+.is-unlocked .brand-panel {
+  padding-right: 0;
+  padding-left: 0;
+  border-color: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-20px) scale(0.985);
+}
+
+.is-unlocked .version {
+  display: none;
+}

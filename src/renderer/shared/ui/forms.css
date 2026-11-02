@@ -1,0 +1,59 @@
+/* Panel forms and secret input rows. Loaded by styles.css, in order. */
+
+.vault-form {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+  margin-top: 36px;
+  text-align: left;
+}
+
+.vault-form label {
+  margin-top: 10px;
+  color: var(--c-bcbcbc);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.vault-form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 7px 0 10px;
+  border: 0;
+  border-bottom: 1px solid var(--c-4b4b4b);
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  color: var(--white);
+  font-size: 14px;
+  transition: border-color 140ms ease;
+}
+
+.vault-form input:focus {
+  border-color: var(--white);
+}
+
+.vault-form input::placeholder {
+  color: var(--c-626262);
+}
+
+.secret-input-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--c-4b4b4b);
+  transition: border-color 140ms ease;
+}
+
+.secret-input-row:focus-within {
+  border-color: var(--white);
+}
+
+.vault-form .secret-input-row > input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  border: 0;
+}

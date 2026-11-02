@@ -1,0 +1,92 @@
+/* Settings: vault sections and confirmation form. Loaded by styles.css, in order. */
+
+/* Settings: vault sections */
+.settings-vault[hidden],
+.settings-vault-locked[hidden],
+.settings-confirm-form[hidden],
+.settings-actions [hidden] {
+  display: none;
+}
+
+.settings-vault-locked {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-section {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-actions .secondary-button {
+  margin-top: 4px;
+}
+
+.settings-danger-button {
+  border-color: var(--c-6b3434);
+  color: var(--c-f0b4b4);
+}
+
+.settings-danger-button:hover:not(:disabled) {
+  border-color: var(--c-a14d4d);
+  background: var(--c-241414);
+}
+
+.settings-actions .secondary-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.settings-confirm-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--c-333333);
+  border-radius: 10px;
+  background: var(--c-0d0d0d);
+}
+
+.settings-confirm-form label {
+  color: var(--c-bcbcbc);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.settings-confirm-form .secret-input-row > input,
+.import-mnemo-fields .secret-input-row > input,
+.import-text-input {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--white);
+  font-size: 14px;
+}
+
+.import-text-input {
+  border-bottom: 1px solid var(--c-4b4b4b);
+}
+
+.import-text-input:focus {
+  border-color: var(--white);
+}
+
+.settings-confirm-form .dialog-actions {
+  margin-top: 6px;
+}
+
+.danger-confirm-button.dialog-save-button {
+  border-color: var(--c-c45c5c);
+  background: var(--c-c45c5c);
+  color: var(--c-ffffff);
+}

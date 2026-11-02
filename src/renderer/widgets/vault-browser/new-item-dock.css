@@ -1,0 +1,52 @@
+/* New item button docked under the list. Loaded by styles.css, in order. */
+
+/* "+ New item" docked at the bottom of the list column; the type menu opens
+   upward over the list. */
+.new-item-dock {
+  margin-top: auto;
+  padding: 12px 0 6px;
+  border-top: 1px solid var(--line);
+}
+
+.new-item-dock .new-entry-button {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 12px;
+  font-size: 12px;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.new-item-dock .new-entry-button:active {
+  transform: translateY(1px);
+}
+
+.new-item-dock .new-entry-button[aria-expanded="true"] {
+  background: var(--c-ffffff);
+}
+
+.new-item-dock .new-item-menu {
+  top: auto;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  min-width: 0;
+  transform-origin: bottom center;
+  animation: new-item-menu-enter 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes new-item-menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .new-item-dock .new-item-menu {
+    animation: none;
+  }
+}

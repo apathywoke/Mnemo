@@ -1,0 +1,57 @@
+/* Settings dialog: fields, selects, and hints. Loaded by styles.css, in order. */
+
+.settings-dialog-content {
+  min-height: 210px;
+  padding: 25px 28px 24px;
+}
+
+.settings-dialog .dialog-heading {
+  margin-bottom: 0;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+/* Same treatment as the dialog's eyebrow above it. */
+.settings-field label {
+  color: var(--c-8b8b8b);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.settings-select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 38px 0 14px;
+  border: 1px solid var(--c-333333);
+  border-radius: 9px;
+  appearance: none;
+  background: var(--c-0b0b0b) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23aaa' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 12px;
+  color: var(--white);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.settings-select:hover {
+  border-color: var(--c-4b4b4b);
+}
+
+.settings-select:focus-visible {
+  border-color: var(--white);
+  outline: none;
+}
+
+.settings-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}

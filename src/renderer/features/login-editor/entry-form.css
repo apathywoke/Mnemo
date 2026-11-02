@@ -1,0 +1,59 @@
+/* Login editor fields. Loaded by styles.css, in order. */
+
+.entry-form > label {
+  margin-top: 12px;
+  color: var(--c-aaaaaa);
+  font-size: 10px;
+}
+
+.entry-form > input:not([type="hidden"]),
+.entry-form textarea {
+  width: 100%;
+  min-height: 37px;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--c-3c3c3c);
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--c-eeeeee);
+  font: inherit;
+  font-size: 12px;
+}
+
+.password-input-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--c-3c3c3c);
+  transition: border-color 140ms ease;
+}
+
+.password-input-row:focus-within {
+  border-color: var(--c-eeeeee);
+}
+
+.password-input-row > input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  min-height: 37px;
+  padding: 8px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--c-eeeeee);
+  font: inherit;
+  font-size: 12px;
+}
+
+.entry-form textarea {
+  min-height: 68px;
+  resize: vertical;
+}
+
+.entry-form > input:focus,
+.entry-form textarea:focus {
+  border-color: var(--c-eeeeee);
+}

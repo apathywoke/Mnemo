@@ -1,0 +1,45 @@
+/* Quiet, detail, copy, and new-entry buttons. Loaded by styles.css, in order. */
+
+.quiet-button,
+.new-entry-button,
+.detail-action,
+.copy-button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--c-aaaaaa);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.quiet-button:hover,
+.detail-action:hover,
+.copy-button:hover {
+  border-color: var(--c-3d3d3d);
+  color: var(--c-f2f2f2);
+}
+
+.new-entry-button {
+  border-color: var(--c-e9e9e9);
+  background: var(--c-e9e9e9);
+  color: var(--c-090909);
+  font-weight: 650;
+}
+
+.new-entry-button:hover {
+  background: var(--c-ffffff);
+  color: var(--c-000000);
+}
+
+.new-entry-button span[aria-hidden="true"] {
+  margin-right: 3px;
+  font-size: 15px;
+  vertical-align: -1px;
+}

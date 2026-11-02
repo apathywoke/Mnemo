@@ -2,9 +2,10 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const test = require("node:test");
+const { readPageStyles } = require("../support/helpers");
 
 test("selected login hides the detail empty state despite its flex layout", async () => {
-  const styles = await fs.readFile(path.join(__dirname, "..", "styles.css"), "utf8");
+  const styles = await readPageStyles();
   const hiddenStateRule = styles.match(/\.detail-empty\[hidden\]\s*\{([^}]*)\}/);
 
   assert.ok(hiddenStateRule, "detail empty state needs an explicit hidden rule");

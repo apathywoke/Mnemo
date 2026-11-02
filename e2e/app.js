@@ -22,10 +22,12 @@ async function createDataFolder(settings = {}) {
   return userDataDir;
 }
 
-async function launchApp(userDataDir) {
+// `chromiumArgs` are extra Chromium switches, such as the ones
+// capture-screens.js uses for repeatable rendering.
+async function launchApp(userDataDir, { chromiumArgs = [] } = {}) {
   const app = await electron.launch({
     executablePath: electronBinary,
-    args: [ROOT, `--user-data-dir=${userDataDir}`],
+    args: [ROOT, `--user-data-dir=${userDataDir}`, ...chromiumArgs],
     // No emulation: the theme comes from the app's own setting, through
     // nativeTheme, as for a user.
     colorScheme: null,

@@ -1,0 +1,36 @@
+/* Status card (startup errors and retry). Loaded by styles.css, in order. */
+
+.status-card {
+  display: flex;
+  gap: 12px;
+  margin-top: 27px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.status-icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--c-555555);
+  border-radius: 50%;
+  color: var(--c-eeeeee);
+  font-size: 11px;
+}
+
+.status-card strong {
+  color: var(--c-e6e6e6);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-card p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}

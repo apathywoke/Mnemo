@@ -35,6 +35,11 @@ Mnemo is a password manager: security beats convenience.
   a relative path ending in `.js`; never use a global
   registry. index.html loads only app/index.js (and
   theme.js in <head>).
+- Styles go in a .css file next to their slice, listed
+  in the root styles.css; its @import order is the
+  cascade order, so keep it. A change meant to keep the
+  look must leave e2e/compare-screens.js with identical
+  screens (README, Checks).
 - Code that both the main process and the renderer load
   (i18n catalog, item types, card tools, password-tools)
   lives in src/shared/ as ES modules, packaged by

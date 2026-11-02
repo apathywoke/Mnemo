@@ -1,0 +1,62 @@
+/* Item fields in the detail view and the editor. Loaded by styles.css, in order. */
+
+.detail-mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.detail-multiline {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.detail-value.detail-multiline {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.item-fields {
+  display: contents;
+}
+
+.item-fields > label {
+  margin-top: 12px;
+  color: var(--c-aaaaaa);
+  font-size: 10px;
+}
+
+.item-fields > input,
+.item-fields > textarea {
+  width: 100%;
+  min-height: 37px;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--c-3c3c3c);
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--c-eeeeee);
+  font: inherit;
+  font-size: 12px;
+}
+
+.item-fields > textarea {
+  resize: vertical;
+}
+
+.item-fields > input:focus,
+.item-fields > textarea:focus {
+  border-color: var(--c-eeeeee);
+}
+
+.item-fields .mono-input {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+}
+
+/* Item field labels come from sentence-case strings shared with the editor;
+   show them like the login detail labels. */
+.item-detail .detail-field label {
+  text-transform: uppercase;
+}

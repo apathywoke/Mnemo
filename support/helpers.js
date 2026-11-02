@@ -30,4 +30,18 @@ function makeLogin(overrides = {}) {
   };
 }
 
-module.exports = { makeLogin, makePngHeader, makeTempDirectory };
+// The page's whole stylesheet as the browser sees it: styles.css with every
+// @import replaced by the imported file, in order.
+async function readPageStyles(file = path.join(__dirname, "..", "styles.css")) {
+  const source = await fs.readFile(file, "utf8");
+  const parts = [];
+  let last = 0;
+  for (const match of source.matchAll(/@import\s+"([^"]+)";/g)) {
+    parts.push(source.slice(last, match.index), await readPageStyles(path.resolve(path.dirname(file), match[1])));
+    last = match.index + match[0].length;
+  }
+  parts.push(source.slice(last));
+  return parts.join("");
+}
+
+module.exports = { makeLogin, makePngHeader, makeTempDirectory, readPageStyles };

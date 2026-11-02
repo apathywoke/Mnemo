@@ -1,0 +1,109 @@
+/* Recovery key dialog and input. Loaded by styles.css, in order. */
+
+/* Recovery key */
+.unlock-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+}
+
+.recovery-key-input {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.recovery-key-input::placeholder {
+  text-transform: none;
+}
+
+#recovery-key-dialog {
+  width: min(92vw, 500px);
+}
+
+.recovery-key-content {
+  display: flex;
+  flex-direction: column;
+  padding: 25px 28px 24px;
+}
+
+.recovery-key-content h3 {
+  margin: 8px 0 0;
+  color: var(--c-f1f1f1);
+  font-size: 25px;
+  font-weight: 450;
+  letter-spacing: -0.04em;
+}
+
+.recovery-key-description {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.recovery-key-value {
+  outline: none;
+  margin: 18px 0 0;
+  padding: 16px 18px;
+  border: 1px solid var(--c-554721);
+  border-radius: 10px;
+  background: var(--c-17140d);
+  color: var(--c-f0e3b8);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  line-height: 1.7;
+  text-align: center;
+  user-select: all;
+  word-break: break-word;
+}
+
+.recovery-key-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.recovery-key-actions .secondary-button {
+  margin-top: 12px;
+}
+
+.recovery-key-tips {
+  margin: 18px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.recovery-key-tip-strong {
+  color: var(--c-d6c58f);
+}
+
+.recovery-key-content[hidden] {
+  display: none;
+}
+
+.recovery-key-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 18px;
+  color: var(--c-d2d2d2);
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.recovery-key-confirm input {
+  margin: 2px 0 0;
+  accent-color: var(--c-eeeeee);
+}
+
+.dialog-save-button:disabled {
+  border-color: var(--c-3a3a3a);
+  background: var(--c-2a2a2a);
+  color: var(--c-777777);
+  cursor: not-allowed;
+}
