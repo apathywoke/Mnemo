@@ -289,11 +289,22 @@ function toEntrySummary(entry) {
   };
 }
 
-// `readable` holds the entry's sealed text, opened by the store: { notes,
-// fields } with the sealed item fields (a secure note's body).
-function toEntryDetails(entry, readable) {
+// Plain item fields, and the keys of the sealed ones present (a secure
+// note's body), for an entry or one of its versions.
+function splitSealedFields(type, fields) {
+  const sealed = new Set(sealedFieldKeys(type));
+  return {
+    fields: Object.fromEntries(Object.entries(fields).filter(([key]) => !sealed.has(key))),
+    sealedFields: Object.keys(fields).filter((key) => sealed.has(key)),
+  };
+}
+
+// What the page gets when an entry is opened. Notes and sealed text are
+// only flagged: they are read with revealText() after real user input
+// (src/main/notes-reveal.js).
+function toEntryDetails(entry) {
   const shared = {
-    notes: readable.notes,
+    hasNotes: Boolean(entry.notes),
     attachments: (entry.attachments ?? []).map(toAttachmentSummary),
     historyCount: entry.history?.length ?? 0,
   };
@@ -301,7 +312,7 @@ function toEntryDetails(entry, readable) {
     return {
       ...toEntrySummary(entry),
       ...shared,
-      fields: { ...entry.fields, ...readable.fields },
+      ...splitSealedFields(entry.type, entry.fields),
       secretFields: Object.keys(entry.secrets),
     };
   }
@@ -403,6 +414,7 @@ module.exports = {
   MAX_DERIVED_LENGTH,
   itemSchema,
   sealedFieldKeys,
+  splitSealedFields,
   isValidNotes,
   isValidItemEntry,
   ITEM_NORMALIZERS,

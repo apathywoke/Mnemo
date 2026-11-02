@@ -19,6 +19,7 @@ function createLock(ctx) {
     state.pendingImport = null;
     state.passwordHealthKey?.fill(0);
     state.passwordHealthKey = null;
+    state.notesRevealGrant = null;
     state.breachResults = null;
     state.breachCheckedAt = null;
     state.openVaultDialogs.clear();

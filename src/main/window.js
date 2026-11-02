@@ -12,7 +12,7 @@ const {
 const APP_ROOT = path.join(__dirname, "..", "..");
 
 function createWindowManager(ctx) {
-  const { state, lockVault, resetAutoLockTimer } = ctx;
+  const { state, lockVault, resetAutoLockTimer, grantRevealFromInput } = ctx;
   const { app, BrowserWindow, protocol } = ctx.electron;
 
   // Serves app://mnemo/ from the app folder (app.asar when packaged). Called
@@ -63,6 +63,8 @@ function createWindowManager(ctx) {
     });
 
     state.mainWindow.webContents.on("before-input-event", resetAutoLockTimer);
+    // Real presses allow one reveal of notes each (notes-reveal.js).
+    state.mainWindow.webContents.on("input-event", (_event, inputEvent) => grantRevealFromInput(inputEvent));
 
     state.mainWindow.loadURL(APP_PAGE_URL);
     return state.mainWindow;

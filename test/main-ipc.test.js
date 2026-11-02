@@ -300,7 +300,21 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal(listed.length, 1);
   assert.equal(JSON.stringify(listed).includes("test-password-value"), false);
   assert.equal(Object.hasOwn(listed[0], "notes"), false);
-  assert.equal((await invoke("vault:get-entry", saved.id)).notes, "local test data");
+  // Notes are only flagged; their text needs a real press first, one
+  // reveal per press (src/main/notes-reveal.js).
+  const opened = await invoke("vault:get-entry", saved.id);
+  assert.equal(opened.hasNotes, true);
+  assert.equal(Object.hasOwn(opened, "notes"), false);
+  await assert.rejects(invoke("vault:reveal-notes", saved.id), /\[mnemo:errors\.notesNeedInput\]/);
+  browserWindow.webContents.emit("input-event", {}, { type: "mouseMove" });
+  browserWindow.webContents.emit("input-event", {}, { type: "mouseUp" });
+  await assert.rejects(invoke("vault:reveal-notes", saved.id), /\[mnemo:errors\.notesNeedInput\]/);
+  browserWindow.webContents.emit("input-event", {}, { type: "mouseDown" });
+  assert.deepEqual(await invoke("vault:reveal-notes", saved.id), { notes: "local test data", fields: {} });
+  await assert.rejects(invoke("vault:reveal-notes", saved.id), /\[mnemo:errors\.notesNeedInput\]/);
+  browserWindow.webContents.emit("input-event", {}, { type: "keyDown" });
+  await assert.rejects(untrustedInvoke("vault:reveal-notes", saved.id), /untrusted frame/);
+  assert.deepEqual(await invoke("vault:reveal-notes", saved.id), { notes: "local test data", fields: {} });
   assert.equal(JSON.stringify(await invoke("vault:get-entry", saved.id)).includes("test-password-value"), false);
   messageResponse = 0;
   assert.deepEqual(await invoke("vault:fetch-site-icon", saved.id), { canceled: true });

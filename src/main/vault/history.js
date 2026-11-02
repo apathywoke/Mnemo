@@ -13,7 +13,7 @@ const {
 } = require("./constants");
 const { isPlainObject, hasExactKeys } = require("./records");
 const { isValidAttachment } = require("./attachments");
-const { isValidItemEntry, isValidLoginEntry } = require("./entries");
+const { isValidItemEntry, isValidLoginEntry, splitSealedFields } = require("./entries");
 
 // --- Folders, history, and other per-entry metadata ---------------------------------
 
@@ -217,15 +217,14 @@ function versionChanges(entry, version, newer) {
   return changes;
 }
 
-// `readable` holds the version's sealed text, opened by the store, as for
-// toEntryDetails().
-function toVersionSummary(entry, version, newer, readable) {
+// Like toEntryDetails(), notes and sealed text are only flagged.
+function toVersionSummary(entry, version, newer) {
   const summary = {
     id: version.id,
     savedAt: version.savedAt,
     updatedAt: version.updatedAt,
     name: version.name,
-    notes: readable.notes,
+    hasNotes: Boolean(version.notes),
     changes: versionChanges(entry, version, newer),
   };
   if (entry.type === "login") {
@@ -237,7 +236,7 @@ function toVersionSummary(entry, version, newer, readable) {
       hasTotp: Boolean(version.totp),
     };
   }
-  return { ...summary, fields: { ...version.fields, ...readable.fields }, secretFields: Object.keys(version.secrets) };
+  return { ...summary, ...splitSealedFields(entry.type, version.fields), secretFields: Object.keys(version.secrets) };
 }
 
 // Old versions go first when the vault would exceed its size limit, oldest

@@ -60,7 +60,7 @@ test("schema 2 vaults open with every sealed value readable and are saved as sch
   await store.saveEntry(makeLogin({ id: login.id, name: "Renamed", password: "" }));
   await reopen(store);
   assert.equal(store.vaultData.schemaVersion, 4);
-  assert.equal(store.getEntry(login.id).notes, "local test data");
+  assert.equal(store.revealText(login.id).notes, "local test data");
   assert.equal(store.revealPassword(login.id), "test-password-value");
 });
 
@@ -184,7 +184,8 @@ test("history keeps earlier versions, skips saves that change nothing, and resto
   }
   history = store.getHistory(login.id);
   assert.equal(history.length, 20);
-  assert.equal(history[0].notes, "edit 23");
+  assert.equal(history[0].hasNotes, true);
+  assert.equal(store.revealText(login.id, history[0].id).notes, "edit 23");
   assert.deepEqual(history[0].changes, ["notes"]);
 
   // Items: secret fields are compared and kept the same way.

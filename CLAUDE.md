@@ -27,7 +27,9 @@ Mnemo is a password manager: security beats convenience.
   registerHandler for IPC; native dialogs in main for
   destructive actions.
 - New IPC method: add it to preload.js and to the list
-  in test/preload.test.js.
+  in test/preload.test.js. Never return notes or sealed
+  text except from vault:reveal-notes, which needs a
+  real press (src/main/notes-reveal.js).
 - New UI text: add en, de, and ru (test/i18n.test.js
   checks this). Errors thrown in main are English and
   must match an `errors.*` message in messages.js.

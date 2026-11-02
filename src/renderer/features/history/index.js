@@ -16,7 +16,8 @@ const LOGIN_FIELDS = Object.freeze({
 
 // Earlier versions of the selected item, newest first. Main sends the
 // plain fields and the names of sealed ones; old secrets are copied or
-// shown by main, like current ones.
+// shown by main, like current ones. A version's notes and sealed text
+// (a secure note's body) are revealed when the user opens that version.
 function init(ctx, { refreshEntries }) {
   const dialog = $("#history-dialog");
   const list = $("#history-list");
@@ -60,7 +61,9 @@ function init(ctx, { refreshEntries }) {
     return row;
   }
 
-  function versionBody(version) {
+  // `revealed` ({ notes, fields }) once the version was opened, else null.
+  function versionBody(version, revealed = null) {
+    const hidden = t("detail.hiddenText");
     const body = document.createElement("div");
     body.className = "history-version-body";
     body.hidden = true;
@@ -71,7 +74,9 @@ function init(ctx, { refreshEntries }) {
       if (version.url) rows.push(valueRow(fieldLabel(type, "url"), version.url));
     } else {
       for (const field of itemTypes.ITEM_TYPES[type].fields) {
-        if (field.kind !== "secret" && version.fields[field.key]) {
+        if (field.sealed && version.sealedFields.includes(field.key)) {
+          rows.push(valueRow(fieldLabel(type, field.key), revealed ? revealed.fields[field.key] ?? "" : hidden));
+        } else if (field.kind !== "secret" && version.fields[field.key]) {
           rows.push(valueRow(fieldLabel(type, field.key), version.fields[field.key]));
         }
       }
@@ -83,7 +88,7 @@ function init(ctx, { refreshEntries }) {
         iconButton(COPY, t("item.copyField", { field: name }), () => void copy(version, field)),
       ]));
     }
-    if (version.notes) rows.push(valueRow(fieldLabel(type, "notes"), version.notes));
+    if (version.hasNotes) rows.push(valueRow(fieldLabel(type, "notes"), revealed ? revealed.notes : hidden));
     body.append(...rows);
     if (!current.trashed) {
       const restore = document.createElement("button");
@@ -114,8 +119,21 @@ function init(ctx, { refreshEntries }) {
     toggle.className = "detail-action";
     toggle.setAttribute("aria-expanded", "false");
     toggle.textContent = t("history.show");
-    const body = versionBody(version);
-    toggle.addEventListener("click", () => {
+    let body = versionBody(version);
+    let revealed = null;
+    const hasText = version.hasNotes || (version.sealedFields ?? []).length > 0;
+    toggle.addEventListener("click", async () => {
+      // Opening a version reveals its text; the click allows one reveal.
+      if (body.hidden && hasText && !revealed) {
+        try {
+          revealed = await ctx.api.revealNotes(current.id, version.id);
+          const next = versionBody(version, revealed);
+          body.replaceWith(next);
+          body = next;
+        } catch (cause) {
+          showToast(errorText(cause, "errors.showNotes"), { type: "error" });
+        }
+      }
       body.hidden = !body.hidden;
       toggle.setAttribute("aria-expanded", String(!body.hidden));
       toggle.textContent = t(body.hidden ? "history.show" : "history.hide");

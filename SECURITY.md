@@ -42,7 +42,9 @@ passwords until the design has received independent security review.
 - The interface language is stored in `settings.json` in the same folder
   (plain text, `0600`). It holds no vault data.
 - The renderer receives only entry metadata (name, username, website, icon,
-  timestamps). Notes are fetched for the selected entry. Passwords never cross
+  timestamps). Notes, and the text of a secure note, are not part of it:
+  opening an entry says only whether it has any, and the text is sent only
+  when the user chooses **Show** (or **Edit**, or opens an earlier version). Passwords never cross
   IPC: the main process decrypts one password when the user copies it, or
   shows it in a native dialog owned by the main process. Editing a login
   leaves the password field empty, and an empty field keeps the stored value.
@@ -55,8 +57,14 @@ passwords until the design has received independent security review.
   record moved to another entry or field does not open. Unlocking decrypts
   no notes; the main process opens one entry's notes when that entry (or its
   history) is opened, saved, read for an import, or rekeyed. Empty notes are
-  stored as an empty string. Notes still reach the renderer when the entry is
-  opened (see `docs/THREAT_MODEL.md`, section 7, item 2).
+  stored as an empty string.
+- The main process sends notes to the page only right after a real key or
+  mouse press that it saw itself (the window's `input-event`, which page
+  scripts cannot create). Each press allows one reveal, of one entry or one
+  earlier version, within three seconds; locking drops it. A compromised
+  page therefore cannot read notes while the user is idle, and gets at most
+  one entry per real press. Copying a secure note's text goes from the main
+  process to the clipboard without passing through the page.
 - Vaults and backups of schemas 1–3 are upgraded in memory on unlock and
   written as schema 4 on the next save; until then the file keeps its schema.
   Earlier versions of Mnemo cannot open a schema 4 vault (0.2.0 and later say

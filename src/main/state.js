@@ -37,6 +37,9 @@ function createState(translator) {
     // A parsed import waiting for the user's confirmation. The logins hold plain
     // passwords, so they are dropped on commit, cancel, or lock.
     pendingImport: null,
+    // One reveal of notes, granted by the last real key or mouse press
+    // (notes-reveal.js); dropped on lock.
+    notesRevealGrant: null,
     // Native dialogs that display vault data; lockVault() closes them so a revealed
     // password does not stay on screen after the vault locks.
     openVaultDialogs: new Set(),

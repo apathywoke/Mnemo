@@ -28,6 +28,7 @@ function create(ctx) {
     password: $("#detail-password"),
     notes: $("#detail-notes"),
     notesField: $("#detail-notes-field"),
+    notesReveal: $("#detail-notes-reveal"),
     totpField: $("#detail-totp-field"),
     copyUsername: $("#copy-username-button"),
   };
@@ -88,14 +89,17 @@ function create(ctx) {
   }
 
   // Cards, notes, identities, and SSH keys: details (without secrets) are
-  // loaded when the item is selected.
-  async function loadItemDetail(id) {
+  // loaded when the item is selected. Notes and a secure note's text come
+  // only when the user chooses Show (`revealed`).
+  async function loadItemDetail(id, revealed = null) {
     try {
       const details = await ctx.api.getEntry(id);
       if (state.selectedEntryId !== id) return;
       itemDetail.renderItemDetail(details, itemUi, {
         onCopy: (field) => void copyItemField(id, field),
         onReveal: (field) => void revealItemField(id, field),
+        revealed,
+        onRevealText: () => void revealItemText(id),
       });
       showSharedDetail(itemUi.detail, getEntry(id) ?? details, details);
     } catch {
@@ -109,6 +113,32 @@ function create(ctx) {
       showToast(t("toast.copied"));
     } catch (cause) {
       showToast(errorText(cause, "errors.copyValue"), { type: "error" });
+    }
+  }
+
+  // Main answers only right after the click on Show (notes-reveal.js).
+  async function revealItemText(id) {
+    try {
+      const revealed = await ctx.api.revealNotes(id);
+      if (state.selectedEntryId === id) await loadItemDetail(id, revealed);
+    } catch (cause) {
+      showToast(errorText(cause, "errors.showNotes"), { type: "error" });
+    }
+  }
+
+  async function revealSelectedNotes() {
+    const id = state.selectedEntryId;
+    try {
+      const revealed = await ctx.api.revealNotes(id);
+      if (state.selectedEntryId !== id) return;
+      state.selectedEntryNotes = revealed.notes;
+      loginDetail.renderDetail(getEntry(id), detailUi, {
+        notes: revealed.notes,
+        hasNotes: state.selectedEntryHasNotes,
+        updateSiteIconButton,
+      });
+    } catch (cause) {
+      showToast(errorText(cause, "errors.showNotes"), { type: "error" });
     }
   }
 
@@ -134,9 +164,11 @@ function create(ctx) {
     try {
       const details = await ctx.api.getEntry(id);
       if (state.selectedEntryId !== id) return;
-      state.selectedEntryNotes = details.notes;
+      // Notes are only flagged here; Show reveals them.
+      state.selectedEntryHasNotes = details.hasNotes;
       loginDetail.renderDetail(getEntry(id), detailUi, {
-        notes: details.notes,
+        notes: state.selectedEntryNotes,
+        hasNotes: details.hasNotes,
         updateSiteIconButton,
       });
       showSharedDetail(detailUi.detail, getEntry(id), details);
@@ -156,6 +188,7 @@ function create(ctx) {
     if (!entry) {
       state.selectedEntryId = null;
       state.selectedEntryNotes = "";
+      state.selectedEntryHasNotes = false;
       loginDetail.renderDetail(null, detailUi, { updateSiteIconButton });
       itemUi.detail.hidden = true;
       totpCode.stop();
@@ -166,6 +199,7 @@ function create(ctx) {
       const changed = state.selectedEntryId !== entry.id;
       state.selectedEntryId = entry.id;
       state.selectedEntryNotes = "";
+      state.selectedEntryHasNotes = false;
       totpCode.stop();
       detailUi.detail.hidden = true;
       detailUi.empty.hidden = true;
@@ -175,10 +209,13 @@ function create(ctx) {
       return;
     }
     itemUi.detail.hidden = true;
-    const notes = state.selectedEntryId === entry.id ? state.selectedEntryNotes : "";
+    const same = state.selectedEntryId === entry.id;
+    const notes = same ? state.selectedEntryNotes : "";
+    const hasNotes = same && state.selectedEntryHasNotes;
     state.selectedEntryId = entry.id;
     state.selectedEntryNotes = notes;
-    loginDetail.renderDetail(entry, detailUi, { notes, updateSiteIconButton });
+    state.selectedEntryHasNotes = hasNotes;
+    loginDetail.renderDetail(entry, detailUi, { notes, hasNotes, updateSiteIconButton });
     organize.attachDetail(detailUi.detail, entry);
     totpCode.follow(entry);
     renderEntryList();
@@ -210,6 +247,7 @@ function create(ctx) {
     if (nextId) renderEntryDetail(nextId);
     else {
       state.selectedEntryNotes = "";
+      state.selectedEntryHasNotes = false;
       detailUi.detail.hidden = true;
       itemUi.detail.hidden = true;
       detailUi.empty.hidden = reports.isOpen();
@@ -229,6 +267,7 @@ function create(ctx) {
     state.entries = [];
     state.selectedEntryId = null;
     state.selectedEntryNotes = "";
+    state.selectedEntryHasNotes = false;
     state.fetchingFaviconForId = null;
     $("#entry-search").value = "";
     renderEntryList();
@@ -264,6 +303,7 @@ function create(ctx) {
     deselect() {
       state.selectedEntryId = null;
       state.selectedEntryNotes = "";
+      state.selectedEntryHasNotes = false;
       totpCode.stop();
       renderEntryList();
     },
@@ -309,15 +349,32 @@ function create(ctx) {
     });
   }
 
+  // The editor needs the item's notes and sealed text, so opening it reveals
+  // them (the click on Edit allows it). Without them the editor stays
+  // closed: saving would otherwise clear them.
   $("#edit-item-button").addEventListener("click", async () => {
     const id = state.selectedEntryId;
+    let details;
     try {
-      const details = await ctx.api.getEntry(id);
-      if (state.selectedEntryId === id) itemEditor.open(details.type, details);
+      details = await ctx.api.getEntry(id);
     } catch (cause) {
       showToast(errorText(cause, "errors.openLogin"), { type: "error" });
+      return;
     }
+    let revealed = { notes: "", fields: {} };
+    if (details.hasNotes || details.sealedFields.length > 0) {
+      try {
+        revealed = await ctx.api.revealNotes(id);
+      } catch (cause) {
+        showToast(errorText(cause, "errors.showNotes"), { type: "error" });
+        return;
+      }
+    }
+    if (state.selectedEntryId !== id) return;
+    itemEditor.open(details.type, { ...details, notes: revealed.notes, fields: { ...details.fields, ...revealed.fields } });
   });
+
+  detailUi.notesReveal.addEventListener("click", () => void revealSelectedNotes());
 
   $("#entry-search").addEventListener("input", renderEntryList);
   onChange(() => {
