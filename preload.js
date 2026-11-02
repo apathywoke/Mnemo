@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("vaultApp", {
   getSettings: () => ipcRenderer.invoke("settings:get"),
   setLanguage: (code) => ipcRenderer.invoke("settings:set-language", code),
   dismissBackupReminder: () => ipcRenderer.invoke("settings:dismiss-backup-reminder"),
+  confirmRecoveryKeySaved: (typed) => ipcRenderer.invoke("recovery:confirm-saved", typed),
   setTheme: (theme) => ipcRenderer.invoke("settings:set-theme", theme),
   setUpdateInterval: (interval) => ipcRenderer.invoke("settings:set-update-interval", interval),
   // Updates are checked, downloaded, verified, and installed by main.

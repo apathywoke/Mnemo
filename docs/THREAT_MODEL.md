@@ -10,7 +10,8 @@ which seals notes per entry (data table, A3, section 7, items 2–3), and
 the same day for revealing notes only after real user input (A3; section 7,
 item 2 done) and for Touch ID backed by the Secure Enclave (B8, "Touch ID
 helper", A1, A4, A8; section 7, item 7), with the Keychain-based Touch ID
-removed after unlock was confirmed on real hardware.
+removed after unlock was confirmed on real hardware, and for confirming
+new recovery keys (data table).
 
 ## 1. What Mnemo protects
 
@@ -22,7 +23,7 @@ removed after unlock was confirmed on real hardware.
 | Notes, and the text of secure notes | Vault file (encrypted, then sealed per entry and field since schema 4); in main-process memory only while one entry is opened, saved, imported, or rekeyed; renderer memory and DOM for the selected entry | Unlocking decrypts none. The page gets them only right after a real key or mouse press, one entry per press (A3; section 7, item 2). |
 | Other entry fields: name, username, website, site icon | Vault file (encrypted); main-process memory while unlocked; renderer memory and DOM for the visible list or selected entry | Usernames and websites reveal which accounts exist. |
 | Master passphrase | Typed into the renderer, sent once over IPC, then dropped | Never stored. |
-| Recovery key (256-bit) | Shown once in the renderer; kept in main memory until the user confirms it is saved; optionally in a user-saved text file; on paper | Opens the vault and resets the passphrase. |
+| Recovery key (256-bit) | Shown once in the renderer; kept in main memory until the user confirms it is saved (by typing its last 4 characters, checked in main) or the vault locks; optionally in a user-saved text file; on paper | Opens the vault and resets the passphrase. Replacing it (new passphrase or new key) is confirmed in a native dialog first; a key never confirmed leaves a reminder (`settings.json` lists the profile ID, nothing secret). |
 | Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock; if Touch ID is on, also in `biometric/<profile>.key`, encrypted under a Secure Enclave key agreement | Unwraps everything. The Touch ID file opens only on this Mac, after a touch of an enrolled finger ("Touch ID helper"). |
 | Attachments | `<vault>.attachments/<id>.bin`, each encrypted under its own key sealed inside the vault data; main-process memory while being added, saved, or verified; a plain copy wherever the user saves one | A file alone reveals only its size. |
 | Earlier versions (history) | Inside the encrypted vault data, sealed values kept sealed | Old passwords remain until 20 newer versions push them out or the item is deleted for good. |

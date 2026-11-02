@@ -211,6 +211,14 @@ passwords until the design has received independent security review.
   from the clipboard after 30 seconds) or saved as a text file with mode
   `0600`. Anyone who holds it can open the vault; it is a second secret of the
   same strength as the vault key, not a weaker one.
+- Changing the master passphrase or creating a new recovery key replaces the
+  recovery key. Both ask first in a native dialog drawn by macOS (after the
+  passphrase is checked), which says that the current key will stop opening
+  the vault but still opens older backups. The new key is confirmed by
+  typing its last 4 characters, checked in the main process. If the vault
+  locks or the app quits before that, the vault is marked as having an
+  unconfirmed key (by profile ID, in `settings.json`) and shows a reminder
+  that cannot be closed until a new key is confirmed.
 - A backup can be restored with its master passphrase, or with the recovery
   key that was valid when it was made. With the recovery key, the restored
   vault is re-encrypted under a new master passphrase and gets a new recovery

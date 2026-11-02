@@ -8,6 +8,10 @@ const THEMES = Object.freeze(["system", "dark", "light"]);
 const DEFAULT_THEME = "system";
 const UPDATE_INTERVALS = Object.freeze(["30m", "1h", "6h", "1d", "off"]);
 const DEFAULT_UPDATE_INTERVAL = "1d";
+// Vaults whose newest recovery key was not confirmed as saved; bounded so
+// the file stays small.
+const MAX_UNCONFIRMED_RECOVERY_KEYS = 32;
+const PROFILE_ID_PATTERN = /^[0-9A-Za-z-]{1,64}$/;
 
 // Non-secret application preferences (interface language and theme), kept
 // next to the profile registry in the per-user application data folder.
@@ -27,6 +31,10 @@ class SettingsStore {
       updateInterval: DEFAULT_UPDATE_INTERVAL,
       backupReminder: true,
     };
+    // Kept in the same file, but not part of get(): the page does not need
+    // the list of profile IDs.
+    /** @type {string[]} */
+    this.unconfirmedRecoveryKeys = [];
     /** @type {Promise<unknown>} */
     this.writeQueue = Promise.resolve();
   }
@@ -48,6 +56,11 @@ class SettingsStore {
             : parsed.autoUpdate === false ? "off" : DEFAULT_UPDATE_INTERVAL,
           backupReminder: parsed.backupReminder !== false,
         };
+        if (Array.isArray(parsed.unconfirmedRecoveryKeys)) {
+          this.unconfirmedRecoveryKeys = parsed.unconfirmedRecoveryKeys
+            .filter((id) => typeof id === "string" && PROFILE_ID_PATTERN.test(id))
+            .slice(-MAX_UNCONFIRMED_RECOVERY_KEYS);
+        }
       }
     } catch {
       // Missing or unreadable settings fall back to the defaults.
@@ -87,11 +100,29 @@ class SettingsStore {
     return this.update({ backupReminder: shown });
   }
 
+  isRecoveryKeyConfirmed(profileId) {
+    return !this.unconfirmedRecoveryKeys.includes(profileId);
+  }
+
+  setRecoveryKeyConfirmed(profileId, confirmed) {
+    if (typeof profileId !== "string" || !PROFILE_ID_PATTERN.test(profileId)) {
+      return Promise.reject(new Error("Could not save the settings."));
+    }
+    const write = this.writeQueue.then(async () => {
+      const others = this.unconfirmedRecoveryKeys.filter((id) => id !== profileId);
+      const next = confirmed ? others : [...others, profileId].slice(-MAX_UNCONFIRMED_RECOVERY_KEYS);
+      await this.write(this.settings, next);
+      this.unconfirmedRecoveryKeys = next;
+    });
+    this.writeQueue = write.catch(() => {});
+    return write;
+  }
+
   // Queued so that quick successive changes each build on the last one.
   update(patch) {
     const write = this.writeQueue.then(async () => {
       const next = { ...this.settings, ...patch };
-      await this.write(next);
+      await this.write(next, this.unconfirmedRecoveryKeys);
       this.settings = next;
       return this.get();
     });
@@ -99,14 +130,14 @@ class SettingsStore {
     return write;
   }
 
-  async write(settings) {
+  async write(settings, unconfirmedRecoveryKeys) {
     const directory = path.dirname(this.filePath);
     const temporaryPath = `${this.filePath}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
     try {
       await fs.mkdir(directory, { recursive: true, mode: 0o700 });
       await fs.writeFile(
         temporaryPath,
-        JSON.stringify({ version: SETTINGS_VERSION, ...settings }),
+        JSON.stringify({ version: SETTINGS_VERSION, ...settings, unconfirmedRecoveryKeys }),
         { mode: 0o600, flag: "wx" },
       );
       await fs.rename(temporaryPath, this.filePath);

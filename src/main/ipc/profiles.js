@@ -2,7 +2,7 @@
 const VaultStore = require("../../../vault-store");
 
 function register(ctx) {
-  const { state, tr, toRestoreCredentials, lockVault, registerHandler } = ctx;
+  const { state, tr, toRestoreCredentials, lockVault, issueRecoveryKey, registerHandler } = ctx;
   const { dialog } = ctx.electron;
 
   registerHandler("profiles:choose", () => {
@@ -46,7 +46,7 @@ function register(ctx) {
     }
     state.vaultStore = created.vaultStore;
     state.activeProfileId = created.profile.id;
-    state.pendingRecoveryKey = { key: recoveryKey, profileName: created.profile.name };
+    await issueRecoveryKey(recoveryKey, created.profile.name);
     return { profile: created.profile, status: await state.vaultStore.getStatus(), recoveryKey };
   });
 
@@ -83,7 +83,7 @@ function register(ctx) {
       throw new Error("The backup was restored but the vault remained locked.");
     }
     if (recoveryKey) {
-      state.pendingRecoveryKey = { key: recoveryKey, profileName: restored.profile.name };
+      await issueRecoveryKey(recoveryKey, restored.profile.name);
     }
     return { canceled: false, profile: restored.profile, recoveryKey };
   });

@@ -86,19 +86,46 @@
 }
 
 .recovery-key-confirm {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
+  display: block;
   margin-top: 18px;
   color: var(--c-d2d2d2);
   font-size: 12px;
   line-height: 1.5;
-  cursor: pointer;
 }
 
-.recovery-key-confirm input {
-  margin: 2px 0 0;
-  accent-color: var(--c-eeeeee);
+/* Sized for the 4 characters typed back from the key above. */
+.recovery-key-confirm-input {
+  width: 9ch;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--c-3a3a3a);
+  border-radius: 8px;
+  background: var(--c-141414);
+  color: var(--c-eeeeee);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.recovery-key-confirm-input:focus-visible {
+  outline: 2px solid var(--c-eeeeee);
+  outline-offset: 1px;
+}
+
+/* After a replacement: the old key no longer opens this vault. */
+.recovery-key-replaced {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--c-554721);
+  border-radius: 10px;
+  color: var(--c-f0e3b8);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.recovery-key-replaced[hidden] {
+  display: none;
 }
 
 .dialog-save-button:disabled {

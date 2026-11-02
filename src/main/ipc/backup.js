@@ -17,6 +17,7 @@ function register(ctx) {
     activeProfileName,
     showVaultDialog,
     lockVault,
+    issueRecoveryKey,
     registerHandler,
   } = ctx;
   const { dialog, shell } = ctx.electron;
@@ -196,7 +197,7 @@ function register(ctx) {
       throw new Error("Restore was interrupted because the vault was locked.");
     }
     if (recoveryKey) {
-      state.pendingRecoveryKey = { key: recoveryKey, profileName: await activeProfileName() };
+      await issueRecoveryKey(recoveryKey);
     }
     return { canceled: false, recoveryKey };
   });

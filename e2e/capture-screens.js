@@ -11,7 +11,7 @@
 // images.
 const fs = require("node:fs/promises");
 const path = require("node:path");
-const { createDataFolder, launchApp, removeDataFolder, TEST_PASSPHRASE } = require("./app");
+const { confirmRecoveryKey, createDataFolder, launchApp, removeDataFolder, TEST_PASSPHRASE } = require("./app");
 
 // Makes the page the same on every run. Playwright's own options for this
 // (style, animations, caret) inject a <style> element, which the page's CSP
@@ -80,10 +80,7 @@ async function captureTheme(theme, folder) {
     await page.locator("#recovery-key-dialog[open]").waitFor();
     await shot("03-recovery-key", ["#recovery-key-value"]);
     // Finish creating the vault, as createVault() in app.js does.
-    await page.check("#recovery-key-confirm");
-    await page.click("#recovery-key-done");
-    const later = page.locator("#recovery-backup-later");
-    if (await later.isVisible()) await later.click();
+    await confirmRecoveryKey(page);
     await page.locator("#open-panel:not([hidden])").waitFor();
     await shot("04-vault-empty");
 

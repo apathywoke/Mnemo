@@ -408,6 +408,13 @@
             </div>
           </header>
 
+          <div id="recovery-unconfirmed-warning" class="recovery-warning backup-recovery-warning" role="alert" hidden>
+            <span class="recovery-warning-mark" aria-hidden="true">!</span>
+            <div>
+              <strong data-i18n="vault.recoveryUnconfirmedTitle">Your new recovery key was not confirmed</strong>
+              <p data-i18n="vault.recoveryUnconfirmedBody">The vault locked before you confirmed that the new recovery key is saved. Create a new one in Settings → Security, and save it.</p>
+            </div>
+          </div>
           <div id="backup-recovery-warning" class="recovery-warning backup-recovery-warning" role="note">
             <span class="recovery-warning-mark" aria-hidden="true">!</span>
             <div>
@@ -1101,6 +1108,7 @@
         <p class="eyebrow section-label" data-i18n="recoveryKey.eyebrow">RECOVERY KEY</p>
         <h3 id="recovery-key-title" data-i18n="recoveryKey.title">Save your recovery key</h3>
         <p class="recovery-key-description" data-i18n="recoveryKey.description">If you forget your master passphrase, this key is the only way back into this vault. Mnemo will not show it again.</p>
+        <p id="recovery-key-replaced" class="recovery-key-replaced" role="note" hidden data-i18n="recoveryKey.replaced">Your previous recovery key no longer opens this vault. It still opens backups made before this change.</p>
         <p id="recovery-key-value" class="recovery-key-value" translate="no" tabindex="-1" autofocus></p>
         <div class="recovery-key-actions">
           <button id="recovery-key-copy" type="button" class="secondary-button" data-i18n="recoveryKey.copy">Copy</button>
@@ -1112,10 +1120,9 @@
           <li data-i18n="recoveryKey.tipFile">If you saved it as a file, move the file to a safe place.</li>
           <li class="recovery-key-tip-strong" data-i18n="recoveryKey.tipBackup">The key only opens this vault’s file or its backups. If the app and its data are deleted, the key alone cannot bring them back — keep an encrypted backup too.</li>
         </ul>
-        <label class="recovery-key-confirm">
-          <input id="recovery-key-confirm" type="checkbox" />
-          <span data-i18n="recoveryKey.confirm">I have saved my recovery key somewhere safe</span>
-        </label>
+        <label class="recovery-key-confirm" for="recovery-key-confirm" data-i18n="recoveryKey.confirmLabel">To confirm that you saved it, type the last 4 characters of the key</label>
+        <input id="recovery-key-confirm" class="recovery-key-confirm-input" type="text" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" translate="no" />
+        <p id="recovery-key-confirm-error" class="form-error" role="alert" hidden></p>
         <div class="dialog-actions">
           <button id="recovery-key-done" type="button" class="dialog-save-button" disabled data-i18n="recoveryKey.done">Done</button>
         </div>
