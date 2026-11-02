@@ -107,8 +107,6 @@ async function loadMain(t) {
       },
     },
     shell: { openExternal: async (url) => opened.push(url), trashItem: async () => {} },
-    safeStorage: { isAsyncEncryptionAvailable: async () => false },
-    systemPreferences: { canPromptTouchID: () => false },
   };
 
   const originalLoad = Module._load;

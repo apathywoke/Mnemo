@@ -9,7 +9,8 @@ rollback designs (section 7, items 2–4), and 2026-11-02 for schema 4,
 which seals notes per entry (data table, A3, section 7, items 2–3), and
 the same day for revealing notes only after real user input (A3; section 7,
 item 2 done) and for Touch ID backed by the Secure Enclave (B8, "Touch ID
-helper", A1, A4, A8; section 7, item 7).
+helper", A1, A4, A8; section 7, item 7), with the Keychain-based Touch ID
+removed after unlock was confirmed on real hardware.
 
 ## 1. What Mnemo protects
 
@@ -22,7 +23,7 @@ helper", A1, A4, A8; section 7, item 7).
 | Other entry fields: name, username, website, site icon | Vault file (encrypted); main-process memory while unlocked; renderer memory and DOM for the visible list or selected entry | Usernames and websites reveal which accounts exist. |
 | Master passphrase | Typed into the renderer, sent once over IPC, then dropped | Never stored. |
 | Recovery key (256-bit) | Shown once in the renderer; kept in main memory until the user confirms it is saved; optionally in a user-saved text file; on paper | Opens the vault and resets the passphrase. |
-| Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock; if Touch ID is on, also in `biometric/<profile>.key`: encrypted under a Secure Enclave key agreement (version 2), or, in files from earlier versions and where the helper cannot run, with a Keychain-held key (version 1) | Unwraps everything. Version 2 opens only on this Mac, after a touch of an enrolled finger ("Touch ID helper"). |
+| Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock; if Touch ID is on, also in `biometric/<profile>.key`, encrypted under a Secure Enclave key agreement | Unwraps everything. The Touch ID file opens only on this Mac, after a touch of an enrolled finger ("Touch ID helper"). |
 | Attachments | `<vault>.attachments/<id>.bin`, each encrypted under its own key sealed inside the vault data; main-process memory while being added, saved, or verified; a plain copy wherever the user saves one | A file alone reveals only its size. |
 | Earlier versions (history) | Inside the encrypted vault data, sealed values kept sealed | Old passwords remain until 20 newer versions push them out or the item is deleted for good. |
 | Encrypted backups (`.vault`) | Wherever the user saves them | Same envelope and passphrase as the local vault; with attachments, a container that also holds the encrypted attachment files. |
@@ -138,7 +139,8 @@ was added or removed: `biometryCurrentSet`) or the file does not decrypt,
 main reports that Touch ID can no longer unlock the vault and removes the
 file; the master passphrase still works and Touch ID can be turned on again.
 A file read where the helper cannot run (`npm start` without a built
-helper) is reported as "not available" and kept.
+helper) is reported as "not available" and kept. Without the helper (macOS
+12, no Secure Enclave, or no enrolled finger) Touch ID is not offered.
 
 **Another process runs the helper, or uses the blob itself.** Without a
 Developer ID there is no Keychain access group, so the Secure Enclave key is
@@ -158,7 +160,7 @@ and wrap, the vault key. What it cannot do:
   removes the file.
 
 So the residual risk is a user who touches the sensor for a prompt that is
-not Mnemo's. Before, with the Keychain backend, a process could get the key
+not Mnemo's. With the earlier Keychain backend, a process could get the key
 with no touch at all, through "Always Allow" or the login password. A
 Developer ID with a keychain access group would bind the key to Mnemo's Team
 ID and close this (section 7, item 9).
@@ -167,11 +169,13 @@ A replaced helper binary (which needs write access to the app bundle, see A4)
 can show its own prompts or return wrong secrets. A wrong secret only fails
 decryption, which turns Touch ID off for that vault.
 
-**Version 1 files** (written by earlier versions, and by this one where the
-helper does not run: macOS 12, or no Secure Enclave) keep the Keychain
-backend and its risks (A4). They are not converted; turning Touch ID off and
-on again where the helper runs writes a version 2 file. Version 1 stays
-until Secure Enclave unlock is confirmed on real hardware.
+**Version 1 files**, written by earlier versions, held the vault key
+encrypted with Electron `safeStorage` (a key in the login Keychain),
+released after an app-side Touch ID check. They are no longer read: main
+deletes them at startup and whenever it finds one, so Touch ID is off for
+those vaults until it is turned on again. Copies made earlier (Time Machine,
+disk images) still decrypt with the login Keychain; changing the master
+passphrase replaces the vault key and makes them useless (A1).
 
 ## 3. Assumptions
 
@@ -205,14 +209,14 @@ until Secure Enclave unlock is confirmed on real hardware.
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
 | Brute-force the recovery key | 256 random bits; the 24-bit checksum only detects typos and reveals nothing about the key | None known. |
-| Use a vault key learned once (an old recovery key with an old copy of the file, or a version 1 Touch ID file with Keychain access) to read later versions | Every change of credentials replaces the vault key: all sealed values and attachments are encrypted again under new keys, and the Touch ID file is removed | Old backups and copies keep their old key and open with the credentials they had; rotation cannot reach them. Changing credentials is not automatic: the user has to do it after a suspected leak. |
+| Use a vault key learned once (an old recovery key with an old copy of the file, or an old Keychain-based Touch ID file with Keychain access) to read later versions | Every change of credentials replaces the vault key: all sealed values and attachments are encrypted again under new keys, and the Touch ID file is removed | Old backups and copies keep their old key and open with the credentials they had; rotation cannot reach them. Changing credentials is not automatic: the user has to do it after a suspected leak. |
 | Strip or replace the recovery wrap to plant a key the attacker knows | The recovery salt is in the AES-GCM associated data of the key wraps and the vault data; a missing or different recovery wrap cannot unwrap the real vault key, and the strict format check rejects the file | An attacker with write access can delete the recovery wrap together with the file (denial of service only). |
 | Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM; a passphrase being set must be at least 12 characters and rated Strong by the built-in estimate, checked in main | The estimate (a port of zxcvbn with English, German, and Russian dictionaries) models known attack strategies; a phrase that is predictable in ways it does not know, such as a quotation outside its dictionaries, can still pass. Vaults from before this rule may still have a 7-character passphrase until it is changed. |
 | Tamper with a vault or backup to plant data or downgrade parameters | AES-GCM with the header (format, version, KDF parameters, salt) as AAD; strict schema and size validation before and after decryption; fixed KDF parameters | None known. |
 | Swap sealed passwords between entries | Each password is sealed with the entry ID in its AAD; a swapped value fails authentication | None known. |
 | Read, alter, or swap attachment files | Each file is AES-256-GCM under its own key with the attachment ID as AAD; the key is sealed with the item and attachment IDs inside the vault data. A changed or swapped file fails to decrypt and is reported by name; backups are verified before they are written and before a restore replaces anything | File sizes and counts are visible. Deleting files is possible (denial of service); the vault then reports them as missing. |
 | Corrupt a backup to damage the vault it is restored into | The container must end exactly after its last file; every referenced attachment is decrypted before anything is written; the vault file is replaced last, in one rename | None known. |
-| Read the vault key from a copied Touch ID key file | Version 2: the key is wrapped under a Secure Enclave key agreement; the blob opens only in this Mac's Secure Enclave, after Touch ID | Version 1 files decrypt with the login Keychain, so with the Keychain and the login password. |
+| Read the vault key from a copied Touch ID key file | The key is wrapped under a Secure Enclave key agreement; the blob opens only in this Mac's Secure Enclave, after Touch ID | Copies of version 1 files from earlier versions (in backups of the home folder) decrypt with the login Keychain and the login password, until a change of credentials replaces the vault key. |
 | Recover deleted vaults | Not addressed: deletion unlinks the file | APFS snapshots, Time Machine, and SSD remapping may keep old encrypted copies. These remain protected by their passphrase. |
 
 ### A2, malicious website (favicon fetch)
@@ -253,8 +257,7 @@ until Secure Enclave unlock is confirmed on real hardware.
 | Load a foreign library: `DYLD_INSERT_LIBRARIES` or another `DYLD_*` variable | Hardened runtime on the app and every helper, without `allow-dyld-environment-variables`; checked with an injected test library (`docs/RELEASING.md`) | None known for injection through the environment. |
 | Load a foreign library by replacing one inside the bundle (for example `Electron Framework`) | Developer ID builds: library validation refuses code from another Team ID | GitHub builds have `disable-library-validation` (an ad-hoc signature has no Team ID to compare), so a replaced, re-signed framework loads. This needs write access to the bundle, which already allows the re-signing attack in the row above. |
 | Replace the vault file or `profiles.json` | AES-GCM authentication; schema validation; registry validation | The attacker can delete or roll back vaults (old encrypted copy). Rollback is not detected. |
-| Read a version 2 Touch ID key file and run the helper (or its own CryptoKit code) with its blob | The Secure Enclave performs the agreement only after a touch of a currently enrolled finger; the file is `0600` and bound to its profile ID ("Touch ID helper") | The key is not bound to Mnemo (no keychain access group without a Developer ID): a user who touches the sensor for such a prompt, whose name and reason the attacker chooses, gives away the vault key. |
-| Read a version 1 Touch ID key file and ask the Keychain for its key | The Keychain item belongs to the signed app; another app gets a macOS Keychain prompt. The file is `0600` and bound to its profile ID | A user who clicks "Always Allow", or an attacker who knows the login password and has the disk, can decrypt the vault key without Touch ID or the master passphrase. Touch ID is checked by the app, not by the Keychain item. Turning Touch ID off and on again where the helper runs replaces the file with version 2. |
+| Read the Touch ID key file and run the helper (or its own CryptoKit code) with its blob | The Secure Enclave performs the agreement only after a touch of a currently enrolled finger; the file is `0600` and bound to its profile ID ("Touch ID helper") | The key is not bound to Mnemo (no keychain access group without a Developer ID): a user who touches the sensor for such a prompt, whose name and reason the attacker chooses, gives away the vault key. |
 | Read clipboard leftovers | Copied values are cleared after 30 s, and on lock, if unchanged | Clipboard managers and Universal Clipboard may keep copies. |
 
 ### A5, local process while unlocked
@@ -299,7 +302,6 @@ must not be used with real vaults on a shared machine.
 | Path or command injection while installing | Archive names are restricted to `[A-Za-z0-9._-]` in the signed manifest; files are unpacked with `ditto` into a fresh directory next to the app; the relaunch script receives the PID and path as arguments, not as shell text | — |
 | Partially installed app | Staging and swap use renames on the same volume; a failed swap restores the previous app; leftovers are removed on the next launch | A crash between the two renames leaves the app at `.Mnemo-previous-….app` in the same folder; the user must rename it back. |
 | Updater installs into a translocated or read-only copy | Installation is refused outside a writable folder, on a mounted disk image, or under App Translocation; the banner offers the release page instead | — |
-| Keychain item tied to an ad-hoc signature | Version 2 Touch ID files use no Keychain item | The ad-hoc signature changes with every build, so after an update macOS asks to let Mnemo use its "Safe Storage" Keychain item, for vaults whose Touch ID file is still version 1. Denying it disables Touch ID unlock until it is turned on again; the master passphrase still works. A Developer ID signature removes the prompt. |
 
 ## 6. Out of scope
 
@@ -349,16 +351,15 @@ must not be used with real vaults on a shared machine.
    pixels (B7). That process runs Node.js without Chromium's sandbox;
    decoding in a sandboxed hidden renderer (`createImageBitmap`) would
    confine it further.
-7. **Touch ID binding.** **Mostly done** ("Touch ID helper").
-   - New Touch ID files are wrapped under a Secure Enclave key whose access
+7. **Touch ID binding.** **Done** ("Touch ID helper").
+   - Touch ID files are wrapped under a Secure Enclave key whose access
      control requires a currently enrolled finger: the Secure Enclave, not
      the app, refuses to use it without a touch, and changing fingerprints
      invalidates it.
+   - The Keychain backend is removed, and its files are deleted.
    - **Accepted** without a Developer ID: the key is not bound to Mnemo, so
      another same-user process can ask for a touch with the file's blob.
-   - **Open:** version 1 (Keychain) files are kept and not converted until
-     Secure Enclave unlock is confirmed on real hardware; then they should
-     be removed, and the Keychain backend with them.
+   - **Accepted:** Touch ID needs macOS 13 or later.
 8. **Passphrase strength.** Mostly done. New passphrases need 12
    characters and score 4 (at least 10^10 guesses) from a port of zxcvbn
    (`src/shared/strength/`, no runtime dependency) with dictionaries of
@@ -370,8 +371,8 @@ must not be used with real vaults on a shared machine.
 9. **Developer ID.** GitHub releases are ad-hoc signed. With a Developer ID,
    sign and notarize in the release workflow, drop
    `build/entitlements.adhoc.plist` so library validation is back, check the
-   new app's Team ID in the updater, and the Gatekeeper and Keychain prompts
-   go away. A keychain access group would also bind the Touch ID key to
+   new app's Team ID in the updater, and the Gatekeeper prompt goes away. A
+   keychain access group would also bind the Touch ID key to
    Mnemo (item 7).
 10. **Update freshness.** A freeze attack (serving an old, validly signed
     release as the latest) is not detected. **Planned, deferred** while the

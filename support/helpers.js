@@ -1,3 +1,4 @@
+const { createECDH, randomBytes } = require("node:crypto");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
@@ -59,4 +60,39 @@ async function readPageStyles(file = path.join(__dirname, "..", "styles.css")) {
   return parts.join("");
 }
 
-module.exports = { makeLogin, makePngHeader, makeTempDirectory, plainTextEntries, readPageStyles };
+// A stand-in for the Touch ID helper (native/touch-id/main.swift) that does
+// the key agreement in software. The "Secure Enclave" keys live in `keys`,
+// so a blob only works with the helper that made it, like on a real Mac.
+// `respond` sets the reply of the next agree: "allow", or an error code.
+function makeTouchIdHelper({ available = true } = {}) {
+  const keys = new Map();
+  const requests = [];
+  let nextAgree = "allow";
+  return {
+    requests,
+    keys,
+    respond(value) { nextAgree = value; },
+    async run(request) {
+      requests.push(request);
+      if (request.command === "status") return { available };
+      if (!available) return { error: "unavailable" };
+      if (request.command === "create") {
+        const key = createECDH("prime256v1");
+        const publicKey = key.generateKeys();
+        const keyBlob = randomBytes(96).toString("base64");
+        keys.set(keyBlob, key);
+        return { publicKey: publicKey.toString("base64"), keyBlob };
+      }
+      if (request.command === "agree") {
+        if (nextAgree !== "allow") return { error: nextAgree };
+        const key = keys.get(request.keyBlob);
+        if (!key) return { error: "invalidated" };
+        const secret = key.computeSecret(Buffer.from(request.peerPublicKey, "base64"));
+        return { sharedSecret: secret.toString("base64") };
+      }
+      return { error: "invalidRequest" };
+    },
+  };
+}
+
+module.exports = { makeLogin, makePngHeader, makeTempDirectory, makeTouchIdHelper, plainTextEntries, readPageStyles };
