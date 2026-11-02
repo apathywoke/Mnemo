@@ -118,15 +118,10 @@ function register(ctx) {
 
   // Touch ID unlock for the selected profile. Status works while locked so
   // the unlock screen can offer it.
-  // `backend`: "secureEnclave" or "keychain" when Touch ID is on.
-  registerHandler("biometric:status", async () => {
-    const backend = state.activeProfileId !== null ? await state.biometricUnlock.backend(state.activeProfileId) : null;
-    return {
-      available: await state.biometricUnlock.isAvailable(),
-      enabled: backend !== null,
-      backend,
-    };
-  });
+  registerHandler("biometric:status", async () => ({
+    available: await state.biometricUnlock.isAvailable(),
+    enabled: state.activeProfileId !== null && await state.biometricUnlock.isEnabled(state.activeProfileId),
+  }));
 
   registerHandler("biometric:enable", async (passphrase) => {
     if (state.activeProfileId === null) throw new Error("Choose a valid vault profile.");

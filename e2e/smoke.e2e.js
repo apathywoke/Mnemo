@@ -122,14 +122,25 @@ test("the page makes no network requests and has no WebRTC", async (t) => {
 
 // package.json says "mnemo", but the Keychain item of the Touch ID files is
 // named after the app name, so main.js keeps the internal one.
-test("the app keeps its internal name, which names the Touch ID Keychain item", async (t) => {
+// The internal name keeps every name-derived value (such as the "Safe
+// Storage" Keychain item earlier versions used) as it was. Touch ID key
+// files from those versions are deleted at startup.
+test("the app keeps its internal name and deletes Keychain-based Touch ID files", async (t) => {
   const userDataDir = await createDataFolder();
   t.after(() => removeDataFolder(userDataDir));
+  const oldKeyFile = path.join(userDataDir, "biometric", "0f8fad5b-d9cb-469f-a165-70867728950e.key");
+  await fs.mkdir(path.dirname(oldKeyFile), { recursive: true });
+  await fs.writeFile(oldKeyFile, Buffer.concat([Buffer.from("v10"), Buffer.alloc(120, 7)]));
 
   const { app } = await launchApp(userDataDir);
   try {
     assert.equal(require("../package.json").name, "mnemo");
     assert.equal(await app.evaluate(({ app: electronApp }) => electronApp.getName()), "local-vault-prototype");
+    const deadline = Date.now() + 10_000;
+    while (await fs.access(oldKeyFile).then(() => true, () => false)) {
+      assert.ok(Date.now() < deadline, "the old Touch ID file was not deleted");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
   } finally {
     await app.close();
   }

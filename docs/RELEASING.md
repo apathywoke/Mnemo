@@ -91,7 +91,7 @@ electron-builder copies it to `Contents/Resources/mnemo-touch-id` and signs
 it with the app and the hardened runtime; `scripts/verify-mac-release.js`
 fails the build if it is missing or is not a Mach-O executable. The release
 runner's Xcode provides the tools. `npm run build:touch-id` builds it alone,
-for `npm start`; without it, Touch ID falls back to the Keychain backend.
+for `npm start`; without it, Touch ID is not offered.
 The protocol is in `docs/THREAT_MODEL.md` ("Touch ID helper").
 
 If the notarization variables are missing, electron-builder skips notarization
@@ -308,16 +308,13 @@ page instead.
 - **First install**: macOS refuses to open an app that is not notarized. The
   user opens it once, then allows it in System Settings → Privacy & Security
   → **Open Anyway**. Updates installed by the app are not quarantined and do
-  not ask again.
-- **After each update**, if Touch ID unlock is on with a key file from
-  before the Secure Enclave helper (version 1), macOS may ask to let Mnemo
-  use its "Safe Storage" Keychain item, because an ad-hoc signature is
-  different for every build. **Always Allow** keeps Touch ID working; denying
-  it means unlocking with the master passphrase until Touch ID is turned on
-  again. Turning Touch ID off and on again moves the vault to the Secure
-  Enclave, which uses no Keychain item and does not ask.
+  not ask again. This goes away with a Developer ID signature.
 
-Both go away with a Developer ID signature.
+Touch ID keys are in the Secure Enclave and use no Keychain item, so updates
+no longer ask for Keychain access. **The first release with the Secure
+Enclave helper** deletes the Keychain-based Touch ID files of earlier
+versions: users who had Touch ID on unlock once with the master passphrase
+and turn it on again in Settings. Its release notes must say so.
 
 ### Rotating or revoking the update key
 
@@ -352,7 +349,7 @@ also covers tampered archives, foreign bundle IDs, and version mismatches.
 `test/make-update-manifest.test.js` runs the signing script against a test
 key pair.
 
-## App name, data folder, and the Keychain
+## App name and data folder
 
 **Data folder.** `main.js` pins the data folder (vaults, `profiles.json`,
 `settings.json`, `biometric/`) to
@@ -361,59 +358,37 @@ It no longer follows `name` or `productName` in `package.json`, so renaming
 the package cannot point the app at an empty folder. `--user-data-dir`
 still overrides it, for test builds.
 
-**Keychain.** Touch ID files from before the Secure Enclave helper
-(version 1), and new ones where the helper does not run (macOS 12), store
-each vault key encrypted with `safeStorage`, whose key lives in the login Keychain as the generic
-password **"<app name> Safe Storage"** (account "<app name>"). In
-Electron 45 the app name is `app.getName()`: the value of `app.setName()`
-if called, otherwise `productName`, otherwise `name` from the packaged
-`package.json`. Electron reads it once per launch, in
+**App name.** In Electron 45 the app name is `app.getName()`: the value of
+`app.setName()` if called, otherwise `productName`, otherwise `name` from
+the packaged `package.json`. Electron reads it once per launch, in
 `ElectronBrowserMainParts::PostCreateMainMessageLoop`
 (`shell/browser/electron_browser_main_parts.cc`). The top level of
-`main.js` runs earlier (`PostEarlyInitialization` → `LoadEnvironment`). The
-item is **"local-vault-prototype Safe Storage"**, and it stays so:
+`main.js` runs earlier (`PostEarlyInitialization` → `LoadEnvironment`).
 `package.json` is named `mnemo`, and the first statement after `main.js`
 reads Electron is `app.setName("local-vault-prototype")`
-(`INTERNAL_APP_NAME`). `productName: "Mnemo"` in
-`electron-builder.config.js` only names the bundle (electron-builder does
-not copy it into the packaged `package.json`, checked in the 0.2.x builds)
-and does not change the item.
+(`INTERNAL_APP_NAME`), so every name-derived value stays as it was.
+`productName: "Mnemo"` in `electron-builder.config.js` only names the
+bundle (electron-builder does not copy it into the packaged `package.json`,
+checked in the 0.2.x builds).
 
-**Async API.** Electron 45 deprecates `safeStorage.isEncryptionAvailable`,
-`encryptString`, and `decryptString`; `src/main/biometric-unlock.js` uses
-`isAsyncEncryptionAvailable`, `encryptStringAsync`, and `decryptStringAsync`.
-Electron documents that data written by `encryptString` decrypts with
-`decryptStringAsync`, so key files from earlier versions keep working; the
-tests check this only with stubs. Before releasing the first version with the
-async API, run the manual check from step 3 below: turn on Touch ID in the
-previous release, update, and unlock with Touch ID. When
-`decryptStringAsync` reports `shouldReEncrypt`, the key file is not
-rewritten (that could race with turning Touch ID off); if a file ever stops
-decrypting, the user turns Touch ID on again.
-
-Changing the app name therefore changes the Keychain item. Electron then
-creates a new key, the existing version 1 `biometric/<profile>.key` files no
-longer decrypt, and Touch ID unlock stops ("Touch ID can no longer unlock this
-vault…"). Vaults, backups, and passphrases are not affected. Without the
-`setName()` call, renaming `package.json` or adding `productName` there would
-do exactly that.
+**Keychain.** Electron's `safeStorage` keeps its key in the login Keychain
+as the generic password **"<app name> Safe Storage"** ("local-vault-prototype
+Safe Storage"). Earlier versions encrypted Touch ID files with it, so
+changing the name would have broken Touch ID. Mnemo no longer calls
+`safeStorage`: Touch ID keys are in the Secure Enclave, and the old
+Keychain-based files are deleted at startup (`removeOldFiles()` in
+`src/main/biometric-unlock.js`). An item left by an earlier version can be
+deleted in Keychain Access. Changing the internal name now changes only
+other name-derived values; review them before doing so.
 
 **How the package was renamed.** `package.json` went from
 `local-vault-prototype` to `mnemo` while the internal name stayed:
 
 1. `main.js` calls `app.setName("local-vault-prototype")` before anything
-   else runs, so the Keychain item and every other name-derived value stay as
-   they are. `test/main-startup.test.js` checks that it comes first whatever
+   else runs, so every name-derived value stays as it is.
+   `test/main-startup.test.js` checks that it comes first whatever
    `package.json` says; `e2e/smoke.e2e.js` checks `app.getName()` in the
    running app.
 2. The visible name is set separately: the bundle name comes from
    `productName` in `electron-builder.config.js`, and the About panel from
    `app.setAboutPanelOptions({ applicationName: "Mnemo" })`.
-3. **Before the first release with the rename**, test on a Mac with Touch ID
-   turned on: install the previous release, turn on Touch ID, update, and
-   unlock with Touch ID.
-
-If the internal name must change after all, there is no way to read the old
-item with `safeStorage` once the name has changed (it is read once per
-launch). Users then turn Touch ID on again with their master passphrase; the
-old Keychain item is left behind and can be deleted in Keychain Access.

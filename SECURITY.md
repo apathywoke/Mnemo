@@ -276,16 +276,13 @@ passwords until the design has received independent security review.
   Mnemo's gives that program the vault key. It cannot get the key without
   a touch. The protocol and this case are described in
   `docs/THREAT_MODEL.md` ("Touch ID helper").
-- Touch ID files from earlier versions, and new ones on macOS 12 where the
-  helper does not run, use the previous backend: the vault key is encrypted
-  with Electron `safeStorage`, whose key lives in the macOS login Keychain
-  under the app's signature, and released after `promptTouchID` succeeds.
-  There Touch ID is enforced by the app rather than by the Keychain item,
-  and someone who can unlock your macOS login keychain (for example, with
-  your Mac login password) could recover the vault key without the master
-  passphrase or a touch. These files are not converted; turn Touch ID off
-  and on again in Settings to move a vault to the Secure Enclave. Settings
-  shows which one a vault uses.
+- Touch ID needs macOS 13 or later. Earlier versions of Mnemo kept the
+  vault key encrypted with Electron `safeStorage` (a key in the macOS login
+  Keychain) and checked Touch ID in the app, so someone who could unlock
+  your login keychain could recover the vault key without a touch. Those
+  key files are deleted at startup; turn Touch ID on again in Settings.
+  Copies of them in backups of your home folder still open with the login
+  Keychain; changing the master passphrase makes them useless.
 - Restoring a backup into the vault, deleting the vault, or any change of
   credentials (which replaces the vault key) removes the stored Touch ID key.
 - Items can be organized in folders (one per item) and marked as favorites.

@@ -4,7 +4,7 @@ const Module = require("node:module");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const test = require("node:test");
-const { makeLogin, makeTempDirectory } = require("../support/helpers");
+const { makeLogin, makeTempDirectory, makeTouchIdHelper } = require("../support/helpers");
 
 test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs, and clipboard", async (t) => {
   const directory = await makeTempDirectory(t, "local-vault-main-test-");
@@ -103,18 +103,6 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
         setProxy: async (config) => { proxyConfig = config; },
       },
     },
-    safeStorage: {
-      isAsyncEncryptionAvailable: async () => true,
-      encryptStringAsync: async (text) => Buffer.from(`sealed:${text}`),
-      decryptStringAsync: async (buffer) => ({
-        shouldReEncrypt: false,
-        result: buffer.toString().replace(/^sealed:/, ""),
-      }),
-    },
-    systemPreferences: {
-      canPromptTouchID: () => true,
-      promptTouchID: async () => {},
-    },
   };
 
   // The real updater, kept offline: if the automatic check runs (20 s after
@@ -131,14 +119,14 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
       });
     }
   }
-  // Touch ID is macOS-only by design (BiometricUnlock checks the platform,
-  // since safeStorage elsewhere may use a weak backend). The stub Electron
-  // offers Touch ID, so the test runs as on a Mac on any host, without
-  // changing process.platform for the rest of main.
+  // Touch ID is macOS-only. A software stand-in for the Secure Enclave
+  // helper replaces the one main would start, so the test runs as on a Mac
+  // on any host, without changing process.platform for the rest of main.
+  const touchIdHelper = makeTouchIdHelper();
   const RealBiometricUnlock = require("../src/main/biometric-unlock");
   class MacBiometricUnlock extends RealBiometricUnlock {
     constructor(directory, options) {
-      super(directory, { ...options, platform: "darwin" });
+      super(directory, { ...options, helper: touchIdHelper, platform: "darwin" });
     }
   }
   // Update state messages can arrive at any time; checks of what else was
@@ -288,12 +276,12 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   await invoke("recovery:dismiss");
 
   // Touch ID: enabling needs the passphrase; unlocking releases the key.
-  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false, backend: null });
+  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false });
   await assert.rejects(invoke("biometric:enable", "wrong passphrase"), /\[mnemo:errors\.passphraseIncorrect\]/);
   assert.deepEqual(await invoke("biometric:enable", "correct horse battery staple"), { enabled: true });
   assert.equal((await invoke("vault:lock")).unlocked, false);
   assert.equal((await invoke("vault:unlock-biometric")).unlocked, true);
-  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: true, backend: "keychain" });
+  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: true });
 
   const saved = await invoke("vault:save-entry", makeLogin());
   assert.equal(Object.hasOwn(saved, "password"), false);
@@ -485,7 +473,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal((await invoke("biometric:status")).enabled, true);
   const changed = await invoke("vault:change-passphrase", "new passphrase 123", "a brand new long passphrase 4");
   assert.match(changed.recoveryKey, /^[0-9A-Z]{4}(-[0-9A-Z]{4})+$/);
-  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false, backend: null });
+  assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false });
   await invoke("recovery:copy");
   assert.equal(clipboardText, changed.recoveryKey);
   await invoke("recovery:dismiss");

@@ -6,16 +6,14 @@ const {
   nativeTheme,
   powerMonitor,
   protocol,
-  safeStorage,
   session,
-  systemPreferences,
 } = electron;
 
-// The internal app name, set before anything else runs. It names the
-// Keychain item that safeStorage creates ("<name> Safe Storage"), which
-// holds the key of the Touch ID files, and Electron reads it once per launch,
-// after this top level. package.json "name" is "mnemo"; without this line
-// the item would change and Touch ID would stop unlocking existing vaults.
+// The internal app name, set before anything else runs; Electron reads it
+// once per launch, after this top level. package.json "name" is "mnemo";
+// this keeps every value derived from the name as it was before the rename.
+// (Earlier versions also kept Touch ID keys in the "<name> Safe Storage"
+// Keychain item; they are now in the Secure Enclave.)
 // Users see "Mnemo" (productName in electron-builder.config.js and the About
 // panel below). See docs/RELEASING.md before changing it.
 const INTERNAL_APP_NAME = "local-vault-prototype";
@@ -140,10 +138,9 @@ if (launchedWithRemoteDebugging) {
       ? path.join(process.resourcesPath, "mnemo-touch-id")
       : path.join(app.getAppPath(), "build", "native", "mnemo-touch-id");
     state.biometricUnlock = new BiometricUnlock(app.getPath("userData"), {
-      safeStorage,
-      systemPreferences,
       helper: createTouchIdHelper(touchIdHelperPath),
     });
+    state.biometricUnlock.removeOldFiles().catch(() => {});
 
     state.settingsStore = new SettingsStore(app.getPath("userData"), {
       isSupportedLanguage: translator.isSupported,

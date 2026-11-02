@@ -3,7 +3,6 @@ const path = require("node:path");
 const { createECDH, hkdfSync, randomBytes, timingSafeEqual } = require("node:crypto");
 const { encryptGcm, decryptGcm } = require("./vault/crypto");
 
-const KEYCHAIN_FILE_VERSION = 1;
 const ENCLAVE_FILE_VERSION = 2;
 const KEY_BYTES = 32;
 const SALT_BYTES = 32;
@@ -17,65 +16,38 @@ const UNAVAILABLE = "Touch ID is not available on this Mac.";
 const ENABLE_FAILED = "Could not turn on Touch ID.";
 const INVALID = "Touch ID can no longer unlock this vault. Unlock it with your master passphrase and turn Touch ID on again.";
 
-// Touch ID unlock, in one of two ways, recorded per vault in
-// biometric/<profile>.key:
+// Touch ID unlock backed by the Secure Enclave, recorded per vault in
+// biometric/<profile>.key. The helper (native/touch-id/main.swift, via
+// touch-id-helper.js) creates a P-256 key in the Secure Enclave that can
+// only be used after Touch ID with the fingerprints enrolled now. The vault
+// key is encrypted (AES-256-GCM) under a key derived (HKDF-SHA-256) from an
+// ECDH agreement between that key and a one-time key whose private half is
+// discarded. Unlocking asks the helper for the same agreement, which the
+// Secure Enclave performs only after Touch ID. The file holds the key's blob
+// (usable only by this Mac's Secure Enclave), the one-time public key, a
+// salt, and the encrypted key. See docs/THREAT_MODEL.md ("Touch ID helper").
 //
-// - Secure Enclave (version 2, the default where available). The helper
-//   (native/touch-id/main.swift, via touch-id-helper.js) creates a P-256 key
-//   in the Secure Enclave that can only be used after Touch ID with the
-//   fingerprints enrolled now. The vault key is encrypted (AES-256-GCM)
-//   under a key derived (HKDF-SHA-256) from an ECDH agreement between that
-//   key and a one-time key whose private half is discarded. Unlocking asks
-//   the helper for the same agreement, which the Secure Enclave performs only
-//   after Touch ID. The file holds the key's blob (usable only by this Mac's
-//   Secure Enclave), the one-time public key, a salt, and the encrypted key.
-//   No Keychain item is involved. See docs/THREAT_MODEL.md ("Touch ID helper").
-//
-// - Keychain (version 1, written by earlier versions, and still used where
-//   the helper cannot run: macOS 12, `npm start` without a built helper). The
-//   vault key is encrypted with Electron safeStorage, whose key lives in the
-//   login Keychain, and is released after systemPreferences.promptTouchID:
-//   Touch ID is checked by the app, not by the Keychain. Kept, and existing
-//   files are not converted, until Secure Enclave unlock is confirmed on real
-//   hardware.
-//
-// safeStorage is used through its async API; the synchronous one is
-// deprecated in Electron 45. Electron documents that data written by the
-// old encryptString decrypts with decryptStringAsync, so key files written
-// by earlier versions keep working.
+// Files from before the helper (version 1) held the vault key encrypted
+// with Electron safeStorage, released after an app-side Touch ID check.
+// They are deleted at startup and whenever one is found: Touch ID is off
+// for that vault until it is turned on again.
 class BiometricUnlock {
   // `helper`: { run(request) } from touch-id-helper.js, or null.
-  constructor(directory, { safeStorage, systemPreferences, helper = null, platform = process.platform }) {
+  constructor(directory, { helper = null, platform = process.platform } = {}) {
     this.directory = path.join(directory, "biometric");
-    this.safeStorage = safeStorage;
-    this.systemPreferences = systemPreferences;
     this.helper = helper;
     this.platform = platform;
   }
 
-  async keychainAvailable() {
-    try {
-      return (
-        this.platform === "darwin" &&
-        Boolean(this.systemPreferences?.canPromptTouchID?.()) &&
-        Boolean(await this.safeStorage?.isAsyncEncryptionAvailable?.())
-      );
-    } catch {
-      return false;
-    }
-  }
-
-  async enclaveAvailable() {
+  // The helper runs (macOS 13 or later, built into the app) and reports a
+  // Secure Enclave and an enrolled finger.
+  async isAvailable() {
     if (this.platform !== "darwin" || !this.helper) return false;
     try {
       return (await this.helper.run({ command: "status" })).available === true;
     } catch {
       return false;
     }
-  }
-
-  async isAvailable() {
-    return (await this.enclaveAvailable()) || (await this.keychainAvailable());
   }
 
   filePath(profileId) {
@@ -85,24 +57,39 @@ class BiometricUnlock {
     return path.join(this.directory, `${profileId}.key`);
   }
 
+  // Whether a Secure Enclave key file exists. A version 1 file is deleted
+  // here, so it never lingers as a copy of the vault key.
   async isEnabled(profileId) {
-    const filePath = this.filePath(profileId);
+    this.filePath(profileId);
+    let contents;
     try {
-      await fs.access(filePath);
-      return true;
-    } catch {
-      return false;
+      contents = await this.readKeyFile(profileId);
+    } catch (error) {
+      // A file that is too large is still "on"; unlocking reports it invalid.
+      return error.code !== "ENOENT";
     }
-  }
-
-  // "secureEnclave", "keychain", or null when Touch ID is off.
-  async backend(profileId) {
-    const contents = await this.readKeyFile(profileId).catch(() => null);
-    if (!contents) return null;
     try {
-      return isEnclaveFile(contents) ? "secureEnclave" : "keychain";
+      if (isEnclaveFile(contents)) return true;
     } finally {
       contents.fill(0);
+    }
+    await this.disable(profileId);
+    return false;
+  }
+
+  // Deletes every version 1 file, including those of vaults that are not
+  // opened. main.js runs it once at startup, before Touch ID can be turned
+  // on for any vault.
+  async removeOldFiles() {
+    let names;
+    try {
+      names = await fs.readdir(this.directory);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      const profileId = name.endsWith(".key") ? name.slice(0, -".key".length) : "";
+      if (PROFILE_ID_PATTERN.test(profileId)) await this.isEnabled(profileId).catch(() => {});
     }
   }
 
@@ -113,26 +100,15 @@ class BiometricUnlock {
     return fs.readFile(filePath);
   }
 
-  async prompt(reason) {
-    if (!(await this.keychainAvailable())) throw new Error(UNAVAILABLE);
-    try {
-      await this.systemPreferences.promptTouchID(reason);
-    } catch {
-      throw new Error(CANCELED);
-    }
-  }
-
   // Stores the data key after a successful Touch ID check, so enrollment
-  // proves the sensor works for this user: in the Secure Enclave where the
-  // helper runs, otherwise with the Keychain.
+  // proves the sensor works for this user.
   async enable(profileId, dataKey, reason) {
     const filePath = this.filePath(profileId);
     if (!Buffer.isBuffer(dataKey) || dataKey.length !== KEY_BYTES) {
       throw new Error(ENABLE_FAILED);
     }
-    const contents = (await this.enclaveAvailable())
-      ? await this.enclaveFile(profileId, dataKey, reason)
-      : await this.keychainFile(profileId, dataKey, reason);
+    if (!(await this.isAvailable())) throw new Error(UNAVAILABLE);
+    const contents = await this.enclaveFile(profileId, dataKey, reason);
     const temporaryPath = `${filePath}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
     try {
       await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
@@ -144,20 +120,6 @@ class BiometricUnlock {
       throw new Error(ENABLE_FAILED);
     } finally {
       contents.fill(0);
-    }
-  }
-
-  async keychainFile(profileId, dataKey, reason) {
-    await this.prompt(reason);
-    const payload = JSON.stringify({
-      version: KEYCHAIN_FILE_VERSION,
-      profileId,
-      key: dataKey.toString("base64"),
-    });
-    try {
-      return await this.safeStorage.encryptStringAsync(payload);
-    } catch {
-      throw new Error(ENABLE_FAILED);
     }
   }
 
@@ -230,7 +192,6 @@ class BiometricUnlock {
       throw new Error(INVALID);
     }
     try {
-      if (!isEnclaveFile(contents)) return await this.releaseFromKeychain(contents, profileId, reason);
       const payload = enclavePayload(contents, profileId);
       if (!payload) throw new Error(INVALID);
       return await this.releaseFromEnclave(payload, profileId, reason);
@@ -260,33 +221,6 @@ class BiometricUnlock {
       payload.salt.fill(0);
     }
   }
-
-  async releaseFromKeychain(encrypted, profileId, reason) {
-    await this.prompt(reason);
-    try {
-      // shouldReEncrypt is not acted on: rewriting the file here could race
-      // with turning Touch ID off and bring back a key that was removed. A
-      // file that stops decrypting ends in the error below, and the user
-      // turns Touch ID on again.
-      const { result } = await this.safeStorage.decryptStringAsync(encrypted);
-      const payload = JSON.parse(result);
-      if (
-        payload?.version !== KEYCHAIN_FILE_VERSION ||
-        payload.profileId !== profileId ||
-        typeof payload.key !== "string"
-      ) {
-        throw new Error("invalid");
-      }
-      const key = Buffer.from(payload.key, "base64");
-      if (key.length !== KEY_BYTES) {
-        key.fill(0);
-        throw new Error("invalid");
-      }
-      return key;
-    } catch {
-      throw new Error(INVALID);
-    }
-  }
 }
 
 function decode(value, length) {
@@ -304,8 +238,8 @@ function deriveWrappingKey(secret, salt, profileId) {
   return Buffer.from(hkdfSync("sha256", secret, salt, wrapAad(profileId), KEY_BYTES));
 }
 
-// Secure Enclave key files are JSON; Keychain files are safeStorage output,
-// which starts with "v10".
+// Secure Enclave key files are JSON; version 1 files were safeStorage
+// output, which starts with "v10".
 function isEnclaveFile(contents) {
   return contents[0] === 0x7b;
 }
