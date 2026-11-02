@@ -148,7 +148,8 @@ function init(ctx, { refreshEntries }) {
 
   async function reveal(version, field) {
     try {
-      await ctx.api.revealVersionField(current.id, version.id, field);
+      const { copied } = await ctx.api.revealVersionField(current.id, version.id, field);
+      if (copied) showToast(t("toast.copied"));
     } catch (cause) {
       showToast(errorText(cause, "errors.showPassword"), { type: "error" });
     }
