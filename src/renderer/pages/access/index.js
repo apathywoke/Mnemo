@@ -80,6 +80,7 @@ function create(ctx) {
       if (status.unlocked) {
         $("#active-profile-name").textContent = state.selectedProfileName ?? "";
         ctx.showPanel("open");
+        void ctx.pages.vault.refreshBackupReminder();
         await ctx.pages.vault.refreshEntries();
       } else {
         ctx.clearVaultView();

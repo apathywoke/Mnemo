@@ -1,13 +1,20 @@
 /* Dashboard title and header actions. Loaded by styles.css, in order. */
 
-.dashboard-header h2 {
-  margin: 5px 0 0;
-  font-size: 30px;
-  letter-spacing: -0.05em;
+/* The open vault's name. */
+.dashboard-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-actions {
   display: flex;
+  flex: none;
   align-items: center;
-  gap: 7px;
+  gap: 4px;
 }

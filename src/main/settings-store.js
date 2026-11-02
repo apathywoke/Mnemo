@@ -17,7 +17,16 @@ class SettingsStore {
     this.isSupportedLanguage = isSupportedLanguage;
     // Update checks contact GitHub; daily by default because they deliver
     // security fixes, and adjustable or off in Settings.
-    this.settings = { language: defaultLanguage, theme: DEFAULT_THEME, updateInterval: DEFAULT_UPDATE_INTERVAL };
+    // `backupReminder`: whether the vault screen shows the reminder that
+    // backups open with the credentials valid when they were made. It is
+    // turned off when the user closes it and back on with each new recovery
+    // key.
+    this.settings = {
+      language: defaultLanguage,
+      theme: DEFAULT_THEME,
+      updateInterval: DEFAULT_UPDATE_INTERVAL,
+      backupReminder: true,
+    };
     /** @type {Promise<unknown>} */
     this.writeQueue = Promise.resolve();
   }
@@ -37,6 +46,7 @@ class SettingsStore {
           updateInterval: UPDATE_INTERVALS.includes(parsed.updateInterval)
             ? parsed.updateInterval
             : parsed.autoUpdate === false ? "off" : DEFAULT_UPDATE_INTERVAL,
+          backupReminder: parsed.backupReminder !== false,
         };
       }
     } catch {
@@ -68,6 +78,13 @@ class SettingsStore {
       return Promise.reject(new Error("Could not save the settings."));
     }
     return this.update({ updateInterval: interval });
+  }
+
+  setBackupReminder(shown) {
+    if (typeof shown !== "boolean") {
+      return Promise.reject(new Error("Could not save the settings."));
+    }
+    return this.update({ backupReminder: shown });
   }
 
   // Queued so that quick successive changes each build on the last one.

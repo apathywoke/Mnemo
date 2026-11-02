@@ -13,26 +13,24 @@
     transform 140ms ease;
 }
 
+/* The form's main action, the same shape as "New item" in the vault. */
 .primary-button {
-  width: 74px;
-  height: 74px;
-  justify-self: end;
-  margin-top: 54px;
-  padding: 9px;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 28px;
+  padding: 9px 16px;
   border: 1px solid var(--white);
-  border-radius: 50%;
+  border-radius: 12px;
   background: var(--white);
   color: var(--c-090909);
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
+  font-size: 12px;
+  font-weight: 600;
   overflow-wrap: anywhere;
   text-align: center;
-  text-transform: uppercase;
 }
 
-.primary-button:hover:not(:disabled) {
-  transform: scale(1.045);
+.primary-button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .primary-button:disabled {

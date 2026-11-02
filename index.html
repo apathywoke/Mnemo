@@ -378,12 +378,7 @@
 
         <section id="open-panel" class="vault-panel vault-dashboard" hidden>
           <header class="dashboard-header">
-            <div>
-              <p class="eyebrow section-label">
-                <span data-i18n="vault.eyebrow">YOUR VAULT</span> · <span id="active-profile-name"></span>
-              </p>
-              <h2 data-i18n="vault.title">Items</h2>
-            </div>
+            <h2 id="active-profile-name" class="dashboard-title"></h2>
             <div class="dashboard-actions">
               <button id="reports-button" type="button" class="quiet-button" aria-controls="reports-view" aria-expanded="false" data-i18n="vault.reports">
                 Reports
@@ -393,6 +388,22 @@
               </button>
               <button id="lock-button" type="button" class="quiet-button" data-i18n="vault.lock">
                 Lock
+              </button>
+              <button id="vault-settings-button" type="button" class="quiet-button settings-button" aria-label="Settings" data-i18n-aria-label="header.settings" aria-haspopup="dialog" aria-controls="settings-dialog" title="Settings" data-i18n-title="header.settings">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <g fill="currentColor" stroke="none">
+                    <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2"/>
+                    <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(45 12 12)"/>
+                    <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(90 12 12)"/>
+                    <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(135 12 12)"/>
+                    <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(180 12 12)"/>
+                    <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(225 12 12)"/>
+                    <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(270 12 12)"/>
+                    <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2" transform="rotate(315 12 12)"/>
+                  </g>
+                  <circle cx="12" cy="12" r="6.2" class="settings-gear-hole" stroke="currentColor" stroke-width="1.8"/>
+                  <circle cx="12" cy="12" r="2.4" class="settings-gear-hole" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
               </button>
             </div>
           </header>

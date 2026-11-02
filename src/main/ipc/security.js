@@ -111,8 +111,15 @@ function register(ctx) {
     return { canceled: false };
   });
 
-  registerHandler("recovery:dismiss", () => {
+  // A new recovery key brings back the backup reminder: backups made before
+  // it still open only with the old key.
+  registerHandler("recovery:dismiss", async () => {
+    const issued = state.pendingRecoveryKey !== null;
     state.pendingRecoveryKey = null;
+    if (issued) {
+      await state.settingsLoaded;
+      await state.settingsStore.setBackupReminder(true).catch(() => {});
+    }
     return { dismissed: true };
   });
 

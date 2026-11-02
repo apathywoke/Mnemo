@@ -142,7 +142,7 @@ async function captureTheme(theme, folder) {
     await page.click("#reports-close");
     await page.locator("#reports-view").waitFor({ state: "hidden" });
 
-    await page.click("#settings-button");
+    await page.click("#vault-settings-button");
     await page.locator("#settings-dialog[open]").waitFor();
     for (const [index, tab] of ["general", "updates", "security", "data", "vault"].entries()) {
       await page.click(`#settings-tab-${tab}`);

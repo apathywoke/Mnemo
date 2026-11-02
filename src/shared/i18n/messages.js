@@ -72,8 +72,6 @@ const en = {
   "restore.submitAria": "Choose and restore encrypted backup",
   "restore.checking": "Checking…",
 
-  "vault.eyebrow": "YOUR VAULT",
-  "vault.title": "Items",
   "vault.backup": "Backup",
   "vault.switch": "Switch vault",
   "vault.lock": "Lock",
@@ -798,8 +796,6 @@ const de = {
   "restore.submitAria": "Verschlüsselte Sicherung auswählen und wiederherstellen",
   "restore.checking": "Wird geprüft…",
 
-  "vault.eyebrow": "IHR TRESOR",
-  "vault.title": "Einträge",
   "vault.backup": "Sichern",
   "vault.switch": "Tresor wechseln",
   "vault.lock": "Sperren",
@@ -1521,8 +1517,6 @@ const ru = {
   "restore.submitAria": "Выбрать и восстановить зашифрованную копию",
   "restore.checking": "Проверка…",
 
-  "vault.eyebrow": "ВАШЕ ХРАНИЛИЩЕ",
-  "vault.title": "Записи",
   "vault.backup": "Резервная копия",
   "vault.switch": "Сменить хранилище",
   "vault.lock": "Заблокировать",

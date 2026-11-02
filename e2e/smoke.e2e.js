@@ -65,6 +65,11 @@ test("a vault is created, keeps a login across lock and relaunch, and never give
     await unlock(page, TEST_PASSPHRASE);
     await page.locator("#open-panel:not([hidden])").waitFor();
     await row.waitFor();
+
+    // The backup reminder shows until it is closed.
+    await page.locator("#backup-recovery-warning:not([hidden])").waitFor();
+    await page.click("#dismiss-backup-warning");
+    await page.locator("#backup-recovery-warning").waitFor({ state: "hidden" });
   } finally {
     await app.close();
   }
@@ -78,6 +83,8 @@ test("a vault is created, keeps a login across lock and relaunch, and never give
     await unlock(page, TEST_PASSPHRASE);
     await page.locator("#open-panel:not([hidden])").waitFor();
     await page.locator("#entry-list .entry-row-name", { hasText: LOGIN.name }).waitFor();
+    // Closed in the previous launch, it stays closed.
+    assert.equal(await page.locator("#backup-recovery-warning").isHidden(), true);
   } finally {
     await app.close();
   }
