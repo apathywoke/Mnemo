@@ -1,0 +1,14 @@
+{
+  "//": "Made-up test data for test/vault-notes-sealing.test.js, written by the schema 3 release (0.2.1).",
+  "passphrase": "violet anchor quarry 47 mosaic",
+  "recoveryKey": "SNMX-APMF-SQ87-CJE3-FNMC-NXWE-ZHFV-NAZ7-EG37-V6D0-HKKD-ETYA-GVGD-6RCA",
+  "ids": {
+    "login": "286d0ab4-d506-4aaf-b154-7fb0a855f18b",
+    "plainLogin": "c15d0b8c-5cec-49a9-ab14-d66dc519f73c",
+    "card": "1fdb969c-9537-4f70-81d8-a1b6b7e8b54f",
+    "note": "fdfd2466-525f-49bf-9835-35e34713d6c6",
+    "identity": "0b2e3a92-966b-4214-9918-6b1d8ba6a193",
+    "ssh": "72980ed8-2540-4679-8308-52630a1c4bad",
+    "trashed": "dce8e38c-c9e2-48d0-a119-9117d2ece7ca"
+  }
+}

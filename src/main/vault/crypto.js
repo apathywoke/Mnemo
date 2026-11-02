@@ -10,12 +10,14 @@ const {
 const { parseTotpInput, toOtpauthUri } = require("../totp");
 const {
   SEALED_AAD_VERSION,
+  NOTES_AAD_VERSION,
   KDF,
   KEY_BYTES,
   NONCE_BYTES,
   TAG_BYTES,
   MAX_FILE_BYTES,
   MAX_SEALED_PASSWORD_BYTES,
+  MAX_SEALED_TEXT_BYTES,
   MAX_SCRYPT_MEMORY_BYTES,
 } = require("./constants");
 const { hasExactKeys, decodeBase64 } = require("./records");
@@ -116,7 +118,7 @@ function openPassword(record, dataKey, entryId) {
   }
 }
 
-function isValidSealedPassword(record) {
+function isValidSealedPassword(record, maxBytes = MAX_SEALED_PASSWORD_BYTES) {
   if (
     !hasExactKeys(record, ["name", "nonce", "tag", "ciphertext"]) ||
     record.name !== "aes-256-gcm"
@@ -126,11 +128,44 @@ function isValidSealedPassword(record) {
   try {
     decodeBase64(record.nonce, NONCE_BYTES, NONCE_BYTES);
     decodeBase64(record.tag, TAG_BYTES, TAG_BYTES);
-    decodeBase64(record.ciphertext, 1, MAX_SEALED_PASSWORD_BYTES);
+    decodeBase64(record.ciphertext, 1, maxBytes);
     return true;
   } catch {
     return false;
   }
+}
+
+// Notes and other free text that schema 4 seals per entry: an entry's notes
+// (`field` "notes") and a secure note's text ("body"). Bound to the entry and
+// the field, like passwords. Empty text is stored as "", not sealed.
+function getNotesAad(entryId, field) {
+  return Buffer.from(
+    `local-vault:entry-notes:v${NOTES_AAD_VERSION}:${entryId}:${field}`,
+    "utf8",
+  );
+}
+
+function sealNotes(text, dataKey, entryId, field) {
+  const plaintext = Buffer.from(text, "utf8");
+  try {
+    return encryptGcm(plaintext, dataKey, getNotesAad(entryId, field));
+  } finally {
+    plaintext.fill(0);
+  }
+}
+
+function openNotes(record, dataKey, entryId, field) {
+  const plaintext = decryptGcm(record, dataKey, getNotesAad(entryId, field));
+  try {
+    return plaintext.toString("utf8");
+  } finally {
+    plaintext.fill(0);
+  }
+}
+
+// "" or a sealed record of at most `maxBytes` of text.
+function isValidSealedText(value, maxBytes = MAX_SEALED_TEXT_BYTES) {
+  return value === "" || isValidSealedPassword(value, maxBytes);
 }
 
 async function deriveWrappingKey(passphrase, salt) {
@@ -183,6 +218,10 @@ module.exports = {
   sealPassword,
   openPassword,
   isValidSealedPassword,
+  getNotesAad,
+  sealNotes,
+  openNotes,
+  isValidSealedText,
   deriveWrappingKey,
   getItemSecretAad,
   sealItemSecret,

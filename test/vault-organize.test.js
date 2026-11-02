@@ -5,7 +5,7 @@ const path = require("node:path");
 const test = require("node:test");
 const ProfileManager = require("../src/main/profile-manager");
 const VaultStore = require("../vault-store");
-const { makeLogin, makeTempDirectory } = require("../support/helpers");
+const { makeLogin, makeTempDirectory, plainTextEntries } = require("../support/helpers");
 
 const PASSPHRASE = "correct horse battery staple";
 const DAY = 24 * 60 * 60 * 1000;
@@ -44,22 +44,23 @@ async function exists(filePath) {
   }
 }
 
-test("schema 2 vaults open with every sealed value readable and are saved as schema 3", async (t) => {
+test("schema 2 vaults open with every sealed value readable and are saved as schema 4", async (t) => {
   const { store } = await openStore(t);
   const login = await store.saveEntry({ ...makeLogin(), totp: "otpauth://totp/Example?secret=JBSWY3DPEHPK3PXP" });
   const visa = await store.saveItem(card({}));
   // Write the vault the way the previous version stored it.
-  await store.persistVaultData({ schemaVersion: 2, entries: store.vaultData.entries });
+  await store.persistVaultData({ schemaVersion: 2, entries: plainTextEntries(store) });
   await reopen(store);
 
-  assert.equal(store.vaultData.schemaVersion, 3);
+  assert.equal(store.vaultData.schemaVersion, 4);
   assert.deepEqual(store.vaultData.folders, []);
   assert.equal(store.revealPassword(login.id), "test-password-value");
   assert.match(store.getTotpCode(login.id).code, /^\d{6}$/);
   assert.equal(store.revealItemSecret(visa.id, "number"), "4242424242424242");
   await store.saveEntry(makeLogin({ id: login.id, name: "Renamed", password: "" }));
   await reopen(store);
-  assert.equal(store.vaultData.schemaVersion, 3);
+  assert.equal(store.vaultData.schemaVersion, 4);
+  assert.equal(store.getEntry(login.id).notes, "local test data");
   assert.equal(store.revealPassword(login.id), "test-password-value");
 });
 
@@ -204,19 +205,23 @@ test("history is trimmed, oldest first, when the vault would exceed its size lim
   for (let index = 0; index < 40; index += 1) await store.saveEntry(makeLogin({ name: `Login ${index}` }));
   const longNotes = "n".repeat(16000);
   let savedAt = Date.now();
-  const entries = store.vaultData.entries.map((entry) => ({
-    ...entry,
-    history: Array.from({ length: 20 }, () => ({
-      id: randomUUID(),
-      savedAt: (savedAt += 1),
-      updatedAt: entry.updatedAt,
-      name: entry.name,
-      username: entry.username,
-      url: entry.url,
-      notes: longNotes,
-      password: entry.password,
-    })).reverse(),
-  }));
+  const entries = store.vaultData.entries.map((entry) => {
+    // Sealed once per entry and shared by its versions, as a migration does.
+    const notes = store.resealedText(null, entry.id, "notes", longNotes);
+    return {
+      ...entry,
+      history: Array.from({ length: 20 }, () => ({
+        id: randomUUID(),
+        savedAt: (savedAt += 1),
+        updatedAt: entry.updatedAt,
+        name: entry.name,
+        username: entry.username,
+        url: entry.url,
+        notes,
+        password: entry.password,
+      })).reverse(),
+    };
+  });
   const allVersions = entries.flatMap((entry) => entry.history);
   assert.ok(Buffer.byteLength(JSON.stringify({ ...store.vaultData, entries })) > 10 * 1024 * 1024);
 

@@ -13,9 +13,12 @@ const {
   openPassword,
   sealItemSecret,
   openItemSecret,
+  sealNotes,
+  openNotes,
 } = require("./crypto");
 const {
   normalizeItemInput,
+  sealedFieldKeys,
   toEntrySummary,
   toEntryDetails,
   isValidFavicon,
@@ -39,7 +42,31 @@ class VaultStoreEntries {
 
   /** @this {Store} */
   getEntry(id) {
-    return toEntryDetails(this.findEntry(id));
+    return this.detailsOf(this.findEntry(id));
+  }
+
+  // The sealed text of an entry, or of `content` (one of its history
+  // versions), opened for display: { notes, fields } with the sealed item
+  // fields. Only this entry's text is decrypted; a record that does not open
+  // affects this entry alone.
+  /** @this {Store} */
+  readableText(entry, content = entry) {
+    try {
+      const fields = {};
+      if (entry.type !== "login") {
+        for (const key of sealedFieldKeys(entry.type)) {
+          if (content.fields[key]) fields[key] = openNotes(content.fields[key], this.dataKey, entry.id, key);
+        }
+      }
+      return { notes: content.notes ? openNotes(content.notes, this.dataKey, entry.id, "notes") : "", fields };
+    } catch {
+      throw new Error("The notes of this item are damaged and cannot be read.");
+    }
+  }
+
+  /** @this {Store} */
+  detailsOf(entry) {
+    return toEntryDetails(entry, this.readableText(entry));
   }
 
   /** @this {Store} */
@@ -114,11 +141,14 @@ class VaultStoreEntries {
     for (const key of Object.keys(fields)) {
       if (fields[key] === "") delete fields[key];
     }
+    for (const key of sealedFieldKeys(normalized.type)) {
+      if (Object.hasOwn(fields, key)) fields[key] = this.resealedText(existing?.fields[key], id, key, fields[key]);
+    }
     return {
       id,
       type: normalized.type,
       name: normalized.name,
-      notes: normalized.notes,
+      notes: this.resealedText(existing?.notes, id, "notes", normalized.notes),
       fields,
       secrets,
       createdAt: existing?.createdAt ?? timestamp,
@@ -145,12 +175,12 @@ class VaultStoreEntries {
       const now = Date.now();
       const content = this.buildItemEntry(normalized, existing, existing?.id ?? randomUUID(), now);
       const saved = this.withSavedContent(existing, content, folderId, now);
-      if (saved === existing) return toEntryDetails(existing);
+      if (saved === existing) return this.detailsOf(existing);
       const entries = this.vaultData.entries.slice();
       if (existingIndex >= 0) entries[existingIndex] = saved;
       else entries.push(saved);
       await this.persistVaultData(this.nextVaultData({ entries }));
-      return toEntryDetails(saved);
+      return this.detailsOf(saved);
     });
   }
 
@@ -221,7 +251,7 @@ class VaultStoreEntries {
           ? this.resealedPassword(existing, id, normalized.password)
           : existing.password,
         url: normalized.url,
-        notes: normalized.notes,
+        notes: this.resealedText(existing?.notes, id, "notes", normalized.notes),
         favicon: existing?.favicon ?? "",
         createdAt: existing?.createdAt ?? timestamp,
         updatedAt: timestamp,
@@ -232,13 +262,13 @@ class VaultStoreEntries {
         content.totp = existing.totp;
       }
       const savedEntry = this.withSavedContent(existing, content, folderId, now);
-      if (savedEntry === existing) return toEntryDetails(existing);
+      if (savedEntry === existing) return this.detailsOf(existing);
       const entries = this.vaultData.entries.slice();
       if (existingIndex >= 0) entries[existingIndex] = savedEntry;
       else entries.push(savedEntry);
 
       await this.persistVaultData(this.nextVaultData({ entries }));
-      return toEntryDetails(savedEntry);
+      return this.detailsOf(savedEntry);
     });
   }
 
@@ -257,7 +287,7 @@ class VaultStoreEntries {
         if (entry.deletedAt) continue;
         const key = entry.type === "login"
           ? JSON.stringify([entry.name, entry.username, entry.url])
-          : JSON.stringify([entry.type, entry.name, entry.fields]);
+          : this.itemImportKey(entry);
         if (!existingKeys.has(key)) existingKeys.set(key, []);
         existingKeys.get(key).push(entry);
       }
@@ -284,7 +314,7 @@ class VaultStoreEntries {
             invalid += 1;
             continue;
           }
-          const key = JSON.stringify([entry.type, entry.name, entry.fields]);
+          const key = this.itemImportKey(entry);
           if (existingKeys.has(key)) {
             duplicates += 1;
             continue;
@@ -320,7 +350,7 @@ class VaultStoreEntries {
           username: normalized.username,
           password: sealPassword(normalized.password, this.dataKey, id),
           url: normalized.url,
-          notes: normalized.notes,
+          notes: this.resealedText(null, id, "notes", normalized.notes),
           favicon: "",
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -425,6 +455,34 @@ class VaultStoreEntries {
     if (folderId !== undefined) changes.folderId = folderId;
     if (changed) changes.history = historyAfterChange(existing, now);
     return withMeta(changed ? content : { ...content, updatedAt: existing.updatedAt }, existing, changes);
+  }
+
+  // What makes an imported item a copy of one in the vault: its type, name,
+  // and fields as text (sealed fields opened, since their records differ).
+  /** @this {Store} */
+  itemImportKey(entry) {
+    let readable = {};
+    try {
+      readable = this.readableText(entry).fields;
+    } catch {
+      // A damaged record never matches an import.
+    }
+    return JSON.stringify([entry.type, entry.name, { ...entry.fields, ...readable }]);
+  }
+
+  // Notes and other sealed text: typing the same text again keeps the sealed
+  // record (not a change); empty text is stored as "".
+  /** @this {Store} */
+  resealedText(record, id, field, text) {
+    if (text === "") return "";
+    if (record) {
+      try {
+        if (openNotes(record, this.dataKey, id, field) === text) return record;
+      } catch {
+        // An unreadable value is replaced.
+      }
+    }
+    return sealNotes(text, this.dataKey, id, field);
   }
 
   // Typing the same password again keeps the sealed record (not a change).

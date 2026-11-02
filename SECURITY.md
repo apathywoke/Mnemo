@@ -48,8 +48,20 @@ passwords until the design has received independent security review.
   leaves the password field empty, and an empty field keeps the stored value.
 - Inside the encrypted vault data (schema 2), each password is sealed again
   with AES-256-GCM under the vault key, with the entry ID as associated data,
-  so unlocking does not decrypt every password. Schema 1 vaults and backups are
-  upgraded in memory on unlock and written as schema 2 on the next save.
+  so unlocking does not decrypt every password.
+- Schema 4 seals notes the same way: an entry's notes, and the text of a
+  secure note, are each sealed under the vault key, bound to the entry ID
+  and the field (`local-vault:entry-notes:v4:<entry ID>:<field>`), so a note
+  record moved to another entry or field does not open. Unlocking decrypts
+  no notes; the main process opens one entry's notes when that entry (or its
+  history) is opened, saved, read for an import, or rekeyed. Empty notes are
+  stored as an empty string. Notes still reach the renderer when the entry is
+  opened (see `docs/THREAT_MODEL.md`, section 7, item 2).
+- Vaults and backups of schemas 1–3 are upgraded in memory on unlock and
+  written as schema 4 on the next save; until then the file keeps its schema.
+  Earlier versions of Mnemo cannot open a schema 4 vault (0.2.0 and later say
+  that it was saved by a newer version); going back means restoring a backup
+  made before the update.
 - Keys and entry data are cleared from managed buffers and UI fields on lock
   where possible, but JavaScript strings and objects cannot be reliably
   zeroized.
@@ -205,10 +217,10 @@ passwords until the design has received independent security review.
   number, SSH private key and its passphrase) are sealed one by one with
   AES-256-GCM under the vault key, bound to the item ID and the field name,
   and never sent to the renderer: they are copied or shown in a native
-  dialog by the main process. Other fields (cardholder, expiry, the last four
-  card digits, identity details, public keys, and the text of secure notes)
-  are protected by the vault encryption and shown in the interface like
-  login notes. SSH fingerprints are computed from the public key, which is
+  dialog by the main process. The text of a secure note is sealed per item
+  like notes and shown when the item is opened. Other fields (cardholder,
+  expiry, the last four card digits, identity details, and public keys) are
+  protected by the vault encryption and shown in the interface. SSH fingerprints are computed from the public key, which is
   derived from OpenSSH and unencrypted PEM private keys when not provided.
 - **Reports** (Vault → Reports) list breached, reused, and weak login
   passwords. The main process reads each password once per report to
@@ -251,7 +263,7 @@ passwords until the design has received independent security review.
   trash; both ask for confirmation in a native dialog in the main process.
   Items in the trash cannot be edited and are left out of reports.
 - Each item keeps its last 20 earlier versions. Sealed values (passwords,
-  one-time code settings, secret fields) are kept sealed as they were, bound
+  one-time code settings, secret fields, notes) are kept sealed as they were, bound
   to the same item, and are copied or shown only by the main process. Saving
   without a change adds no version; restoring a version keeps the replaced
   content as the newest version. If the vault would grow past its size

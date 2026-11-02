@@ -3,6 +3,8 @@
 // `npm run test:e2e` (needs the Electron binary; macOS or Linux with a
 // display).
 const assert = require("node:assert/strict");
+const fs = require("node:fs/promises");
+const path = require("node:path");
 const test = require("node:test");
 const {
   TEST_PASSPHRASE,
@@ -128,6 +130,37 @@ test("the app keeps its internal name, which names the Touch ID Keychain item", 
   try {
     assert.equal(require("../package.json").name, "mnemo");
     assert.equal(await app.evaluate(({ app: electronApp }) => electronApp.getName()), "local-vault-prototype");
+  } finally {
+    await app.close();
+  }
+});
+
+// Schema 4 seals notes per entry; the app still shows them when an item is
+// opened, and the vault file holds neither text in the clear.
+test("notes and a secure note's text are shown when opened and sealed on disk", async (t) => {
+  const userDataDir = await createDataFolder();
+  t.after(() => removeDataFolder(userDataDir));
+
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    await createVault(page);
+    const note = await page.evaluate(() => window.vaultApp.saveItem({
+      id: "", type: "note", name: "Wi-Fi", notes: "Router in the hall", fields: { body: "Network: example-net" },
+    }));
+    assert.equal(note.fields.body, "Network: example-net");
+    assert.equal(note.notes, "Router in the hall");
+
+    await page.click("#lock-button");
+    await unlock(page, TEST_PASSPHRASE);
+    await page.locator("#entry-list .entry-row-name", { hasText: "Wi-Fi" }).click();
+    await page.getByText("Network: example-net").waitFor();
+    await page.getByText("Router in the hall").waitFor();
+
+    const vaults = path.join(userDataDir, "vaults");
+    const files = (await fs.readdir(vaults)).filter((name) => name.endsWith(".vault"));
+    assert.equal(files.length, 1);
+    const contents = await fs.readFile(path.join(vaults, files[0]), "utf8");
+    assert.doesNotMatch(contents, /example-net|Router in the hall/);
   } finally {
     await app.close();
   }

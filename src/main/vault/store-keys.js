@@ -22,7 +22,9 @@ const {
   getPasswordAad,
   deriveWrappingKey,
   getItemSecretAad,
+  getNotesAad,
 } = require("./crypto");
+const { sealedFieldKeys } = require("./entries");
 const {
   headerOf,
   getAad,
@@ -199,15 +201,23 @@ class VaultStoreKeys {
       }
       return resealed.get(cacheKey);
     };
-    // `content` is the entry itself or one of its history versions.
+    // `content` is the entry itself or one of its history versions. Empty
+    // notes stay "".
     const resealContent = (entry, content) => {
+      const notes = content.notes ? reseal(content.notes, getNotesAad(entry.id, "notes")) : "";
       if (entry.type === "login") {
-        const next = { ...content, password: reseal(content.password, getPasswordAad(entry.id)) };
+        const next = { ...content, notes, password: reseal(content.password, getPasswordAad(entry.id)) };
         if (content.totp) next.totp = reseal(content.totp, getTotpAad(entry.id));
         return next;
       }
+      const fields = { ...content.fields };
+      for (const key of sealedFieldKeys(entry.type)) {
+        if (fields[key]) fields[key] = reseal(fields[key], getNotesAad(entry.id, key));
+      }
       return {
         ...content,
+        notes,
+        fields,
         secrets: Object.fromEntries(Object.entries(content.secrets).map(([field, record]) =>
           [field, reseal(record, getItemSecretAad(entry.id, field))])),
       };

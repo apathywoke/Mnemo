@@ -9,7 +9,7 @@ const VaultStore = require("./store");
 const { MAX_FILE_BYTES } = require("./constants");
 const { hasExactKeys } = require("./records");
 const { decodeRecoveryKey } = require("./recovery-key");
-const { openTotp, openPassword, openItemSecret } = require("./crypto");
+const { openTotp, openPassword, openItemSecret, openNotes } = require("./crypto");
 const { validatePassphrase, validateNewPassphrase, parseEnvelope } = require("./envelope");
 const { ATTACHMENT_OVERHEAD, attachmentsOf } = require("./attachments");
 
@@ -40,13 +40,16 @@ class VaultStoreBackup {
     try {
       // Items in the backup's trash are left out. Attachments are not
       // imported; their number is reported.
+      // The data is schema 4 by now (upgraded on reading), so its text is
+      // sealed under the backup's key.
       const entries = opened.vaultData.entries.filter((entry) => !entry.deletedAt);
       const attachments = entries.reduce((sum, entry) => sum + (entry.attachments?.length ?? 0), 0);
+      const text = (entry, record, field) => (record ? openNotes(record, opened.dataKey, entry.id, field) : "");
       const logins = entries.map((entry) => entry.type !== "login"
         ? {
           type: entry.type,
           name: entry.name,
-          notes: entry.notes,
+          notes: text(entry, entry.notes, "notes"),
           fields: Object.fromEntries(
             ITEM_TYPES[entry.type].fields.map((field) => [
               field.key,
@@ -54,7 +57,9 @@ class VaultStoreBackup {
                 ? (entry.secrets[field.key]
                   ? openItemSecret(entry.secrets[field.key], opened.dataKey, entry.id, field.key)
                   : "")
-                : entry.fields[field.key] ?? "",
+                : field.sealed
+                  ? text(entry, entry.fields[field.key], field.key)
+                  : entry.fields[field.key] ?? "",
             ]),
           ),
         }
@@ -63,7 +68,7 @@ class VaultStoreBackup {
         username: entry.username,
         password: openPassword(entry.password, opened.dataKey, entry.id),
         url: entry.url,
-        notes: entry.notes,
+        notes: text(entry, entry.notes, "notes"),
         totp: entry.totp ? toOtpauthUri(openTotp(entry.totp, opened.dataKey, entry.id)) : "",
       });
       return { logins, attachments };

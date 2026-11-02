@@ -30,6 +30,21 @@ function makeLogin(overrides = {}) {
   };
 }
 
+// An open store's entries as schema 3 kept them: notes and sealed item fields
+// (a secure note's body) as plain text, in the entry and its history. For
+// tests that write a vault the way an earlier version did.
+function plainTextEntries(store) {
+  const plain = (entry, content) => {
+    const { notes, fields } = store.readableText(entry, content);
+    return entry.type === "login" ? { ...content, notes } : { ...content, notes, fields: { ...content.fields, ...fields } };
+  };
+  return store.vaultData.entries.map((entry) => {
+    const next = plain(entry, entry);
+    if (entry.history) next.history = entry.history.map((version) => plain(entry, version));
+    return next;
+  });
+}
+
 // The page's whole stylesheet as the browser sees it: styles.css with every
 // @import replaced by the imported file, in order.
 async function readPageStyles(file = path.join(__dirname, "..", "styles.css")) {
@@ -44,4 +59,4 @@ async function readPageStyles(file = path.join(__dirname, "..", "styles.css")) {
   return parts.join("");
 }
 
-module.exports = { makeLogin, makePngHeader, makeTempDirectory, readPageStyles };
+module.exports = { makeLogin, makePngHeader, makeTempDirectory, plainTextEntries, readPageStyles };

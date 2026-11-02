@@ -5,16 +5,18 @@ work (fuses, metadata-only renderer, signing and notarization). Review it
 again whenever a trigger at the end of this document applies. Updated
 2026-10-28 for in-app updates (B6, A8) and 2026-10-31 for the favicon
 decoder process (B7, A2) and for the risks accepted with the notes and
-rollback designs (section 7, items 2–4).
+rollback designs (section 7, items 2–4), and 2026-11-02 for schema 4,
+which seals notes per entry (data table, A3, section 7, items 2–3).
 
 ## 1. What Mnemo protects
 
 | Asset | Where it lives | Notes |
 | --- | --- | --- |
-| Card numbers, security codes, PINs, document numbers, SSH private keys | Vault file (encrypted, then sealed per item and field); main-process memory while unlocked; clipboard after a copy | Same protection as passwords; never sent to the renderer. Secure note text and identity details are not sealed separately and reach the renderer when the item is opened. Identity details stay so by decision (section 7, item 2). |
+| Card numbers, security codes, PINs, document numbers, SSH private keys | Vault file (encrypted, then sealed per item and field); main-process memory while unlocked; clipboard after a copy | Same protection as passwords; never sent to the renderer. Identity details are not sealed separately and reach the renderer when the item is opened; they stay so by decision (section 7, item 2). |
 | One-time code (TOTP) secrets | Vault file (encrypted, then sealed per entry); main-process memory while unlocked | Same protection as passwords; only current codes reach the renderer. |
 | Entry passwords | Vault file (encrypted, then sealed per entry); main-process memory while unlocked; clipboard for up to 30 s after a copy | Highest value. |
-| Other entry fields: name, username, website, notes, site icon | Vault file (encrypted); main-process memory while unlocked; renderer memory and DOM for the visible list or selected entry | Usernames and websites reveal which accounts exist. |
+| Notes, and the text of secure notes | Vault file (encrypted, then sealed per entry and field since schema 4); in main-process memory only while one entry is opened, saved, imported, or rekeyed; renderer memory and DOM for the selected entry | Unlocking decrypts none. A compromised renderer can still ask for them one entry at a time (A3; section 7, item 2). |
+| Other entry fields: name, username, website, site icon | Vault file (encrypted); main-process memory while unlocked; renderer memory and DOM for the visible list or selected entry | Usernames and websites reveal which accounts exist. |
 | Master passphrase | Typed into the renderer, sent once over IPC, then dropped | Never stored. |
 | Recovery key (256-bit) | Shown once in the renderer; kept in main memory until the user confirms it is saved; optionally in a user-saved text file; on paper | Opens the vault and resets the passphrase. |
 | Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock; if Touch ID is on, also in `biometric/<profile>.key`, encrypted with a Keychain-held key | Unwraps everything. |
@@ -131,7 +133,7 @@ rollback designs (section 7, items 2–4).
 
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
-| Read all passwords in bulk | **New in this change.** The renderer receives metadata only (`listEntries`); passwords never cross IPC. `copyEntryField` writes to the clipboard from the main process; `revealPassword` shows a native dialog. The renderer cannot read the clipboard back: permission requests and permission checks are both denied, so `navigator.clipboard.readText()` fails and `document.execCommand("paste")` returns `false` (verified in the running app). | An attacker can still read usernames, websites, and the selected entry's notes, and can call `getEntry` for every ID to read all notes. It can trigger copies or reveal dialogs, which the user sees. |
+| Read all passwords in bulk | **New in this change.** The renderer receives metadata only (`listEntries`); passwords never cross IPC. `copyEntryField` writes to the clipboard from the main process; `revealPassword` shows a native dialog. The renderer cannot read the clipboard back: permission requests and permission checks are both denied, so `navigator.clipboard.readText()` fails and `document.execCommand("paste")` returns `false` (verified in the running app). | An attacker can still read usernames, websites, and the selected entry's notes, and can call `getEntry` for every ID to read all notes: since schema 4 main opens them one entry per call, but still returns them (section 7, item 2). It can trigger copies or reveal dialogs, which the user sees. |
 | Write arbitrary clipboard contents (for example, a malicious command) | The old `copySecret(value)` API is removed; only an entry's username or password can be copied | None known. |
 | Modify or delete entries, or export a backup | Entries can be changed through the preload API while unlocked. Exporting a backup and deleting the vault need the master passphrase again; deletion also needs a native confirmation; export, import, and restore always show a native file dialog | A compromised renderer can corrupt entries, and one that captured the passphrase at unlock can pass these checks. Keep backups. |
 | Read a third-party export through import | Import files are chosen in a native dialog and parsed in main; only counts return to the renderer | Main parses untrusted JSON, CSV, and ZIP; sizes are capped, but parser bugs would run in the privileged process. |
@@ -219,19 +221,22 @@ must not be used with real vaults on a shared machine.
 1. **`file://` privileges.** **Done.** The UI is served from `app://mnemo/`
    by `protocol.handle` with a path traversal check, and
    `GrantFileProtocolExtraPrivileges` is off.
-2. **Notes are not sealed per entry.** They are decrypted with the vault index
-   and can be read by a compromised renderer one entry at a time.
-   - **Planned** in `docs/design-notes-sealing.md` (approved, not
-     implemented): schema 4 seals each note, and a secure note's text, per
-     entry. A reveal gated on real user input is a follow-up.
+2. **Notes and the renderer.** **Partly done.**
+   - **Done (schema 4, `docs/design-notes-sealing.md`, decisions D1, D2,
+     D3a):** each note, and a secure note's text, is sealed per entry and
+     field; unlocking decrypts none, and main opens one entry's notes at a
+     time.
+   - **Open:** `getEntry` still returns notes, so a compromised renderer can
+     read them one entry at a time. **Planned (D3b):** notes revealed only
+     after real user input that main sees itself.
    - **Accepted:** identity details (name, email, phone, address, birth date)
      stay plain fields (decision D2); name and email are list and search
      metadata.
 3. **Memory hygiene.** JavaScript strings (the passphrase in the renderer,
    decrypted passwords during copy, schema 1 vaults during upgrade) cannot be
    zeroized.
-   - **Accepted** for the planned schema 4 too: the plain notes parsed from
-     schema 3 data during the upgrade stay in memory until garbage collection.
+   - **Accepted** for schema 4 too: the plain notes parsed from schema 3
+     data during the upgrade stay in memory until garbage collection.
    - Once the vault is saved as schema 4, unlocking no longer creates them.
 4. **Rollback.** Replacing a vault with an older encrypted copy is not
    detected.
@@ -309,7 +314,8 @@ the fuse and entitlement configuration, and no logging of secrets.
 - Adding any network feature (sync, breach checks), or changing the update
   channel, its keys, or the release workflow.
 - Adding browser autofill or a browser extension bridge.
-- Changing the vault format, KDF, or key hierarchy.
+- Changing the vault format, KDF, or key hierarchy, or what is sealed per
+  entry (a new schema version).
 - Adding IPC methods or widening what the renderer receives.
 - Upgrading Electron across a major version (review new fuses).
 - Before the first public release, and after the independent audit.
