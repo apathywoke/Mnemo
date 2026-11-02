@@ -57,10 +57,10 @@ test("every main screen and dialog opens without page errors", async (t) => {
       await closeDialog(page, "item-dialog", "close-item-dialog");
     }
 
-    // The scope menu and the folder dialog.
-    await page.click("#scope-button");
-    await page.locator("#scope-menu:not([hidden])").waitFor();
-    await page.locator("#scope-menu [role='menuitem']").last().click();
+    // The sidebar and the folder dialog.
+    await page.click("#vault-sidebar .sidebar-item:has([data-type='card'])");
+    await page.locator("#vault-sidebar [aria-current='true']:has([data-type='card'])").waitFor();
+    await page.click("#vault-sidebar .sidebar-item-folders");
     await page.locator("#folders-dialog[open]").waitFor();
     await closeDialog(page, "folders-dialog", "close-folders-dialog");
 

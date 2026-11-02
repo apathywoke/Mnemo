@@ -119,6 +119,20 @@ function bind(ctx) {
   document.addEventListener("pointerdown", () => ctx.reportActivity(), true);
   document.addEventListener("keydown", () => ctx.reportActivity(), true);
 
+  // Menu bar commands. Lock is handled in main. Nothing happens over another
+  // dialog, and New item and Find need an open vault.
+  ctx.api.onMenuCommand((command) => {
+    if (ctx.recoveryKey.isOpen || document.querySelector("dialog[open]")) return;
+    const unlocked = document.body.classList.contains("is-unlocked");
+    if (command === "settings") {
+      $(unlocked ? "#vault-settings-button" : "#settings-button").click();
+    } else if (unlocked && command === "new-item" && !$("#create-entry-button").hidden) {
+      $("#create-entry-button").click();
+    } else if (unlocked && command === "find") {
+      $("#entry-search").focus();
+    }
+  });
+
   ctx.api.onAutoLocked(() => {
     ctx.clearVaultView();
     ctx.clearSensitiveFields();

@@ -68,6 +68,7 @@ function create(ctx) {
     );
     $("#entry-list-title").textContent = (organize?.scopeTitle() ?? typeTitle).toLocaleUpperCase();
     organize?.updateDock();
+    organize?.renderSidebar();
   }
 
   // Folder, favorite, trash, attachments, and history for the shown item.
@@ -337,17 +338,6 @@ function create(ctx) {
   document.addEventListener("pointerdown", (event) => {
     if (!newItemMenu.hidden && !/** @type {Element} */ (event.target).closest(".new-item")) setMenuOpen(false);
   });
-
-  // Type filter above the list.
-  for (const option of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("[data-type-filter]"))) {
-    option.addEventListener("click", () => {
-      state.typeFilter = option.dataset.typeFilter;
-      for (const other of document.querySelectorAll("[data-type-filter]")) {
-        other.setAttribute("aria-checked", String(other === option));
-      }
-      renderEntryList();
-    });
-  }
 
   // The editor needs the item's notes and sealed text, so opening it reveals
   // them (the click on Edit allows it). Without them the editor stays

@@ -426,6 +426,7 @@
             </button>
           </div>
           <div class="vault-browser">
+            <nav id="vault-sidebar" class="vault-sidebar" aria-label="Show items" data-i18n-aria-label="sidebar.label"></nav>
             <aside class="entry-browser" aria-label="Vault logins" data-i18n-aria-label="vault.listAria">
               <div class="search-box">
                 <span aria-hidden="true">⌕</span>
@@ -433,21 +434,9 @@
                 <input id="entry-search" type="search" placeholder="Search vault" data-i18n-placeholder="vault.searchPlaceholder" />
                 <kbd>⌘ K</kbd>
               </div>
-              <div id="type-filter" class="type-filter" role="radiogroup" aria-label="Item types" data-i18n-aria-label="vault.typeFilter">
-                <button type="button" role="radio" aria-checked="true" class="type-filter-option" data-type-filter="all" data-i18n="vault.filterAll">All</button>
-                <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="login" data-i18n="vault.filterLogin">Logins</button>
-                <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="card" data-i18n="vault.filterCard">Cards</button>
-                <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="note" data-i18n="vault.filterNote">Notes</button>
-                <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="identity" data-i18n="vault.filterIdentity">Identities</button>
-                <button type="button" role="radio" aria-checked="false" class="type-filter-option" data-type-filter="ssh" data-i18n="vault.filterSsh">SSH keys</button>
-              </div>
-              <div class="entry-list-heading scope-picker">
-                <button id="scope-button" type="button" class="scope-button" aria-haspopup="menu" aria-expanded="false" aria-controls="scope-menu">
-                  <span id="entry-list-title" data-i18n="vault.allItems">ALL ITEMS</span>
-                  <svg class="scope-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3"/></svg>
-                </button>
+              <div class="entry-list-heading">
+                <span id="entry-list-title" data-i18n="vault.allItems">ALL ITEMS</span>
                 <span id="entry-count">0</span>
-                <div id="scope-menu" class="new-item-menu scope-menu" role="menu" aria-labelledby="scope-button" hidden></div>
               </div>
               <div id="entry-list" class="entry-list" role="list"></div>
               <div id="empty-list" class="empty-list" hidden>

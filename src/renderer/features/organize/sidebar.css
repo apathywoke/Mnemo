@@ -1,0 +1,119 @@
+/* Vault sidebar, favorites star, and trash button. Loaded by styles.css, in order. */
+
+/* Sidebar | list | detail. The sidebar has a fixed width; the list and the
+   detail share the rest. */
+.vault-browser {
+  grid-template-columns: 168px minmax(220px, 0.8fr) minmax(0, 1.3fr);
+}
+
+/* Vault → sidebar: all items, favorites, types, folders, trash. */
+.vault-sidebar {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 1px;
+  overflow: auto;
+  padding: 10px 8px 8px 0;
+  border-right: 1px solid var(--line);
+}
+
+.sidebar-item {
+  display: flex;
+  width: 100%;
+  min-height: 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--c-b8b8b8);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+}
+
+.sidebar-item:hover {
+  background: var(--c-181818);
+  color: var(--c-e4e4e4);
+}
+
+.sidebar-item[aria-current="true"] {
+  background: var(--c-1d1d1d);
+  color: var(--c-f2f2f2);
+  font-weight: 600;
+}
+
+.sidebar-item:focus-visible {
+  outline: 1px solid var(--white);
+}
+
+.sidebar-item-icon {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  place-items: center;
+  color: var(--c-9a9a9a);
+}
+
+.sidebar-item-label {
+  overflow: hidden;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-item-count {
+  color: var(--c-777777);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-heading {
+  margin: 12px 8px 3px;
+  color: var(--c-777777);
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+/* The trash sits apart, at the bottom. */
+.sidebar-item-trash {
+  margin-top: auto;
+}
+
+.sidebar-item-icon svg,
+.organize-chip svg,
+.add-attachment-button svg,
+.attachment-icon svg,
+.folder-row-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.entry-row:has(.entry-row-star) {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+}
+
+.entry-row-star {
+  color: var(--c-d6c58f);
+  font-size: 11px;
+}
+
+.empty-trash-button[hidden],
+.new-item-dock .new-entry-button[hidden] {
+  display: none;
+}
+
+.empty-trash-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

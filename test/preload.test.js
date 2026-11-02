@@ -109,6 +109,7 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
     "lockVault",
     "recoverVault",
     "onAutoLocked",
+    "onMenuCommand",
     "onUpdateState",
     "openReleasePage",
     "reportActivity",
@@ -211,4 +212,10 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
   exposedApi.onAutoLocked(() => { autoLocked = true; });
   listeners.get("vault:auto-locked")();
   assert.equal(autoLocked, true);
+  const commands = [];
+  exposedApi.onMenuCommand((command) => commands.push(command));
+  for (const command of ["settings", "new-item", "find", "lock", { toString: () => "find" }]) {
+    listeners.get("menu:command")({}, command);
+  }
+  assert.deepEqual(commands, ["settings", "new-item", "find"]);
 });

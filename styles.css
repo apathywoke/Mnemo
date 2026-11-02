@@ -58,7 +58,7 @@
 @import "./src/renderer/features/updates/update-status.css";
 @import "./src/renderer/features/password-health/reports.css";
 @import "./src/renderer/shared/ui/toast-actions.css";
-@import "./src/renderer/features/organize/scope-picker.css";
+@import "./src/renderer/features/organize/sidebar.css";
 @import "./src/renderer/features/organize/detail-organize.css";
 @import "./src/renderer/features/attachments/attachments.css";
 @import "./src/renderer/features/history/history.css";
