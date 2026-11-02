@@ -31,9 +31,11 @@ test("a new master passphrase needs 12 characters and a Strong rating", async (t
     ["abcdefghijkl", /too easy to guess/],
     ["Password1234", /too easy to guess/],
     ["aaaaaaaaaaaaaaaaaaaa", /too easy to guess/],
-    ["another passphrase", /too easy to guess/],
+    ["iloveyou123456", /too easy to guess/],
+    // Strong on its own, but built from the vault's name.
+    ["Personal vault 2026", /too easy to guess/],
   ]) {
-    await assert.rejects(store.create(passphrase), message, passphrase);
+    await assert.rejects(store.create(passphrase, { userInputs: ["Personal vault"] }), message, passphrase);
   }
   await assert.rejects(store.getStatus().then(({ vaultExists }) => {
     if (!vaultExists) throw new Error("no vault");

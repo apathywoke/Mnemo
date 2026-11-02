@@ -89,8 +89,9 @@ item 2 done).
   is unlocked. Mnemo cannot defend against malware running as the same user
   with Accessibility, screen-recording, or debugger rights, or as root.
 - The user picks a master passphrase that resists offline guessing. A new
-  passphrase must be at least 12 characters and rated Strong by a simple
-  heuristic; older vaults may still have a 7-character one.
+  passphrase must be at least 12 characters and rated Strong (score 4, at
+  least 10^10 guesses) by the zxcvbn-style estimate; older vaults may still
+  have a 7-character one.
 - Apple's code-signing, notarization, and Gatekeeper checks work as designed.
 - Electron 45 / Chromium are kept current; sandbox escapes are fixed upstream.
 
@@ -116,7 +117,7 @@ item 2 done).
 | Brute-force the recovery key | 256 random bits; the 24-bit checksum only detects typos and reveals nothing about the key | None known. |
 | Use a vault key learned once (an old recovery key with an old copy of the file, or the Touch ID file with Keychain access) to read later versions | Every change of credentials replaces the vault key: all sealed values and attachments are encrypted again under new keys, and the Touch ID file is removed | Old backups and copies keep their old key and open with the credentials they had; rotation cannot reach them. Changing credentials is not automatic: the user has to do it after a suspected leak. |
 | Strip or replace the recovery wrap to plant a key the attacker knows | The recovery salt is in the AES-GCM associated data of the key wraps and the vault data; a missing or different recovery wrap cannot unwrap the real vault key, and the strict format check rejects the file | An attacker with write access can delete the recovery wrap together with the file (denial of service only). |
-| Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM; a passphrase being set must be at least 12 characters and rated Strong by the built-in estimate, checked in main | The estimate is a heuristic without a dictionary, so a long but predictable phrase can pass. Vaults from before this rule may still have a 7-character passphrase until it is changed through recovery. |
+| Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM; a passphrase being set must be at least 12 characters and rated Strong by the built-in estimate, checked in main | The estimate (a port of zxcvbn with English, German, and Russian dictionaries) models known attack strategies; a phrase that is predictable in ways it does not know, such as a quotation outside its dictionaries, can still pass. Vaults from before this rule may still have a 7-character passphrase until it is changed. |
 | Tamper with a vault or backup to plant data or downgrade parameters | AES-GCM with the header (format, version, KDF parameters, salt) as AAD; strict schema and size validation before and after decryption; fixed KDF parameters | None known. |
 | Swap sealed passwords between entries | Each password is sealed with the entry ID in its AAD; a swapped value fails authentication | None known. |
 | Read, alter, or swap attachment files | Each file is AES-256-GCM under its own key with the attachment ID as AAD; the key is sealed with the item and attachment IDs inside the vault data. A changed or swapped file fails to decrypt and is reported by name; backups are verified before they are written and before a restore replaces anything | File sizes and counts are visible. Deleting files is possible (denial of service); the vault then reports them as missing. |
@@ -261,15 +262,14 @@ must not be used with real vaults on a shared machine.
    Keychain itself refuses to release the key without a fingerprint and the
    key is invalidated when fingerprints change. Needs a native module, the
    data protection keychain, and a provisioning profile.
-8. **Passphrase strength.** Partly done. New passphrases need 12
-   characters and a Strong rating from a simple heuristic: length,
-   character classes of any script, a few common words and runs, and since
-   then repeats (one block repeated, by its smallest period, or fewer than 8
-   different characters is Weak). The passphrase can be changed in Settings
-   with the current one, so old 7-character vaults can be upgraded; they are
-   not forced to. Still open: a dictionary-based estimate (such as zxcvbn,
-   which would be a new dependency) or a word-count rule, and raising scrypt
-   cost or moving to Argon2id.
+8. **Passphrase strength.** Mostly done. New passphrases need 12
+   characters and score 4 (at least 10^10 guesses) from a port of zxcvbn
+   (`src/shared/strength/`, no runtime dependency) with dictionaries of
+   common passwords, EFF diceware words, and English, German, and Russian
+   words and names, including Russian typed in Cyrillic or in the wrong
+   keyboard layout; the vault name counts as a known word. Old 7-character
+   vaults can be upgraded in Settings but are not forced to. Still open:
+   raising the scrypt cost or moving to Argon2id.
 9. **Developer ID.** GitHub releases are ad-hoc signed. With a Developer ID,
    sign and notarize in the release workflow, drop
    `build/entitlements.adhoc.plist` so library validation is back, check the

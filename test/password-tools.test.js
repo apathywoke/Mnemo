@@ -41,23 +41,28 @@ test("strength estimate distinguishes weak, fair, and strong passwords", () => {
     level: "empty",
     value: 0,
     label: "Enter a password",
+    score: 0,
+    feedback: { warning: "", suggestions: [] },
   });
-  assert.equal(estimatePasswordStrength("password123!").level, "weak");
-  assert.equal(estimatePasswordStrength("tealRiver82").level, "fair");
-  assert.equal(estimatePasswordStrength("8T!cL4m@Q2v#n6Wx").level, "strong");
+  // Levels follow the estimate's score: 0–2 weak, 3 fair, 4 strong.
+  assert.deepEqual(
+    ["password123!", "tealRiver82", "8T!cL4m@Q2v#n6Wx"].map((password) => {
+      const { level, value, score } = estimatePasswordStrength(password);
+      return [level, value, score];
+    }),
+    [["weak", 1, 1], ["fair", 2, 3], ["strong", 3, 4]],
+  );
 });
 
-test("one block repeated, or fewer than 8 different characters, is weak", () => {
-  for (const password of ["Ab1!Ab1!Ab1!", "Mnemo-Mnemo-Mnemo", "abcabcabcabc"]) {
+test("repeats, sequences, keyboard rows, and common passwords are weak however long", () => {
+  for (const password of ["Ab1!Ab1!Ab1!", "abcabcabcabc", "aaaaaaaaaaaaaaaaaaaa", "abcdefghijkl", "qwertyuiop12", "iloveyou123456"]) {
     assert.equal(estimatePasswordStrength(password).level, "weak", password);
   }
   for (const password of ["correct horse battery staple", "Tr0ub4dor&3x", "корова летит над домом"]) {
     assert.equal(estimatePasswordStrength(password).level, "strong", password);
   }
-  // Each rule on its own: a repeated block with 11 different characters, and
-  // 4 different characters without a repeated block.
-  assert.equal(estimatePasswordStrength("Tr0ub4dor&3xTr0ub4dor&3x").level, "weak");
-  assert.equal(estimatePasswordStrength("Aa1!Aa1!aA1!").level, "weak");
+  assert.equal(estimatePasswordStrength("abcabcabcabc").feedback.warning, "strength.warning.repeatedText");
+  assert.equal(estimatePasswordStrength("password").feedback.warning, "strength.warning.topTen");
 });
 
 test("generated password estimate reflects length and selected character groups", () => {
