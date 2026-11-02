@@ -4,11 +4,11 @@ import * as vaultBrowserWidget from "../../widgets/vault-browser/index.js";
 
 function create(ctx) {
   const browser = vaultBrowserWidget.create(ctx);
-  backupFeature.bind();
+  const backupReminder = backupFeature.bind(ctx);
   $("#lock-button").addEventListener("click", () => void ctx.pages.access.lockVault());
   $("#retry-button").addEventListener("click", () => void ctx.pages.access.refreshState());
 
-  return browser;
+  return Object.assign(browser, { refreshBackupReminder: backupReminder.refresh });
 }
 
 export { create };

@@ -317,14 +317,17 @@ function bind(ctx) {
   dialog.addEventListener("close", resetVaultActions);
   i18n.onChange(renderVault);
 
-  $("#settings-button").addEventListener("click", () => {
-    error.hidden = true;
-    themeError.hidden = true;
-    showSavedTheme();
-    selectTab(activeTab);
-    dialog.showModal();
-    void refreshVault();
-  });
+  // One button in the access screens' header, one in the vault's.
+  for (const button of [$("#settings-button"), $("#vault-settings-button")]) {
+    button.addEventListener("click", () => {
+      error.hidden = true;
+      themeError.hidden = true;
+      showSavedTheme();
+      selectTab(activeTab);
+      dialog.showModal();
+      void refreshVault();
+    });
+  }
   $("#close-settings-dialog").addEventListener("click", () => dialog.close());
 }
 

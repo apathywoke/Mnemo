@@ -18,6 +18,11 @@ function register(ctx) {
     return settings;
   });
 
+  registerHandler("settings:dismiss-backup-reminder", async () => {
+    await state.settingsLoaded;
+    return state.settingsStore.setBackupReminder(false);
+  });
+
   registerHandler("settings:set-language", async (code) => {
     await state.settingsLoaded;
     const settings = await state.settingsStore.setLanguage(code);

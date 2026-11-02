@@ -12,13 +12,13 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  padding: 18px 14px 8px;
+  padding: 10px 10px 4px;
   border-right: 1px solid var(--line);
 }
 
 .search-box {
   display: flex;
-  min-height: 38px;
+  min-height: 32px;
   align-items: center;
   gap: 8px;
   padding: 0 9px;
@@ -60,7 +60,7 @@
 .entry-list-heading {
   display: flex;
   justify-content: space-between;
-  margin: 23px 2px 8px;
+  margin: 12px 2px 4px;
   color: var(--c-777777);
   font-size: 8px;
   font-weight: 650;
@@ -76,11 +76,11 @@
 .entry-row {
   display: grid;
   width: 100%;
-  min-height: 60px;
-  grid-template-columns: 32px minmax(0, 1fr);
+  min-height: 44px;
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  padding: 9px 8px;
+  padding: 5px 8px;
   border: 0;
   border-bottom: 1px solid var(--c-202020);
   background: transparent;
@@ -142,15 +142,15 @@
 }
 
 .entry-row-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
 }
 
 .entry-row-copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .entry-row-name,

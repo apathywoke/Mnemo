@@ -3,7 +3,18 @@
 .is-unlocked .content {
   align-items: stretch;
   justify-content: stretch;
-  padding: 14px 0 22px;
+  padding: 0;
+}
+
+/* The vault has its own header row; the access screens' header and footer
+   would only take height from the list. */
+.is-unlocked .workspace {
+  padding: 12px 16px 10px;
+}
+
+.is-unlocked .workspace-header,
+.is-unlocked .workspace-footer {
+  display: none;
 }
 
 .is-unlocked .app-shell {

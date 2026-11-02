@@ -27,6 +27,8 @@ function init(ctx) {
   async function closeAndForget() {
     await ctx.api.dismissRecoveryKey().catch(() => {});
     finish();
+    // Main turns the backup reminder back on for a new key.
+    void ctx.pages.vault?.refreshBackupReminder();
   }
 
   function show(recoveryKey) {

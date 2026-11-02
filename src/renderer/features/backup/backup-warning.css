@@ -1,7 +1,7 @@
 /* Backup reminder banner. Loaded by styles.css, in order. */
 
 .backup-recovery-warning {
-  margin: 12px 14px 0;
+  margin: 8px 10px 0;
   padding: 8px 10px;
   gap: 8px;
 }

@@ -69,6 +69,7 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
     "disableTouchId",
     "deleteEntry",
     "deleteProfile",
+    "dismissBackupReminder",
     "dismissRecoveryKey",
     "downloadUpdate",
     "enableTouchId",
@@ -130,6 +131,7 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
   const calls = [
     ["getVersion", "app:get-version", []],
     ["getSettings", "settings:get", []],
+    ["dismissBackupReminder", "settings:dismiss-backup-reminder", []],
     ["setLanguage", "settings:set-language", ["de"]],
     ["setTheme", "settings:set-theme", ["light"]],
     ["setUpdateInterval", "settings:set-update-interval", ["6h"]],
