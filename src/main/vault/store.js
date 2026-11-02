@@ -47,6 +47,7 @@ function newerVersionError(isBackup) {
 class VaultStore {
   constructor(filePath) {
     this.filePath = filePath;
+    /** @type {Buffer | null} */
     this.dataKey = null;
     this.vaultData = null;
     this.envelope = null;
@@ -91,6 +92,7 @@ class VaultStore {
       throw new Error("A vault already exists on this Mac.");
     }
 
+    /** @type {Buffer | null} */
     let dataKey = randomBytes(KEY_BYTES);
 
     try {
@@ -143,7 +145,7 @@ class VaultStore {
   // A copy of the vault key for Touch ID enrollment.
   exportDataKey() {
     this.requireUnlocked();
-    return Buffer.from(this.dataKey);
+    return Buffer.from(/** @type {Buffer} */ (this.dataKey));
   }
 
   async unlock(passphrase) {
@@ -169,15 +171,17 @@ class VaultStore {
   // have been in the trash for 30 days and attachment files no item refers
   // to. Failures are left for the next time.
   async maintainNow(now = Date.now()) {
-    if (!this.isUnlocked()) return;
+    // The cleanup methods come from store-attachments.js and store-entries.js.
+    const store = /** @type {import("./index").Instance} */ (/** @type {unknown} */ (this));
+    if (!store.isUnlocked()) return;
     const cutoff = now - TRASH_RETENTION_MS;
     try {
-      await this.removeEntries((entry) => Boolean(entry.deletedAt) && entry.deletedAt <= cutoff);
+      await store.removeEntries((entry) => Boolean(entry.deletedAt) && entry.deletedAt <= cutoff);
     } catch {
       // Tried again on the next unlock.
     }
     try {
-      await this.removeUnreferencedAttachments();
+      await store.removeUnreferencedAttachments();
     } catch {
       // Tried again on the next unlock.
     }
@@ -254,7 +258,8 @@ class VaultStore {
         maxAttachmentFileBytes: MAX_ATTACHMENT_BYTES + ATTACHMENT_OVERHEAD,
       });
       rawFile = source.envelopeBytes ?? null;
-      const envelope = source.container ? source.envelope : JSON.parse(rawFile.toString("utf8"));
+      // A plain vault file has envelope bytes; a container has a parsed envelope.
+      const envelope = source.container ? source.envelope : JSON.parse(/** @type {Buffer} */ (rawFile).toString("utf8"));
       if (isNewerEnvelope(envelope)) throw newerVersionError(allowContainer);
       const parsed = parseEnvelope(envelope);
       if (usingDataKey) {
@@ -296,6 +301,7 @@ class VaultStore {
       if (isFromNewerVersion(vaultData)) throw newerVersionError(allowContainer);
       if (!validateVaultData(vaultData)) throw new Error("Invalid vault data");
 
+      /** @type {{ envelope: any, vaultData: any, dataKey: Buffer, container: any }} */
       const opened = {
         envelope,
         vaultData: upgradeVaultData(vaultData, dataKey),

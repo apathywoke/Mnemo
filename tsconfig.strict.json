@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": false,
+    "useUnknownInCatchVariables": false
+  },
+  "include": [
+    "src/main/vault/**/*.js",
+    "src/main/vault/**/*.d.ts",
+    "src/shared/**/*.js",
+    "src/renderer/globals.d.ts"
+  ]
+}

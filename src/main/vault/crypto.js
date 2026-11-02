@@ -20,6 +20,7 @@ const {
 } = require("./constants");
 const { hasExactKeys, decodeBase64 } = require("./records");
 
+/** @type {(password: Buffer, salt: Buffer, keylen: number, options: import("node:crypto").ScryptOptions) => Promise<Buffer>} */
 const scryptAsync = promisify(scrypt);
 
 function encryptGcm(plaintext, key, aad) {
@@ -39,6 +40,7 @@ function encryptGcm(plaintext, key, aad) {
   };
 }
 
+/** @param {number | null} [exactCiphertextLength] */
 function decryptGcm(record, key, aad, exactCiphertextLength = null) {
   const nonce = decodeBase64(record.nonce, NONCE_BYTES, NONCE_BYTES);
   const tag = decodeBase64(record.tag, TAG_BYTES, TAG_BYTES);

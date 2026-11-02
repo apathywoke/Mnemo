@@ -91,7 +91,7 @@ function checkItemCount(count) {
 
 // RFC 4180: quoted fields may contain commas, quotes ("") and line breaks.
 function parseCsv(input) {
-  const source = input.replace(/^﻿/, "");
+  const source = input.replace(/^\uFEFF/, "");
   const rows = [];
   let row = [];
   let field = "";

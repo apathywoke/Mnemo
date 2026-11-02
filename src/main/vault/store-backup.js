@@ -13,6 +13,8 @@ const { openTotp, openPassword, openItemSecret } = require("./crypto");
 const { validatePassphrase, validateNewPassphrase, parseEnvelope } = require("./envelope");
 const { ATTACHMENT_OVERHEAD, attachmentsOf } = require("./attachments");
 
+/** @typedef {import("./index").Instance} Store */
+
 class VaultStoreBackup {
   // Reads the logins of a Mnemo backup for import, using its passphrase or
   // { recoveryKey }. Returns plain values; the caller must not keep them.
@@ -74,6 +76,7 @@ class VaultStoreBackup {
   // there are any (see backup-file.js). Runs in the mutation queue so the
   // copy matches one saved state. Every attachment is decrypted once first:
   // a backup that could not be restored is not written at all.
+  /** @this {Store} */
   async exportBackup(destinationPath) {
     return this.enqueueMutation(async () => {
       if (!this.isUnlocked()) throw new Error("Unlock the vault first.");
@@ -124,9 +127,12 @@ class VaultStoreBackup {
   // { recoveryKey, newPassphrase } when that passphrase is forgotten. With a
   // recovery key the backup is re-encrypted under the new passphrase and a new
   // recovery key, available afterwards from takeIssuedRecoveryKey().
+  /** @this {Store} */
   async restoreBackup(sourcePath, credentials) {
     return this.enqueueMutation(async () => {
       const sessionEpoch = this.sessionEpoch;
+      // The key is handed to the store below; `dataKey` is then set to null.
+      /** @type {{ envelope: any, vaultData: any, dataKey: Buffer | null, container: any }} */
       let opened;
       let envelope;
       if (typeof credentials === "string") {
@@ -187,6 +193,7 @@ class VaultStoreBackup {
   // with that backup and the recovery key just typed in, so the restored vault
   // gets a new key. Attachments come straight from the backup, are verified
   // by decrypting them, and are stored under new keys and IDs.
+  /** @this {Store} */
   async restoreWithNewKey(opened, newPassphrase, sessionEpoch) {
     try {
       if (this.sessionEpoch !== sessionEpoch) {

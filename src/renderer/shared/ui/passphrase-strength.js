@@ -11,7 +11,7 @@
   // input). The main process uses the same estimate and accepts only
   // "strong", which also means at least 12 characters.
   function update(meter) {
-    const input = document.getElementById(meter.dataset.strengthFor);
+    const input = /** @type {HTMLInputElement | null} */ (document.getElementById(meter.dataset.strengthFor));
     const result = window.passwordTools.estimatePasswordStrength(input?.value ?? "");
     meter.dataset.strength = result.level;
     meter.querySelector(".password-strength-label").textContent = ns.shared.i18n.t(LEVEL_KEYS[result.level]);
@@ -19,7 +19,7 @@
   }
 
   function meters() {
-    return document.querySelectorAll("[data-strength-for]");
+    return /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("[data-strength-for]"));
   }
 
   // For fields cleared without an input event.

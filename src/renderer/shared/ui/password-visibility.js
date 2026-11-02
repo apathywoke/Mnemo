@@ -13,16 +13,26 @@
     setToggleButton(button, visible);
   }
 
+  /** @param {ParentNode} container */
+  function buttonsIn(container) {
+    return /** @type {NodeListOf<HTMLButtonElement>} */ (container.querySelectorAll("[data-password-visibility-for]"));
+  }
+
+  /** @param {HTMLButtonElement} button */
+  function inputFor(button) {
+    return /** @type {HTMLInputElement | null} */ (document.getElementById(button.dataset.passwordVisibilityFor));
+  }
+
   function conceal(container = document) {
-    for (const button of container.querySelectorAll("[data-password-visibility-for]")) {
-      const input = document.getElementById(button.dataset.passwordVisibilityFor);
+    for (const button of buttonsIn(container)) {
+      const input = inputFor(button);
       if (input) setInputVisibility(input, button, false);
     }
   }
 
   function bindAll(container = document) {
-    for (const button of container.querySelectorAll("[data-password-visibility-for]")) {
-      const input = document.getElementById(button.dataset.passwordVisibilityFor);
+    for (const button of buttonsIn(container)) {
+      const input = inputFor(button);
       if (!input || button.dataset.visibilityBound === "true") continue;
       button.dataset.visibilityBound = "true";
       button.addEventListener("click", () => {

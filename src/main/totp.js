@@ -49,6 +49,7 @@ function encodeBase32(buffer) {
 
 // Normalized form stored in the vault: the secret in canonical Base32 plus
 // the parameters needed to compute codes. Labels are kept for display only.
+/** @param {{ secret: string, algorithm?: string, digits?: number | string, period?: number | string, issuer?: string, account?: string }} config */
 function normalizeConfig({ secret, algorithm, digits, period, issuer = "", account = "" }) {
   const secretBytes = decodeBase32(secret);
   try {

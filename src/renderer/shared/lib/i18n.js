@@ -13,7 +13,7 @@
   }
 
   function apply(root = document) {
-    for (const element of root.querySelectorAll("[data-i18n]")) {
+    for (const element of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll("[data-i18n]"))) {
       element.textContent = t(element.dataset.i18n);
     }
     for (const attribute of TRANSLATED_ATTRIBUTES) {

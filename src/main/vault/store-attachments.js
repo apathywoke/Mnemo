@@ -29,6 +29,8 @@ const {
 } = require("./attachments");
 const { withMeta } = require("./history");
 
+/** @typedef {import("./index").Instance} Store */
+
 class VaultStoreAttachments {
   // --- Attachments ------------------------------------------------------------------
 
@@ -36,16 +38,20 @@ class VaultStoreAttachments {
     return `${vaultPath}.attachments`;
   }
 
+  /** @this {Store} */
   get attachmentDirectory() {
-    return VaultStore.attachmentDirectoryFor(this.filePath);
+    // A static method of this class, copied onto VaultStore by ./index.js.
+    return /** @type {import("./index")} */ (/** @type {unknown} */ (VaultStore)).attachmentDirectoryFor(this.filePath);
   }
 
+  /** @this {Store} */
   attachmentPath(attachmentId) {
     return path.join(this.attachmentDirectory, `${attachmentId}.bin`);
   }
 
   // The vault file and its attachment folder are never a source or target
   // for user files.
+  /** @this {Store} */
   isVaultPath(candidate) {
     const resolved = path.resolve(candidate);
     const directory = path.resolve(this.attachmentDirectory);
@@ -54,11 +60,13 @@ class VaultStoreAttachments {
       resolved.startsWith(`${directory}${path.sep}`);
   }
 
+  /** @this {Store} */
   async ensureAttachmentDirectory() {
     await fs.mkdir(this.attachmentDirectory, { recursive: true, mode: 0o700 });
     if (process.platform !== "win32") await fs.chmod(this.attachmentDirectory, 0o700);
   }
 
+  /** @this {Store} */
   findAttachment(id, attachmentId) {
     const entry = this.findEntry(id);
     const attachment = typeof attachmentId === "string"
@@ -68,6 +76,7 @@ class VaultStoreAttachments {
     return { entry, attachment };
   }
 
+  /** @this {Store} */
   totalAttachmentBytes() {
     return attachmentsOf(this.vaultData).reduce((sum, { attachment }) => sum + attachment.size, 0);
   }
@@ -75,6 +84,7 @@ class VaultStoreAttachments {
   // Encrypts a copy of `sourcePath` and adds it to the entry. The encrypted
   // file is written first and the vault second, so an interruption leaves at
   // most an unreferenced file, which maintainNow removes.
+  /** @this {Store} */
   async addAttachment(id, sourcePath) {
     return this.enqueueMutation(async () => {
       const entry = this.findEntry(id);
@@ -133,6 +143,7 @@ class VaultStoreAttachments {
   }
 
   // Decrypts an attachment and writes it to `destinationPath`.
+  /** @this {Store} */
   async exportAttachment(id, attachmentId, destinationPath) {
     return this.enqueueMutation(async () => {
       const { entry, attachment } = this.findAttachment(id, attachmentId);
@@ -151,6 +162,7 @@ class VaultStoreAttachments {
     });
   }
 
+  /** @this {Store} */
   async openAttachment(entry, attachment) {
     let fileBytes = null;
     let fileKey = null;
@@ -166,6 +178,7 @@ class VaultStoreAttachments {
     }
   }
 
+  /** @this {Store} */
   async deleteAttachment(id, attachmentId) {
     return this.enqueueMutation(async () => {
       const { entry, attachment } = this.findAttachment(id, attachmentId);
@@ -178,6 +191,7 @@ class VaultStoreAttachments {
     });
   }
 
+  /** @this {Store} */
   async deleteAttachmentFiles(attachmentIds) {
     await Promise.all(attachmentIds.map((attachmentId) =>
       fs.unlink(this.attachmentPath(attachmentId)).catch(() => {})));
@@ -186,6 +200,7 @@ class VaultStoreAttachments {
   // Removes files no entry refers to: left by an interrupted save, deletion,
   // or restore. Runs inside the mutation queue, so no attachment is being
   // written at the same time.
+  /** @this {Store} */
   async removeUnreferencedAttachments() {
     if (!this.isUnlocked()) return 0;
     const referenced = new Set(attachmentsOf(this.vaultData).map(({ attachment }) => attachment.id));
@@ -213,6 +228,7 @@ class VaultStoreAttachments {
   // Verifies and copies the attachments of a vault being restored. Returns
   // the files it created; files that already existed hold the same content
   // (attachment IDs are unique and files never change).
+  /** @this {Store} */
   async restoreAttachmentFiles(opened) {
     const wanted = attachmentsOf(opened.vaultData);
     if (wanted.length === 0) return [];

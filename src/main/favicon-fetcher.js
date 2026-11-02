@@ -11,9 +11,7 @@ const MAX_PAGE_BYTES = 1024 * 1024;
 const MAX_DISCOVERED_ICONS = 5;
 
 function unsupportedFavicon(message) {
-  const error = new Error(message);
-  error.unsupportedFavicon = true;
-  return error;
+  return Object.assign(new Error(message), { unsupportedFavicon: true });
 }
 
 function isPublicIPv4(address) {
@@ -124,8 +122,10 @@ function downloadResourceOnce(hostname, address, requestPath, accept, maxBytes) 
       resolve(value);
     };
 
+    // `autoSelectFamily` is passed on to net.connect; @types/node does not
+    // list it in RequestOptions.
     const request = https.get(
-      {
+      /** @type {import("node:https").RequestOptions} */ ({
         hostname,
         servername: hostname,
         port: 443,
@@ -146,7 +146,7 @@ function downloadResourceOnce(hostname, address, requestPath, accept, maxBytes) 
             callback(null, address, 4);
           }
         },
-      },
+      }),
       (response) => {
         const contentType = String(response.headers["content-type"] ?? "")
           .split(";")[0]
@@ -203,9 +203,7 @@ function downloadResourceOnce(hostname, address, requestPath, accept, maxBytes) 
     );
 
     request.setTimeout(7000, () => {
-      const error = new Error("Favicon request timed out");
-      error.code = "ETIMEDOUT";
-      request.destroy(error);
+      request.destroy(Object.assign(new Error("Favicon request timed out"), { code: "ETIMEDOUT" }));
     });
     request.on("error", (error) => fail(makeNetworkError(hostname, error)));
   });
@@ -375,11 +373,13 @@ function discoverIconPaths(html, hostname) {
     }
   }
 
-  for (const [path, declaredSize] of [
+  /** @type {Array<[string, number]>} */
+  const fallbackIcons = [
     ["/apple-touch-icon.png", 180],
     ["/apple-touch-icon-precomposed.png", 180],
     ["/favicon.png", 64],
-  ]) {
+  ];
+  for (const [path, declaredSize] of fallbackIcons) {
     if (!seen.has(path)) {
       seen.set(path, { declaredSize, index: discovered.length });
       discovered.push({ path, declaredSize });

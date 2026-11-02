@@ -32,7 +32,8 @@ function encodeRecoveryKey(keyBytes) {
     }
   }
   bytes.fill(0);
-  return text.match(new RegExp(`.{1,${RECOVERY_GROUP_SIZE}}`, "g")).join("-");
+  // The text is never empty, so there is always a match.
+  return /** @type {RegExpMatchArray} */ (text.match(new RegExp(`.{1,${RECOVERY_GROUP_SIZE}}`, "g"))).join("-");
 }
 
 // Accepts any case, spaces, and dashes, and the usual look-alikes (O→0,

@@ -24,6 +24,7 @@ const { hasExactKeys, decodeBase64 } = require("./records");
 const { encodeRecoveryKey, deriveRecoveryWrappingKey } = require("./recovery-key");
 const { encryptGcm, deriveWrappingKey } = require("./crypto");
 
+/** @param {{ name: string, salt: string } | null} [recovery] */
 function getHeader(kdf, recovery = null) {
   return recovery
     ? { format: FORMAT, version: FORMAT_VERSION, kdf, recovery }

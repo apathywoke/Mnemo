@@ -4,7 +4,7 @@
   const { show: showToast } = ns.shared.toast;
   const { t, errorText } = ns.shared.i18n;
 
-  function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetail, updateSiteIconButton }) {
+  function init(ctx, { getEntry, renderEntryList, renderEntryDetail, updateSiteIconButton }) {
     const state = ctx.state.vault;
 
     async function copyField(entryId, field) {

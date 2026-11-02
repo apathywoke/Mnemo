@@ -79,6 +79,7 @@ function truncateUnits(text, max) {
 
 // A safe display and save-as name taken from the original file name.
 function normalizeAttachmentName(rawName) {
+  // eslint-disable-next-line no-control-regex -- replaces control characters in file names
   let name = String(rawName ?? "").normalize("NFC").replace(/[\u0000-\u001f\u007f/\\:]/g, "_").trim();
   if (!name || name === "." || name === "..") name = "attachment";
   if (name.length > MAX_ATTACHMENT_NAME) {

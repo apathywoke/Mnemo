@@ -8,12 +8,15 @@ const { openPassword, openItemSecret } = require("./crypto");
 const { isFolderIdInput, toEntrySummary, toEntryDetails } = require("./entries");
 const { normalizeFolderName, withMeta, snapshotOf, toVersionSummary } = require("./history");
 
+/** @typedef {import("./index").Instance} Store */
+
 class VaultStoreOrganize {
   // --- Folders and favorites ------------------------------------------------------
   //
   // Folder and favorite are organization, not content: changing them does not
   // change the entry's date or add a version to its history.
 
+  /** @this {Store} */
   listFolders() {
     this.requireUnlocked();
     return this.vaultData.folders
@@ -21,6 +24,7 @@ class VaultStoreOrganize {
       .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base", numeric: true }));
   }
 
+  /** @this {Store} */
   findFolder(id) {
     this.requireUnlocked();
     const folder = typeof id === "string" ? this.vaultData.folders.find((item) => item.id === id) : null;
@@ -28,6 +32,7 @@ class VaultStoreOrganize {
     return folder;
   }
 
+  /** @this {Store} */
   requireUniqueFolderName(name, exceptId) {
     const lowered = name.toLowerCase();
     if (this.vaultData.folders.some((folder) => folder.id !== exceptId && folder.name.toLowerCase() === lowered)) {
@@ -35,6 +40,7 @@ class VaultStoreOrganize {
     }
   }
 
+  /** @this {Store} */
   async createFolder(name) {
     return this.enqueueMutation(async () => {
       this.requireUnlocked();
@@ -49,6 +55,7 @@ class VaultStoreOrganize {
     });
   }
 
+  /** @this {Store} */
   async renameFolder(id, name) {
     return this.enqueueMutation(async () => {
       const folder = this.findFolder(id);
@@ -64,6 +71,7 @@ class VaultStoreOrganize {
   }
 
   // Items in a deleted folder are kept; they only leave the folder.
+  /** @this {Store} */
   async deleteFolder(id) {
     return this.enqueueMutation(async () => {
       const folder = this.findFolder(id);
@@ -77,6 +85,7 @@ class VaultStoreOrganize {
   }
 
   // `folderId` is a folder ID, or null to take the entry out of its folder.
+  /** @this {Store} */
   async setFolder(id, folderId) {
     return this.enqueueMutation(async () => {
       const entry = this.findEntry(id);
@@ -90,6 +99,7 @@ class VaultStoreOrganize {
     });
   }
 
+  /** @this {Store} */
   async setFavorite(id, favorite) {
     return this.enqueueMutation(async () => {
       const entry = this.findEntry(id);
@@ -108,6 +118,7 @@ class VaultStoreOrganize {
   // history. It can be restored for 30 days (maintainNow removes it after
   // that) or deleted for good, which also removes its attachment files.
 
+  /** @this {Store} */
   async deleteEntry(id) {
     return this.enqueueMutation(async () => {
       const entry = this.findEntry(id);
@@ -118,6 +129,7 @@ class VaultStoreOrganize {
     });
   }
 
+  /** @this {Store} */
   async restoreEntry(id) {
     return this.enqueueMutation(async () => {
       const entry = this.findEntry(id);
@@ -128,6 +140,7 @@ class VaultStoreOrganize {
     });
   }
 
+  /** @this {Store} */
   async deletePermanently(id) {
     return this.enqueueMutation(async () => {
       const entry = this.findEntry(id);
@@ -137,6 +150,7 @@ class VaultStoreOrganize {
     });
   }
 
+  /** @this {Store} */
   async emptyTrash() {
     return this.enqueueMutation(async () => {
       this.requireUnlocked();
@@ -146,6 +160,7 @@ class VaultStoreOrganize {
 
   // Removes matching entries; their attachment files go after the save, so
   // the vault never refers to a missing file.
+  /** @this {Store} */
   async removeEntries(predicate) {
     const removed = this.vaultData.entries.filter(predicate);
     if (removed.length === 0) return 0;
@@ -161,6 +176,7 @@ class VaultStoreOrganize {
 
   // Earlier versions, newest first, without secrets. `changes` lists the
   // fields that were different in the version that replaced each one.
+  /** @this {Store} */
   getHistory(id) {
     const entry = this.findEntry(id);
     const versions = entry.history ?? [];
@@ -168,6 +184,7 @@ class VaultStoreOrganize {
       toVersionSummary(entry, version, index === 0 ? entry : versions[index - 1]));
   }
 
+  /** @this {Store} */
   findVersion(entry, versionId) {
     const version = typeof versionId === "string"
       ? (entry.history ?? []).find((item) => item.id === versionId)
@@ -178,6 +195,7 @@ class VaultStoreOrganize {
 
   // A secret from an earlier version (the old password, or a secret field of
   // a card, identity, or SSH key), for copy or reveal by main.
+  /** @this {Store} */
   revealVersionSecret(id, versionId, field) {
     const entry = this.findEntry(id);
     const version = this.findVersion(entry, versionId);
@@ -199,6 +217,7 @@ class VaultStoreOrganize {
 
   // Makes an earlier version current. The content it replaces becomes the
   // newest version, so restoring can itself be undone.
+  /** @this {Store} */
   async restoreVersion(id, versionId) {
     return this.enqueueMutation(async () => {
       const entry = this.findEntry(id);
