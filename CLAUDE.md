@@ -55,6 +55,11 @@ Mnemo is a password manager: security beats convenience.
   `src/shared/**/*.js` and `src/shared/package.json`.
   Main loads them with require(); they may use only what
   both Node.js and the browser have.
+- The strength dictionaries in src/shared/strength/data/
+  are generated (scripts/make-strength-dictionaries.js)
+  from pinned devDependencies; never edit them by hand.
+  The estimator must keep matching zxcvbn 4.4.2 on its
+  own dictionaries (test/password-strength.test.js).
 - Paths built from `__dirname` must exist and be
   packaged (test/build-config.test.js checks every one);
   moving a file changes what they point to.

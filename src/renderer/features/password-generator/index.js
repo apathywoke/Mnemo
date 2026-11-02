@@ -2,6 +2,7 @@
 import { $ } from "../../shared/lib/dom.js";
 import { t, onChange } from "../../shared/lib/i18n.js";
 import * as passwordTools from "../../../shared/password-tools.js";
+import { showStrengthFeedback } from "../../shared/ui/strength-feedback.js";
 
 const STRENGTH_KEYS = {
   empty: "strength.empty",
@@ -37,6 +38,7 @@ function init(ctx) {
     strength.dataset.strength = result.level;
     strengthLabel.textContent = t(STRENGTH_KEYS[result.level]);
     strengthMeter.setAttribute("aria-valuenow", String(result.value));
+    showStrengthFeedback(strength, result);
   }
 
   function updateGeneratedPasswordStrength() {

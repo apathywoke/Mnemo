@@ -3,7 +3,8 @@
 A macOS-first Electron prototype for the local-first password manager Mnemo. It can
 create, unlock, and back up an encrypted vault, and manage login entries with
 search, edit, delete, and copy actions. It also includes an on-device password
-generator with a heuristic strength estimate and optional, user-requested site
+generator with a zxcvbn-style strength estimate (English, German, and Russian
+dictionaries; see `NOTICE.md`) and optional, user-requested site
 icons. Multiple named vault profiles can be created, selected, and restored
 independently. It has not had an independent security review.
 
@@ -169,5 +170,5 @@ credentials or adding network access.
 ## Not decided yet
 
 Other item types, authenticator, browser integration, and any future sync
-protocol still need design. The password strength display is a rough heuristic,
-not a security guarantee. Do not use this prototype for real passwords.
+protocol still need design. The password strength display is an estimate of
+known attack strategies, not a security guarantee. Do not use this prototype for real passwords.

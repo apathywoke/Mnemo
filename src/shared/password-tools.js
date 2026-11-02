@@ -1,27 +1,16 @@
 // Password generation and the strength estimate. Shared by the renderer
 // (import), which shows the estimate, and the main process (require), which
 // enforces it for new master passphrases.
+import { strengthDictionaries, KEYBOARD_GRAPHS } from "./strength/dictionaries.js";
+import { createEstimator } from "./strength/estimator.js";
+import { RUSSIAN_MATCHERS } from "./strength/russian.js";
+
 const characterSets = {
   lowercase: "abcdefghijklmnopqrstuvwxyz",
   uppercase: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
   numbers: "0123456789",
   symbols: "!@#$%^&*()-_=+[]{}:,.?",
 };
-
-const commonFragments = [
-  "password",
-  "qwerty",
-  "letmein",
-  "welcome",
-  "admin",
-  "iloveyou",
-  "monkey",
-  "dragon",
-  "sunshine",
-  "football",
-  "baseball",
-  "master",
-];
 
 function secureRandomInt(maxExclusive) {
   if (!Number.isSafeInteger(maxExclusive) || maxExclusive < 1 || maxExclusive > 0x100000000) {
@@ -90,86 +79,46 @@ function estimateGeneratedPasswordStrength(length, options = {}) {
   return { level: "weak", value: 1, label: "Weak" };
 }
 
-function hasObviousSequence(password) {
-  const lowered = password.toLowerCase();
-  const sequences = [
-    "0123456789",
-    "abcdefghijklmnopqrstuvwxyz",
-    "qwertyuiop",
-    "asdfghjkl",
-    "zxcvbnm",
-  ];
+// The strength of a typed password: a zxcvbn-style estimate of the guesses
+// an attacker needs (src/shared/strength/), with dictionaries of common
+// passwords, English, German, and Russian words and names, and Russian
+// typed in Cyrillic or in the wrong keyboard layout. zxcvbn's score (0–4)
+// is shown as three levels:
+// - weak: score 0–2, under 10^8 guesses (what Bitwarden reports as weak);
+// - fair: score 3;
+// - strong: score 4, at least 10^10 guesses, required for a new master
+//   passphrase (src/main/vault/envelope.js).
+let estimator = null;
 
-  for (const sequence of sequences) {
-    const candidates = [sequence, [...sequence].reverse().join("")];
-    if (candidates.some((candidate) => {
-      for (let index = 0; index <= candidate.length - 4; index += 1) {
-        if (lowered.includes(candidate.slice(index, index + 4))) return true;
-      }
-      return false;
-    })) return true;
-  }
-  return false;
+function getEstimator() {
+  estimator ??= createEstimator({
+    dictionaries: strengthDictionaries(),
+    graphs: KEYBOARD_GRAPHS,
+    extraMatchers: RUSSIAN_MATCHERS,
+  });
+  return estimator;
 }
 
-// Character groups for any script: lowercase (and letters without case,
-// such as CJK), uppercase, numbers, and everything else. For ASCII these
-// are exactly a-z, A-Z, 0-9, and the rest.
-const CHARACTER_GROUPS = [
-  /[\p{Ll}\p{Lm}\p{Lo}]/u,
-  /[\p{Lu}\p{Lt}]/u,
-  /\p{N}/u,
-  /[^\p{L}\p{N}]/u,
-];
+const LEVELS = Object.freeze({
+  weak: { level: "weak", value: 1, label: "Weak" },
+  fair: { level: "fair", value: 2, label: "Fair" },
+  strong: { level: "strong", value: 3, label: "Strong" },
+});
 
-// Smallest p such that the string repeats itself every p characters,
-// from the KMP prefix function: 3 for "abcabcab", the length for "abcd".
-function smallestPeriod(characters) {
-  const prefix = new Array(characters.length).fill(0);
-  for (let index = 1; index < characters.length; index += 1) {
-    let matched = prefix[index - 1];
-    while (matched > 0 && characters[index] !== characters[matched]) matched = prefix[matched - 1];
-    if (characters[index] === characters[matched]) matched += 1;
-    prefix[index] = matched;
+// `userInputs`: text someone who knows the user would try first, such as
+// the vault name; each is also tried word by word. `feedback` holds UI text
+// keys ("strength.*").
+/** @param {string} password @param {{ userInputs?: string[] }} [options] */
+function estimatePasswordStrength(password, { userInputs = [] } = {}) {
+  if (!password) {
+    return { level: "empty", value: 0, label: "Enter a password", score: 0, feedback: { warning: "", suggestions: [] } };
   }
-  return characters.length - prefix[characters.length - 1];
-}
-
-// Below this many different characters a password is weak at any length.
-const MIN_DISTINCT_CHARACTERS = 8;
-
-function estimatePasswordStrength(password) {
-  if (!password) return { level: "empty", value: 0, label: "Enter a password" };
-
-  // Length in code points, so "пароль" or an emoji counts as typed.
-  const characters = Array.from(password);
-  // One block repeated ("Ab1!Ab1!Ab1!") is only as long as the block, and
-  // is weak however often it repeats.
-  const period = smallestPeriod(characters);
-  const repeated = period <= characters.length / 2;
-  const length = repeated ? period : characters.length;
-  let score = 0;
-  if (length >= 8) score += 1;
-  if (length >= 12) score += 1;
-  if (length >= 16) score += 1;
-  if (length >= 20) score += 1;
-
-  const groups = CHARACTER_GROUPS.filter((group) => group.test(password)).length;
-  if (groups >= 2) score += 1;
-  if (groups >= 3) score += 1;
-  if (groups === 4) score += 1;
-
-  const lowered = password.toLowerCase();
-  if (commonFragments.some((fragment) => lowered.includes(fragment))) score -= 4;
-  if (/(.)\1{2,}/u.test(password)) score -= 2;
-  if (hasObviousSequence(password)) score -= 2;
-
-  if (repeated || new Set(characters).size < MIN_DISTINCT_CHARACTERS) {
-    return { level: "weak", value: 1, label: "Weak" };
-  }
-  if (score >= 5) return { level: "strong", value: 3, label: "Strong" };
-  if (score >= 3) return { level: "fair", value: 2, label: "Fair" };
-  return { level: "weak", value: 1, label: "Weak" };
+  const inputs = userInputs
+    .filter((input) => typeof input === "string" && input.trim())
+    .flatMap((input) => [input.trim(), ...input.split(/[^\p{L}\p{N}]+/u).filter((word) => word.length >= 3)]);
+  const result = getEstimator().estimate(password, inputs);
+  const level = result.score === 4 ? LEVELS.strong : result.score === 3 ? LEVELS.fair : LEVELS.weak;
+  return { ...level, score: result.score, guessesLog10: result.guessesLog10, feedback: result.feedback };
 }
 
 export {

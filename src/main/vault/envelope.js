@@ -63,7 +63,10 @@ function validatePassphrase(passphrase) {
 // For a passphrase being set (new vault, recovery, restore with the recovery
 // key), with the same estimate the editor shows. Unlocking and other checks
 // of the current passphrase use validatePassphrase() only.
-function validateNewPassphrase(passphrase) {
+// `userInputs`: text that makes the passphrase easier to guess, such as the
+// vault name (see estimatePasswordStrength).
+/** @param {string[]} [userInputs] */
+function validateNewPassphrase(passphrase, userInputs = []) {
   // The 12-character rule is reported first, not the 7-character floor.
   if (typeof passphrase === "string" && Array.from(passphrase).length < MIN_NEW_PASSPHRASE_CHARACTERS) {
     throw new Error(
@@ -71,7 +74,7 @@ function validateNewPassphrase(passphrase) {
     );
   }
   validatePassphrase(passphrase);
-  if (estimatePasswordStrength(passphrase).level !== "strong") {
+  if (estimatePasswordStrength(passphrase, { userInputs }).level !== "strong") {
     throw new Error("This master passphrase is too easy to guess. Use a longer phrase of several unrelated words.");
   }
 }

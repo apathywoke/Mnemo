@@ -85,9 +85,10 @@ class VaultStore {
     return this.dataKey !== null && this.vaultData !== null;
   }
 
-  async create(passphrase) {
+  // `userInputs`: see validateNewPassphrase (the profile name).
+  async create(passphrase, { userInputs = [] } = {}) {
     const sessionEpoch = this.sessionEpoch;
-    validateNewPassphrase(passphrase);
+    validateNewPassphrase(passphrase, userInputs);
     if (await this.fileExists()) {
       throw new Error("A vault already exists on this Mac.");
     }

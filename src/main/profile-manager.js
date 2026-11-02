@@ -176,7 +176,7 @@ class ProfileManager {
 
   async createProfile(name, passphrase) {
     return this.enqueueMutation(() =>
-      this.createProfileWith(name, (store) => store.create(passphrase)),
+      this.createProfileWith(name, (store) => store.create(passphrase, { userInputs: [name] })),
     );
   }
 

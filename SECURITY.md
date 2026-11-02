@@ -23,15 +23,23 @@ passwords until the design has received independent security review.
   must be at least 12 characters (counted in code points) and rated Strong
   by `estimatePasswordStrength` (`src/shared/password-tools.js`),
   checked in the main process; the forms show the same estimate while
-  typing. The estimate counts letters and digits of any script, so a long
-  phrase in Cyrillic rates like one in Latin letters. One block repeated
-  (`Ab1!Ab1!Ab1!`: the smallest period, from the KMP prefix function, is at
-  most half the length) and anything with fewer than 8 different
-  characters is rated Weak at any length. It is a heuristic, not a measure
-  of entropy: it knows a few common words and keyboard runs but no
-  dictionary. Existing vaults with a passphrase of 7 or more
-  characters keep opening; the stricter rule applies only when a passphrase
-  is set.
+  typing, with the reason when it is not Strong. Existing vaults with a
+  passphrase of 7 or more characters keep opening; the stricter rule applies
+  only when a passphrase is set.
+- The estimate (`src/shared/strength/`) is a port of zxcvbn 4.4.2, the
+  estimator Bitwarden uses, and gives the same results as zxcvbn on
+  zxcvbn's dictionaries (tested on about 4,400 passwords). It counts the
+  guesses an attacker needs who tries common passwords (49,000), the EFF
+  diceware words, the most common English, German, and Russian words and
+  names, keyboard patterns, repeats, sequences, dates, and years, also
+  reversed, capitalized, or with l33t substitutions. Russian words are also
+  found typed in Cyrillic ("пароль") or with the other keyboard layout
+  ("gfhjkm", and English words typed on the Russian layout). When a vault
+  is created, its name counts as a known word. Strong means score 4: at
+  least 10^10 guesses; Weak is score 0–2 (under 10^8 guesses), which is
+  also what Reports lists as weak. The first 100 characters are analyzed;
+  a longer passphrase is never rated higher than its beginning. It is an
+  estimate of known attack strategies, not a guarantee.
 - A random 256-bit vault key is wrapped with AES-256-GCM; vault data is
   separately encrypted with AES-256-GCM and authenticated metadata.
 - Login records have bounded fields and are validated before entering the
