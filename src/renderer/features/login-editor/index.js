@@ -60,6 +60,17 @@ function init(ctx, { getEntry, refreshEntries, passwordGenerator }) {
       showToast(errorText(cause, "errors.openLogin"), { type: "error" });
       return;
     }
+    // The editor needs the notes; the click on Edit allows one reveal. If it
+    // fails the editor stays closed, since saving would clear the notes.
+    let notes = "";
+    if (entry.hasNotes) {
+      try {
+        notes = (await ctx.api.revealNotes(entry.id)).notes;
+      } catch (cause) {
+        showToast(errorText(cause, "errors.showNotes"), { type: "error" });
+        return;
+      }
+    }
     if (ctx.state.vault.selectedEntryId !== entry.id) return;
     clearForm();
     setTitle("editor.titleEdit");
@@ -72,7 +83,7 @@ function init(ctx, { getEntry, refreshEntries, passwordGenerator }) {
     passwordInput.required = false;
     passwordInput.dataset.i18nPlaceholder = "editor.keepPassword";
     passwordInput.placeholder = t("editor.keepPassword");
-    $("#entry-notes").value = entry.notes;
+    $("#entry-notes").value = notes;
     // Like the password, the TOTP secret stays in main: blank keeps it.
     if (entry.hasTotp) {
       totpInput.dataset.i18nPlaceholder = "editor.totpKeep";

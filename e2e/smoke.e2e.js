@@ -135,9 +135,10 @@ test("the app keeps its internal name, which names the Touch ID Keychain item", 
   }
 });
 
-// Schema 4 seals notes per entry; the app still shows them when an item is
-// opened, and the vault file holds neither text in the clear.
-test("notes and a secure note's text are shown when opened and sealed on disk", async (t) => {
+// Schema 4 seals notes per entry, and the page gets their text only after a
+// real click (src/main/notes-reveal.js). The vault file never holds them in
+// the clear.
+test("notes and a secure note's text appear only after a real click, and are sealed on disk", async (t) => {
   const userDataDir = await createDataFolder();
   t.after(() => removeDataFolder(userDataDir));
 
@@ -147,12 +148,23 @@ test("notes and a secure note's text are shown when opened and sealed on disk", 
     const note = await page.evaluate(() => window.vaultApp.saveItem({
       id: "", type: "note", name: "Wi-Fi", notes: "Router in the hall", fields: { body: "Network: example-net" },
     }));
-    assert.equal(note.fields.body, "Network: example-net");
-    assert.equal(note.notes, "Router in the hall");
+    assert.equal(note.hasNotes, true);
+    assert.deepEqual(note.sealedFields, ["body"]);
+    assert.ok(!JSON.stringify(note).includes("example-net"));
 
     await page.click("#lock-button");
     await unlock(page, TEST_PASSPHRASE);
     await page.locator("#entry-list .entry-row-name", { hasText: "Wi-Fi" }).click();
+    const reveal = page.locator("#item-detail-fields .detail-reveal-button").first();
+    await reveal.waitFor();
+    assert.equal(await page.getByText("Network: example-net").count(), 0);
+
+    // A page script cannot read the text without a real press.
+    await page.waitForTimeout(3500);
+    const scripted = await page.evaluate((id) => window.vaultApp.revealNotes(id).then(() => "revealed", () => "refused"), note.id);
+    assert.equal(scripted, "refused");
+
+    await reveal.click();
     await page.getByText("Network: example-net").waitFor();
     await page.getByText("Router in the hall").waitFor();
 
@@ -161,6 +173,46 @@ test("notes and a secure note's text are shown when opened and sealed on disk", 
     assert.equal(files.length, 1);
     const contents = await fs.readFile(path.join(vaults, files[0]), "utf8");
     assert.doesNotMatch(contents, /example-net|Router in the hall/);
+  } finally {
+    await app.close();
+  }
+});
+
+// A login's notes: Show in the detail, the editor (opened by a real click on
+// Edit), and an earlier version in the history.
+test("a login's notes are revealed by Show, by Edit, and by opening a version", async (t) => {
+  const userDataDir = await createDataFolder();
+  t.after(() => removeDataFolder(userDataDir));
+
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    await createVault(page);
+    await page.click("#create-entry-button");
+    await page.click("[data-new-item='login']");
+    await page.locator("#entry-dialog[open]").waitFor();
+    await page.fill("#entry-name", LOGIN.name);
+    await page.fill("#entry-password", LOGIN.password);
+    await page.fill("#entry-notes", "First notes");
+    await page.click("#entry-form button[type='submit']");
+    await page.locator("#entry-dialog[open]").waitFor({ state: "detached" });
+
+    await page.locator("#entry-list .entry-row-name", { hasText: LOGIN.name }).click();
+    await page.locator("#detail-notes-reveal:not([hidden])").waitFor();
+    assert.equal(await page.locator("#detail-notes").isVisible(), false);
+    await page.click("#detail-notes-reveal");
+    await page.locator("#detail-notes", { hasText: "First notes" }).waitFor();
+
+    await page.click("#edit-entry-button");
+    await page.locator("#entry-dialog[open]").waitFor();
+    assert.equal(await page.inputValue("#entry-notes"), "First notes");
+    await page.fill("#entry-notes", "Second notes");
+    await page.click("#entry-form button[type='submit']");
+    await page.locator("#entry-dialog[open]").waitFor({ state: "detached" });
+
+    await page.click("#history-button");
+    await page.locator("#history-dialog[open]").waitFor();
+    await page.locator("#history-list .history-version-head button").first().click();
+    await page.locator("#history-list .history-field-value", { hasText: "First notes" }).waitFor();
   } finally {
     await app.close();
   }

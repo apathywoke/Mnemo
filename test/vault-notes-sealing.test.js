@@ -46,22 +46,27 @@ async function dataOnDisk(store) {
 const isSealed = (value) => typeof value === "object" && value?.name === "aes-256-gcm";
 const entryOf = (store, id) => store.vaultData.entries.find((entry) => entry.id === id);
 
-// Every note of the fixture, read through the store as the app would.
+// Every note of the fixture, read through the store as the app would: the
+// details only flag notes, and revealText() opens them.
 function assertFixtureNotes(store) {
-  assert.equal(store.getEntry(ids.login).notes, "Login notes, second version.");
-  assert.equal(store.getEntry(ids.plainLogin).notes, "");
-  assert.equal(store.getEntry(ids.card).notes, "Card notes ✓ — ünïcödé");
-  const note = store.getEntry(ids.note);
-  assert.equal(note.notes, "Notes of a secure note.");
-  assert.equal(note.fields.body, "Network: example\nPassword: made-up-4");
-  assert.equal(store.getEntry(ids.identity).notes, "Identity notes.");
-  assert.equal(store.getEntry(ids.ssh).notes, "SSH notes.");
-  assert.equal(store.getEntry(ids.trashed).notes, "Notes of a deleted login.");
+  const notes = (id, versionId) => store.revealText(id, versionId).notes;
+  assert.equal(notes(ids.login), "Login notes, second version.");
+  assert.equal(store.getEntry(ids.login).hasNotes, true);
+  assert.equal(notes(ids.plainLogin), "");
+  assert.equal(store.getEntry(ids.plainLogin).hasNotes, false);
+  assert.equal(notes(ids.card), "Card notes ✓ — ünïcödé");
+  assert.equal(notes(ids.note), "Notes of a secure note.");
+  assert.equal(store.revealText(ids.note).fields.body, "Network: example\nPassword: made-up-4");
+  assert.deepEqual(store.getEntry(ids.note).sealedFields, ["body"]);
+  assert.equal(notes(ids.identity), "Identity notes.");
+  assert.equal(notes(ids.ssh), "SSH notes.");
+  assert.equal(notes(ids.trashed), "Notes of a deleted login.");
   const loginHistory = store.getHistory(ids.login);
-  assert.deepEqual(loginHistory.map((version) => version.notes), ["Login notes, second version.", "Login notes, first version."]);
+  assert.deepEqual(loginHistory.map((version) => notes(ids.login, version.id)), ["Login notes, second version.", "Login notes, first version."]);
   assert.deepEqual(loginHistory.map((version) => version.changes), [["name"], ["notes"]]);
   const [noteVersion] = store.getHistory(ids.note);
-  assert.equal(noteVersion.fields.body, "Network: example\nPassword: made-up-3");
+  assert.equal(store.revealText(ids.note, noteVersion.id).fields.body, "Network: example\nPassword: made-up-3");
+  assert.deepEqual(noteVersion.sealedFields, ["body"]);
   assert.deepEqual(noteVersion.changes, ["body"]);
 }
 
@@ -128,10 +133,10 @@ test("saving keeps unchanged notes, records changed ones, and stores cleared not
   await store.saveEntry(makeLogin({ id: login.id, notes: "second", password: "" }));
   assert.equal(entryOf(store, login.id).history.length, 1);
   assert.deepEqual(store.getHistory(login.id)[0].changes, ["notes"]);
-  assert.equal(store.getHistory(login.id)[0].notes, "first");
+  assert.equal(store.revealText(login.id, store.getHistory(login.id)[0].id).notes, "first");
 
   const cleared = await store.saveEntry(makeLogin({ id: login.id, notes: "", password: "" }));
-  assert.equal(cleared.notes, "");
+  assert.equal(cleared.hasNotes, false);
   assert.equal(entryOf(store, login.id).notes, "");
 
   const note = await store.saveItem({ id: "", type: "note", name: "Note", notes: "", fields: { body: "text" } });
@@ -142,7 +147,8 @@ test("saving keeps unchanged notes, records changed ones, and stores cleared not
   assert.equal(entryOf(store, note.id).history, undefined);
   await store.saveItem({ id: note.id, type: "note", name: "Note", notes: "", fields: { body: "" } });
   assert.equal(Object.hasOwn(entryOf(store, note.id).fields, "body"), false);
-  assert.equal(store.getEntry(note.id).fields.body, undefined);
+  assert.equal(store.revealText(note.id).fields.body, undefined);
+  assert.deepEqual(store.getEntry(note.id).sealedFields, []);
 });
 
 test("a note record moved to another entry or field does not open, and only that entry fails", async (t) => {
@@ -169,10 +175,10 @@ test("a note record moved to another entry or field does not open, and only that
   store.lock();
   await store.unlock(fixture.passphrase);
 
-  assert.throws(() => store.getHistory(second.id), DAMAGED);
-  assert.throws(() => store.getEntry(note.id), DAMAGED);
-  assert.equal(store.getEntry(second.id).notes, "changed");
-  assert.equal(store.getEntry(first.id).notes, "first notes");
+  assert.throws(() => store.revealText(second.id, store.getHistory(second.id)[0].id), DAMAGED);
+  assert.throws(() => store.revealText(note.id), DAMAGED);
+  assert.equal(store.revealText(second.id).notes, "changed");
+  assert.equal(store.revealText(first.id).notes, "first notes");
   assert.equal(store.listEntries().length, 3);
 });
 
@@ -209,7 +215,7 @@ test("import from CSV and from schema 3 and 4 backups gives the same notes, seal
   assert.equal((await store.importLogins(csv.logins)).imported, 1);
   const fromCsv = store.vaultData.entries.find((entry) => entry.name === "CSV");
   assert.ok(isSealed(fromCsv.notes));
-  assert.equal(store.getEntry(fromCsv.id).notes, "CSV notes, with a comma");
+  assert.equal(store.revealText(fromCsv.id).notes, "CSV notes, with a comma");
 
   const fromSchema3 = await VaultStore.readBackupLogins(FIXTURE, fixture.passphrase);
   // Six items; the one in the backup's trash is left out.
@@ -217,8 +223,8 @@ test("import from CSV and from schema 3 and 4 backups gives the same notes, seal
   assert.equal(result.imported, 6);
   const byName = (name) => store.vaultData.entries.find((entry) => entry.name === name);
   assert.ok(isSealed(byName("Wi-Fi").fields.body));
-  assert.equal(store.getEntry(byName("Wi-Fi").id).fields.body, "Network: example\nPassword: made-up-4");
-  assert.equal(store.getEntry(byName("Visa").id).notes, "Card notes ✓ — ünïcödé");
+  assert.equal(store.revealText(byName("Wi-Fi").id).fields.body, "Network: example\nPassword: made-up-4");
+  assert.equal(store.revealText(byName("Visa").id).notes, "Card notes ✓ — ünïcödé");
   // Importing again finds every item, including the one with a sealed body.
   assert.equal((await store.importLogins(fromSchema3.logins)).imported, 0);
 

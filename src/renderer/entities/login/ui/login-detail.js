@@ -1,8 +1,9 @@
 import { setSiteIcon } from "./site-icon.js";
 
-// `entry` is a summary from listEntries(); `notes` arrive separately from
-// getEntry(). The password is never part of renderer state.
-function renderLoginDetail(entry, ui, { notes = "", updateSiteIconButton }) {
+// `entry` is a summary from listEntries(). getEntry() says whether there are
+// notes (`hasNotes`); their text (`notes`) arrives only after Show. The
+// password is never part of renderer state.
+function renderLoginDetail(entry, ui, { notes = "", hasNotes = false, updateSiteIconButton }) {
   if (!entry) {
     ui.detail.hidden = true;
     ui.empty.hidden = false;
@@ -17,7 +18,9 @@ function renderLoginDetail(entry, ui, { notes = "", updateSiteIconButton }) {
   ui.password.textContent = "••••••••••••";
   ui.totpField.hidden = !entry.hasTotp;
   ui.notes.textContent = notes;
-  ui.notesField.hidden = !notes;
+  ui.notes.hidden = !notes;
+  ui.notesReveal.hidden = Boolean(notes);
+  ui.notesField.hidden = !hasNotes;
   ui.copyUsername.disabled = !entry.username;
   ui.detail.hidden = false;
   ui.empty.hidden = true;

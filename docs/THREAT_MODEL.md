@@ -6,7 +6,9 @@ again whenever a trigger at the end of this document applies. Updated
 2026-10-28 for in-app updates (B6, A8) and 2026-10-31 for the favicon
 decoder process (B7, A2) and for the risks accepted with the notes and
 rollback designs (section 7, items 2–4), and 2026-11-02 for schema 4,
-which seals notes per entry (data table, A3, section 7, items 2–3).
+which seals notes per entry (data table, A3, section 7, items 2–3), and
+the same day for revealing notes only after real user input (A3; section 7,
+item 2 done).
 
 ## 1. What Mnemo protects
 
@@ -15,7 +17,7 @@ which seals notes per entry (data table, A3, section 7, items 2–3).
 | Card numbers, security codes, PINs, document numbers, SSH private keys | Vault file (encrypted, then sealed per item and field); main-process memory while unlocked; clipboard after a copy | Same protection as passwords; never sent to the renderer. Identity details are not sealed separately and reach the renderer when the item is opened; they stay so by decision (section 7, item 2). |
 | One-time code (TOTP) secrets | Vault file (encrypted, then sealed per entry); main-process memory while unlocked | Same protection as passwords; only current codes reach the renderer. |
 | Entry passwords | Vault file (encrypted, then sealed per entry); main-process memory while unlocked; clipboard for up to 30 s after a copy | Highest value. |
-| Notes, and the text of secure notes | Vault file (encrypted, then sealed per entry and field since schema 4); in main-process memory only while one entry is opened, saved, imported, or rekeyed; renderer memory and DOM for the selected entry | Unlocking decrypts none. A compromised renderer can still ask for them one entry at a time (A3; section 7, item 2). |
+| Notes, and the text of secure notes | Vault file (encrypted, then sealed per entry and field since schema 4); in main-process memory only while one entry is opened, saved, imported, or rekeyed; renderer memory and DOM for the selected entry | Unlocking decrypts none. The page gets them only right after a real key or mouse press, one entry per press (A3; section 7, item 2). |
 | Other entry fields: name, username, website, site icon | Vault file (encrypted); main-process memory while unlocked; renderer memory and DOM for the visible list or selected entry | Usernames and websites reveal which accounts exist. |
 | Master passphrase | Typed into the renderer, sent once over IPC, then dropped | Never stored. |
 | Recovery key (256-bit) | Shown once in the renderer; kept in main memory until the user confirms it is saved; optionally in a user-saved text file; on paper | Opens the vault and resets the passphrase. |
@@ -133,7 +135,7 @@ which seals notes per entry (data table, A3, section 7, items 2–3).
 
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
-| Read all passwords in bulk | **New in this change.** The renderer receives metadata only (`listEntries`); passwords never cross IPC. `copyEntryField` writes to the clipboard from the main process; `revealPassword` shows a native dialog. The renderer cannot read the clipboard back: permission requests and permission checks are both denied, so `navigator.clipboard.readText()` fails and `document.execCommand("paste")` returns `false` (verified in the running app). | An attacker can still read usernames, websites, and the selected entry's notes, and can call `getEntry` for every ID to read all notes: since schema 4 main opens them one entry per call, but still returns them (section 7, item 2). It can trigger copies or reveal dialogs, which the user sees. |
+| Read all passwords in bulk | **New in this change.** The renderer receives metadata only (`listEntries`); passwords never cross IPC. `copyEntryField` writes to the clipboard from the main process; `revealPassword` shows a native dialog. The renderer cannot read the clipboard back: permission requests and permission checks are both denied, so `navigator.clipboard.readText()` fails and `document.execCommand("paste")` returns `false` (verified in the running app). | An attacker can still read usernames and websites. Notes are sent only by `revealNotes`, and only right after a real key or mouse press that main saw (the `input-event` of the window, which page scripts cannot create): one entry or version per press, within three seconds. So it cannot read notes while the user is idle, but can take one entry's notes for each real click or key press, including presses meant for something else. It can trigger copies or reveal dialogs, which the user sees. |
 | Write arbitrary clipboard contents (for example, a malicious command) | The old `copySecret(value)` API is removed; only an entry's username or password can be copied | None known. |
 | Modify or delete entries, or export a backup | Entries can be changed through the preload API while unlocked. Exporting a backup and deleting the vault need the master passphrase again; deletion also needs a native confirmation; export, import, and restore always show a native file dialog | A compromised renderer can corrupt entries, and one that captured the passphrase at unlock can pass these checks. Keep backups. |
 | Read a third-party export through import | Import files are chosen in a native dialog and parsed in main; only counts return to the renderer | Main parses untrusted JSON, CSV, and ZIP; sizes are capped, but parser bugs would run in the privileged process. |
@@ -221,14 +223,15 @@ must not be used with real vaults on a shared machine.
 1. **`file://` privileges.** **Done.** The UI is served from `app://mnemo/`
    by `protocol.handle` with a path traversal check, and
    `GrantFileProtocolExtraPrivileges` is off.
-2. **Notes and the renderer.** **Partly done.**
-   - **Done (schema 4, `docs/design-notes-sealing.md`, decisions D1, D2,
-     D3a):** each note, and a secure note's text, is sealed per entry and
-     field; unlocking decrypts none, and main opens one entry's notes at a
-     time.
-   - **Open:** `getEntry` still returns notes, so a compromised renderer can
-     read them one entry at a time. **Planned (D3b):** notes revealed only
-     after real user input that main sees itself.
+2. **Notes and the renderer.** **Done** (`docs/design-notes-sealing.md`,
+   decisions D1, D2, D3a, D3b).
+   - Each note, and a secure note's text, is sealed per entry and field;
+     unlocking decrypts none, and main opens one entry's notes at a time.
+   - `getEntry` and `getHistory` only flag notes. `revealNotes` answers only
+     right after a real key or mouse press (`src/main/notes-reveal.js`), one
+     entry or version per press.
+   - **Accepted:** a compromised renderer can still take one entry's notes
+     per real press, including presses the user made for something else.
    - **Accepted:** identity details (name, email, phone, address, birth date)
      stay plain fields (decision D2); name and email are list and search
      metadata.

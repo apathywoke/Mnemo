@@ -1,7 +1,12 @@
 # Design: sealing notes per entry
 
-Status: **implemented** in schema 4 with decisions D1, D2, and D3a
-(2026-11-02); D3b is the next change. The owner approved the decisions in
+Status: **implemented**: schema 4 with decisions D1, D2, and D3a, and
+D3b in the following change (2026-11-02). For D3b the window's
+`input-event` counts presses (`mouseDown`, `rawKeyDown`, `keyDown`,
+`gestureTap`); a press allows one `revealNotes` call within three seconds
+(`src/main/notes-reveal.js`). The detail view, the editors (opened with
+Edit), and the history (when a version is opened) reveal through it, and a
+secure note's text is gated like notes. The owner approved the decisions in
 section 12 as recommended on 2026-10-31. Sections 1 and 8 describe the
 state before the change.
 

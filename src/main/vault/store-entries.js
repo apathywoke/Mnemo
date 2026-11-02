@@ -42,7 +42,15 @@ class VaultStoreEntries {
 
   /** @this {Store} */
   getEntry(id) {
-    return this.detailsOf(this.findEntry(id));
+    return toEntryDetails(this.findEntry(id));
+  }
+
+  // The notes and sealed text of an entry, or of one of its earlier versions
+  // (`versionId`). The caller checks that the user asked for them.
+  /** @this {Store} */
+  revealText(id, versionId = null) {
+    const entry = this.findEntry(id);
+    return this.readableText(entry, versionId === null ? entry : this.findVersion(entry, versionId));
   }
 
   // The sealed text of an entry, or of `content` (one of its history
@@ -64,10 +72,6 @@ class VaultStoreEntries {
     }
   }
 
-  /** @this {Store} */
-  detailsOf(entry) {
-    return toEntryDetails(entry, this.readableText(entry));
-  }
 
   /** @this {Store} */
   revealPassword(id) {
@@ -175,12 +179,12 @@ class VaultStoreEntries {
       const now = Date.now();
       const content = this.buildItemEntry(normalized, existing, existing?.id ?? randomUUID(), now);
       const saved = this.withSavedContent(existing, content, folderId, now);
-      if (saved === existing) return this.detailsOf(existing);
+      if (saved === existing) return toEntryDetails(existing);
       const entries = this.vaultData.entries.slice();
       if (existingIndex >= 0) entries[existingIndex] = saved;
       else entries.push(saved);
       await this.persistVaultData(this.nextVaultData({ entries }));
-      return this.detailsOf(saved);
+      return toEntryDetails(saved);
     });
   }
 
@@ -262,13 +266,13 @@ class VaultStoreEntries {
         content.totp = existing.totp;
       }
       const savedEntry = this.withSavedContent(existing, content, folderId, now);
-      if (savedEntry === existing) return this.detailsOf(existing);
+      if (savedEntry === existing) return toEntryDetails(existing);
       const entries = this.vaultData.entries.slice();
       if (existingIndex >= 0) entries[existingIndex] = savedEntry;
       else entries.push(savedEntry);
 
       await this.persistVaultData(this.nextVaultData({ entries }));
-      return this.detailsOf(savedEntry);
+      return toEntryDetails(savedEntry);
     });
   }
 

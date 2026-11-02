@@ -36,6 +36,25 @@ function fieldRow(labelText, { value, masked = false, mono = false, multiline = 
   return field;
 }
 
+function textButton(label, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "detail-action detail-reveal-button";
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+// Notes or sealed text: the text once revealed, otherwise a placeholder and
+// a Show button.
+function textRow(labelText, value, { onRevealText, multiline = true, mono = false, actions = [] }) {
+  if (value !== null) return fieldRow(labelText, { value, multiline, mono, actions });
+  return fieldRow(labelText, {
+    value: t("detail.hiddenText"),
+    actions: [textButton(t("detail.showText"), onRevealText), ...actions],
+  });
+}
+
 function maskFor(type, key, details) {
   if (type === "card" && key === "number" && details.fields.last4) {
     return `•••• •••• •••• ${details.fields.last4}`;
@@ -43,9 +62,11 @@ function maskFor(type, key, details) {
   return "••••••••••••";
 }
 
-// `details` comes from getEntry(): plain fields, notes, and the names of
-// stored secret fields. Secret values are never part of it.
-function renderItemDetail(details, ui, { onCopy, onReveal }) {
+// `details` comes from getEntry(): plain fields, the names of stored secret
+// and sealed fields, and whether there are notes. Secret values are never
+// part of it; notes and sealed text (a secure note's body) are in
+// `revealed` ({ notes, fields }) once the user chose Show.
+function renderItemDetail(details, ui, { onCopy, onReveal, revealed = null, onRevealText }) {
   const { type } = details;
   const schema = itemTypes.ITEM_TYPES[type];
   ui.kind.textContent = t(`item.type.${type}`).toLocaleUpperCase();
@@ -60,7 +81,15 @@ function renderItemDetail(details, ui, { onCopy, onReveal }) {
     const copy = field.copy
       ? [iconButton(COPY, t("item.copyField", { field: label }), () => onCopy(field.key))]
       : [];
-    if (field.kind === "secret") {
+    if (field.sealed) {
+      if (!details.sealedFields.includes(field.key)) continue;
+      rows.push(textRow(label, revealed ? revealed.fields[field.key] ?? "" : null, {
+        onRevealText,
+        multiline: field.kind === "multiline",
+        mono: field.mono,
+        actions: copy,
+      }));
+    } else if (field.kind === "secret") {
       if (!details.secretFields.includes(field.key)) continue;
       rows.push(fieldRow(label, {
         value: maskFor(type, field.key, details),
@@ -87,8 +116,8 @@ function renderItemDetail(details, ui, { onCopy, onReveal }) {
       actions: [iconButton(COPY, t("item.copyField", { field: label }), () => onCopy("fingerprint"))],
     }));
   }
-  if (details.notes) {
-    rows.push(fieldRow(t("detail.notes"), { value: details.notes, multiline: true }));
+  if (details.hasNotes) {
+    rows.push(textRow(t("detail.notes"), revealed ? revealed.notes : null, { onRevealText }));
   }
   ui.fields.replaceChildren(...rows);
   ui.detail.hidden = false;

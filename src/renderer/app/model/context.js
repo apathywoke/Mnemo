@@ -19,7 +19,10 @@ function createContext() {
       vault: {
         entries: [],
         selectedEntryId: null,
+        // Notes of the selected login once the user chose Show, and whether
+        // it has any.
         selectedEntryNotes: "",
+        selectedEntryHasNotes: false,
         typeFilter: "all",
         // { kind: "all" | "favorites" | "folder" | "trash", folderId }
         scope: { kind: "all" },
@@ -94,6 +97,8 @@ function createContext() {
       $("#detail-password").textContent = "••••••••••••";
       $("#detail-notes").textContent = "";
       $("#detail-notes-field").hidden = true;
+      ctx.state.vault.selectedEntryNotes = "";
+      ctx.state.vault.selectedEntryHasNotes = false;
       siteIcon.setSiteIcon($("#detail-icon"), "", "");
       for (const id of ["entry-dialog", "history-dialog", "folders-dialog"]) {
         const dialog = $(`#${id}`);

@@ -42,6 +42,9 @@ contextBridge.exposeInMainWorld("vaultApp", {
     ipcRenderer.invoke("vault:change-passphrase", currentPassphrase, newPassphrase),
   listEntries: () => ipcRenderer.invoke("vault:list-entries"),
   getEntry: (id) => ipcRenderer.invoke("vault:get-entry", id),
+  // Notes and a secure note's text, of the entry or of one earlier version.
+  // Main answers only right after a real key or mouse press.
+  revealNotes: (id, versionId) => ipcRenderer.invoke("vault:reveal-notes", id, versionId ?? null),
   getTotpCode: (id) => ipcRenderer.invoke("vault:get-totp", id),
   getPasswordHealth: () => ipcRenderer.invoke("vault:password-health"),
   checkBreaches: () => ipcRenderer.invoke("vault:check-breaches"),

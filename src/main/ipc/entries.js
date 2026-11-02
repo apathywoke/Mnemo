@@ -13,6 +13,7 @@ function register(ctx) {
     showSecretDialog,
     copyToClipboardTemporarily,
     registerHandler,
+    takeRevealGrant,
   } = ctx;
 
   // The renderer gets entry metadata only. Passwords are decrypted in this
@@ -20,6 +21,15 @@ function register(ctx) {
   registerHandler("vault:list-entries", () => state.vaultStore.listEntries());
 
   registerHandler("vault:get-entry", (entryId) => state.vaultStore.getEntry(entryId));
+
+  // The notes and sealed text (a secure note's body) of one entry, or of one
+  // of its earlier versions, only right after a real key or mouse press
+  // (src/main/notes-reveal.js). getEntry and getHistory say only whether
+  // there is any.
+  registerHandler("vault:reveal-notes", (entryId, versionId = null) => {
+    if (!takeRevealGrant()) throw new Error("Click Show to read the notes.");
+    return state.vaultStore.revealText(entryId, versionId);
+  });
 
   // The current one-time code only; the secret never leaves this process.
   registerHandler(
@@ -69,9 +79,11 @@ function register(ctx) {
   function copyableItemValue(entry, field) {
     const schemaField = ITEM_TYPES[entry.type].fields.find((item) => item.key === field);
     if (schemaField?.copy) {
-      return schemaField.kind === "secret"
-        ? state.vaultStore.revealItemSecret(entry.id, field)
-        : entry.fields[field] ?? "";
+      if (schemaField.kind === "secret") return state.vaultStore.revealItemSecret(entry.id, field);
+      // Sealed text (a secure note's body) goes to the clipboard from here,
+      // like secrets, without passing through the page.
+      if (schemaField.sealed) return state.vaultStore.revealText(entry.id).fields[field] ?? "";
+      return entry.fields[field] ?? "";
     }
     if (entry.type === "ssh" && field === "fingerprint") return entry.fields.fingerprint ?? "";
     throw new Error("Could not copy this value.");

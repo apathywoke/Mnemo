@@ -45,7 +45,9 @@ test("vault lifecycle, encrypted entries, validation, icon storage, and locking"
     "attachmentCount", "createdAt", "deletedAt", "favicon", "favorite", "folderId", "hasTotp", "id", "name",
     "type", "updatedAt", "url", "username",
   ]);
-  assert.equal(store.getEntry(login.id).notes, "local test data");
+  assert.equal(store.getEntry(login.id).hasNotes, true);
+  assert.equal(Object.hasOwn(store.getEntry(login.id), "notes"), false);
+  assert.equal(store.revealText(login.id).notes, "local test data");
   assert.equal(Object.hasOwn(store.getEntry(login.id), "password"), false);
   assert.equal(store.revealPassword(login.id), "test-password-value");
   assert.throws(() => store.revealPassword("not-an-id"), /Invalid login entry/);
@@ -202,7 +204,7 @@ test("schema 1 vaults with plain password fields are upgraded to sealed password
   store.lock();
   await store.unlock(PASSPHRASE);
   assert.equal(store.vaultData.schemaVersion, 4);
-  assert.equal(store.getEntry(id).notes, "local test data");
+  assert.equal(store.revealText(id).notes, "local test data");
   assert.equal(store.revealPassword(id), "test-password-value");
 });
 
@@ -531,7 +533,9 @@ test("cards, notes, identities, and SSH keys store secrets sealed per field", as
   await assert.rejects(store.saveItem(item("card", "  ", {})), /Enter a name for this item/);
 
   const note = await store.saveItem(item("note", "Wi-Fi", { body: "Network: home\nPassword: hunter2" }));
-  assert.equal(store.getEntry(note.id).fields.body, "Network: home\nPassword: hunter2");
+  assert.deepEqual(store.getEntry(note.id).sealedFields, ["body"]);
+  assert.equal(Object.hasOwn(store.getEntry(note.id).fields, "body"), false);
+  assert.equal(store.revealText(note.id).fields.body, "Network: home\nPassword: hunter2");
 
   const identity = await store.saveItem(item("identity", "Me", {
     firstName: "Alice", lastName: "Example", email: "alice@example.com", documentNumber: "P1234567",
