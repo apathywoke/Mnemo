@@ -1,7 +1,15 @@
 # Design: sealing notes per entry
 
-Status: approved plan (stage 3, task 7), not implemented. The owner
-approved the decisions in section 12 as recommended on 2026-10-31.
+Status: **implemented** in schema 4 with decisions D1, D2, and D3a
+(2026-11-02); D3b is the next change. The owner approved the decisions in
+section 12 as recommended on 2026-10-31. Sections 1 and 8 describe the
+state before the change.
+
+How the item schema marks a sealed text field (D2): `sealed: true` on the
+field in `src/shared/item-types.js` (the secure note's `body`). Such a field
+is stored in `fields` as a sealed record under
+`local-vault:entry-notes:v4:<entryId>:<field>`, left out when empty, and
+opened for display like notes.
 
 ## 1. What happens today
 

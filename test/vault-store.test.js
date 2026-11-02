@@ -3,7 +3,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const test = require("node:test");
 const VaultStore = require("../vault-store");
-const { makeLogin, makePngHeader, makeTempDirectory } = require("../support/helpers");
+const { makeLogin, makePngHeader, makeTempDirectory, plainTextEntries } = require("../support/helpers");
 
 const PASSPHRASE = "correct horse battery staple";
 
@@ -186,7 +186,7 @@ test("schema 1 vaults with plain password fields are upgraded to sealed password
   const { id } = await store.saveEntry(makeLogin());
 
   // Rewrite the vault as schema 1, the format used before per-entry sealing.
-  const legacyEntries = store.vaultData.entries.map((entry) => ({
+  const legacyEntries = plainTextEntries(store).map((entry) => ({
     ...entry,
     password: store.revealPassword(entry.id),
   }));
@@ -194,14 +194,15 @@ test("schema 1 vaults with plain password fields are upgraded to sealed password
   store.lock();
 
   await store.unlock(PASSPHRASE);
-  assert.equal(store.vaultData.schemaVersion, 3);
+  assert.equal(store.vaultData.schemaVersion, 4);
   assert.equal(typeof store.vaultData.entries[0].password, "object");
   assert.equal(store.revealPassword(id), "test-password-value");
 
   await store.saveEntry(makeLogin({ id, name: "Upgraded", password: "" }));
   store.lock();
   await store.unlock(PASSPHRASE);
-  assert.equal(store.vaultData.schemaVersion, 3);
+  assert.equal(store.vaultData.schemaVersion, 4);
+  assert.equal(store.getEntry(id).notes, "local test data");
   assert.equal(store.revealPassword(id), "test-password-value");
 });
 

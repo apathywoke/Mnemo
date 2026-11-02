@@ -4,7 +4,6 @@ const {
 } = require("node:crypto");
 const { ITEM_TYPES } = require("../../shared/item-types.js");
 const {
-  SEALED_SCHEMA_VERSION,
   UUID_PATTERN,
   MAX_FOLDERS,
   MAX_FOLDER_NAME,
@@ -60,7 +59,8 @@ function isValidFolderList(folders) {
 const LOGIN_SNAPSHOT_KEYS = Object.freeze(["id", "savedAt", "updatedAt", "name", "username", "url", "notes", "password"]);
 const ITEM_SNAPSHOT_KEYS = Object.freeze(["id", "savedAt", "updatedAt", "name", "notes", "fields", "secrets"]);
 
-function isValidSnapshot(snapshot, entry) {
+// `schemaVersion` is the vault's (3 or later; earlier schemas had no history).
+function isValidSnapshot(snapshot, entry, schemaVersion) {
   if (
     !isPlainObject(snapshot) ||
     typeof snapshot.id !== "string" ||
@@ -75,10 +75,10 @@ function isValidSnapshot(snapshot, entry) {
   if (entry.type === "login") {
     const keys = Object.hasOwn(snapshot, "totp") ? [...LOGIN_SNAPSHOT_KEYS, "totp"] : LOGIN_SNAPSHOT_KEYS;
     return hasExactKeys(snapshot, keys) &&
-      isValidLoginEntry({ ...content, id: entry.id, type: "login", createdAt: entry.createdAt }, SEALED_SCHEMA_VERSION);
+      isValidLoginEntry({ ...content, id: entry.id, type: "login", createdAt: entry.createdAt }, schemaVersion);
   }
   return hasExactKeys(snapshot, ITEM_SNAPSHOT_KEYS) &&
-    isValidItemEntry({ ...content, id: entry.id, type: entry.type, createdAt: entry.createdAt });
+    isValidItemEntry({ ...content, id: entry.id, type: entry.type, createdAt: entry.createdAt }, schemaVersion);
 }
 
 // Splits a stored entry into its content (validated by type) and metadata.
@@ -93,8 +93,8 @@ function splitEntry(entry) {
   return { core, meta };
 }
 
-// `context` carries the vault's folder IDs and collects attachment IDs, which
-// must be unique across the vault (they name the files).
+// `context` carries the vault's schema version and folder IDs and collects
+// attachment IDs, which must be unique across the vault (they name the files).
 function isValidEntryMeta(meta, core, context) {
   for (const [key, value] of Object.entries(meta)) {
     if (key === "folderId" && !(typeof value === "string" && context.folderIds.has(value))) return false;
@@ -112,7 +112,7 @@ function isValidEntryMeta(meta, core, context) {
       (!Array.isArray(value) ||
         value.length === 0 ||
         value.length > HISTORY_LIMIT ||
-        !value.every((snapshot) => isValidSnapshot(snapshot, core)) ||
+        !value.every((snapshot) => isValidSnapshot(snapshot, core, context.schemaVersion)) ||
         new Set(value.map((snapshot) => snapshot.id)).size !== value.length)
     ) {
       return false;
@@ -181,23 +181,25 @@ function sameRecord(left, right, same) {
 }
 
 // Whether a save changes what the entry contains (not its folder, favorite,
-// icon, or attachments). Unchanged sealed values are reused, so comparing
-// the sealed records is enough.
+// icon, or attachments). Unchanged sealed values (notes too) are reused, so
+// comparing the sealed records is enough.
 function contentChanged(previous, next) {
-  if (previous.name !== next.name || previous.notes !== next.notes) return true;
+  if (previous.name !== next.name || !sameSealed(previous.notes, next.notes)) return true;
   if (previous.type === "login") {
     return previous.username !== next.username ||
       previous.url !== next.url ||
       !sameSealed(previous.password, next.password) ||
       !sameSealed(previous.totp, next.totp);
   }
-  return !sameRecord(previous.fields, next.fields, (left, right) => left === right) ||
+  return !sameRecord(previous.fields, next.fields, sameSealed) ||
     !sameRecord(previous.secrets, next.secrets, sameSealed);
 }
 
 // Which fields differ between an earlier version and the one that replaced it.
 function versionChanges(entry, version, newer) {
-  const changes = ["name", "notes"].filter((key) => version[key] !== newer[key]);
+  const changes = [];
+  if (version.name !== newer.name) changes.push("name");
+  if (!sameSealed(version.notes, newer.notes)) changes.push("notes");
   if (entry.type === "login") {
     for (const key of ["username", "url"]) {
       if (version[key] !== newer[key]) changes.push(key);
@@ -209,19 +211,21 @@ function versionChanges(entry, version, newer) {
   for (const field of ITEM_TYPES[entry.type].fields) {
     const changed = field.kind === "secret"
       ? !sameSealed(version.secrets[field.key], newer.secrets[field.key])
-      : (version.fields[field.key] ?? "") !== (newer.fields[field.key] ?? "");
+      : !sameSealed(version.fields[field.key] ?? "", newer.fields[field.key] ?? "");
     if (changed) changes.push(field.key);
   }
   return changes;
 }
 
-function toVersionSummary(entry, version, newer) {
+// `readable` holds the version's sealed text, opened by the store, as for
+// toEntryDetails().
+function toVersionSummary(entry, version, newer, readable) {
   const summary = {
     id: version.id,
     savedAt: version.savedAt,
     updatedAt: version.updatedAt,
     name: version.name,
-    notes: version.notes,
+    notes: readable.notes,
     changes: versionChanges(entry, version, newer),
   };
   if (entry.type === "login") {
@@ -233,7 +237,7 @@ function toVersionSummary(entry, version, newer) {
       hasTotp: Boolean(version.totp),
     };
   }
-  return { ...summary, fields: { ...version.fields }, secretFields: Object.keys(version.secrets) };
+  return { ...summary, fields: { ...version.fields, ...readable.fields }, secretFields: Object.keys(version.secrets) };
 }
 
 // Old versions go first when the vault would exceed its size limit, oldest

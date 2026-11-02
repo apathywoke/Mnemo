@@ -4,6 +4,7 @@ const { ITEM_TYPES } = require("../../shared/item-types.js");
 const { isPrivateKey } = require("../ssh-keys");
 const cardTools = require("../../shared/card-tools.js");
 const {
+  VAULT_SCHEMA_VERSION,
   LEGACY_VAULT_SCHEMA_VERSION,
   MAX_FAVICON_BYTES,
   MAX_FAVICON_BASE64_LENGTH,
@@ -13,7 +14,7 @@ const {
   UUID_PATTERN,
 } = require("./constants");
 const { isPlainObject, hasExactKeys } = require("./records");
-const { isValidSealedPassword } = require("./crypto");
+const { isValidSealedPassword, isValidSealedText } = require("./crypto");
 const { toAttachmentSummary } = require("./attachments");
 
 // Cards, notes, identities, and SSH keys share one shape: plain `fields`
@@ -33,7 +34,26 @@ function itemSchema(type) {
   };
 }
 
-function isValidItemEntry(entry) {
+// Text fields of an item type that schema 4 stores sealed (`sealed` in
+// item-types.js), such as a secure note's body.
+function sealedFieldKeys(type) {
+  return ITEM_TYPES[type].fields.filter((field) => field.sealed).map((field) => field.key);
+}
+
+// Notes: plain text up to schema 3; "" or a sealed record from schema 4.
+function isValidNotes(notes, schemaVersion) {
+  return schemaVersion >= VAULT_SCHEMA_VERSION
+    ? isValidSealedText(notes, ENTRY_LIMITS.notes * 3)
+    : typeof notes === "string" && notes.length <= ENTRY_LIMITS.notes;
+}
+
+function isValidPlainField(field, value, schemaVersion) {
+  return field.sealed && schemaVersion >= VAULT_SCHEMA_VERSION
+    ? isValidSealedPassword(value, field.max * 3)
+    : typeof value === "string" && value.length <= field.max;
+}
+
+function isValidItemEntry(entry, schemaVersion = VAULT_SCHEMA_VERSION) {
   if (
     !hasExactKeys(entry, ITEM_ENTRY_KEYS) ||
     !Object.hasOwn(ITEM_TYPES, entry.type) ||
@@ -41,8 +61,7 @@ function isValidItemEntry(entry) {
     typeof entry.name !== "string" ||
     !entry.name.trim() ||
     entry.name.length > MAX_ITEM_NAME ||
-    typeof entry.notes !== "string" ||
-    entry.notes.length > ENTRY_LIMITS.notes ||
+    !isValidNotes(entry.notes, schemaVersion) ||
     !Number.isSafeInteger(entry.createdAt) ||
     !Number.isSafeInteger(entry.updatedAt) ||
     entry.createdAt <= 0 ||
@@ -55,10 +74,9 @@ function isValidItemEntry(entry) {
   const schema = itemSchema(entry.type);
   return (
     Object.entries(entry.fields).every(([key, value]) =>
-      typeof value === "string" &&
-      (schema.plain.has(key)
-        ? value.length <= schema.plain.get(key).max
-        : schema.derived.has(key) && value.length <= MAX_DERIVED_LENGTH)) &&
+      schema.plain.has(key)
+        ? isValidPlainField(schema.plain.get(key), value, schemaVersion)
+        : schema.derived.has(key) && typeof value === "string" && value.length <= MAX_DERIVED_LENGTH) &&
     Object.entries(entry.secrets).every(([key, value]) =>
       schema.secret.has(key) && isValidSealedPassword(value))
   );
@@ -183,7 +201,7 @@ function hasAllowedEntryKeys(entry) {
   );
 }
 
-function isValidLoginEntry(entry, schemaVersion) {
+function isValidLoginEntry(entry, schemaVersion = VAULT_SCHEMA_VERSION) {
   if (
     !hasAllowedEntryKeys(entry) ||
     (Object.hasOwn(entry, "totp") &&
@@ -201,7 +219,9 @@ function isValidLoginEntry(entry, schemaVersion) {
   if (!isValidFavicon(entry.favicon ?? "")) return false;
 
   for (const field of TEXT_FIELDS) {
-    if (
+    if (field === "notes") {
+      if (!isValidNotes(entry.notes, schemaVersion)) return false;
+    } else if (
       typeof entry[field] !== "string" ||
       entry[field].length > ENTRY_LIMITS[field]
     ) {
@@ -269,9 +289,11 @@ function toEntrySummary(entry) {
   };
 }
 
-function toEntryDetails(entry) {
+// `readable` holds the entry's sealed text, opened by the store: { notes,
+// fields } with the sealed item fields (a secure note's body).
+function toEntryDetails(entry, readable) {
   const shared = {
-    notes: entry.notes,
+    notes: readable.notes,
     attachments: (entry.attachments ?? []).map(toAttachmentSummary),
     historyCount: entry.history?.length ?? 0,
   };
@@ -279,7 +301,7 @@ function toEntryDetails(entry) {
     return {
       ...toEntrySummary(entry),
       ...shared,
-      fields: { ...entry.fields },
+      fields: { ...entry.fields, ...readable.fields },
       secretFields: Object.keys(entry.secrets),
     };
   }
@@ -380,6 +402,8 @@ module.exports = {
   MAX_ITEM_NAME,
   MAX_DERIVED_LENGTH,
   itemSchema,
+  sealedFieldKeys,
+  isValidNotes,
   isValidItemEntry,
   ITEM_NORMALIZERS,
   normalizeItemInput,

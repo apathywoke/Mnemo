@@ -24,7 +24,7 @@ async function makeNewerVault(t) {
   await store.saveEntry(makeLogin());
   const dataKey = store.exportDataKey();
   t.after(() => dataKey.fill(0));
-  await store.persistVaultData({ ...store.vaultData, schemaVersion: 4 });
+  await store.persistVaultData({ ...store.vaultData, schemaVersion: store.vaultData.schemaVersion + 1 });
   store.lock();
   return { directory, filePath, recoveryKey, dataKey };
 }

@@ -5,7 +5,7 @@ const {
 } = require("node:crypto");
 const { MAX_FOLDERS, HISTORY_LIMIT } = require("./constants");
 const { openPassword, openItemSecret } = require("./crypto");
-const { isFolderIdInput, toEntrySummary, toEntryDetails } = require("./entries");
+const { isFolderIdInput, toEntrySummary } = require("./entries");
 const { normalizeFolderName, withMeta, snapshotOf, toVersionSummary } = require("./history");
 
 /** @typedef {import("./index").Instance} Store */
@@ -181,7 +181,7 @@ class VaultStoreOrganize {
     const entry = this.findEntry(id);
     const versions = entry.history ?? [];
     return versions.map((version, index) =>
-      toVersionSummary(entry, version, index === 0 ? entry : versions[index - 1]));
+      toVersionSummary(entry, version, index === 0 ? entry : versions[index - 1], this.readableText(entry, version)));
   }
 
   /** @this {Store} */
@@ -252,7 +252,7 @@ class VaultStoreOrganize {
       const history = [snapshotOf(entry, now), ...others].slice(0, HISTORY_LIMIT);
       const saved = withMeta(content, entry, { history });
       await this.replaceEntry(entry, saved);
-      return toEntryDetails(saved);
+      return this.detailsOf(saved);
     });
   }
 }

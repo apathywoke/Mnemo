@@ -17,14 +17,19 @@ const RECOVERY_GROUP_SIZE = 4;
 // Schema 2 additionally seals each password under the vault key, bound to its
 // entry ID, so unlocking does not decrypt every password at once.
 // Schema 3 adds folders, favorites, the trash, version history, and
-// attachments. Older schemas are upgraded in memory on unlock and written as
-// schema 3 on the next save.
-const VAULT_SCHEMA_VERSION = 3;
+// attachments. Schema 4 seals notes, and a secure note's text, per entry
+// (docs/design-notes-sealing.md), so unlocking decrypts none of them. Older
+// schemas are upgraded in memory on unlock and written as schema 4 on the
+// next save.
+const VAULT_SCHEMA_VERSION = 4;
+const ORGANIZED_SCHEMA_VERSION = 3;
 const SEALED_SCHEMA_VERSION = 2;
 const LEGACY_VAULT_SCHEMA_VERSION = 1;
 // Sealed values keep the label of the schema that introduced them, so a new
 // schema never changes what an existing sealed value is bound to.
 const SEALED_AAD_VERSION = 2;
+// Notes were first sealed by schema 4.
+const NOTES_AAD_VERSION = 4;
 const KDF = Object.freeze({ name: "scrypt", N: 2 ** 17, r: 8, p: 1 });
 const KEY_BYTES = 32;
 const SALT_BYTES = 16;
@@ -46,6 +51,8 @@ const ENTRY_LIMITS = Object.freeze({
 const TEXT_FIELDS = Object.freeze(["name", "username", "url", "notes"]);
 // UTF-8 needs at most three bytes per UTF-16 code unit.
 const MAX_SEALED_PASSWORD_BYTES = ENTRY_LIMITS.password * 3;
+// The longest sealed text: a secure note's body (65,536 characters).
+const MAX_SEALED_TEXT_BYTES = 65536 * 3;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_PASSPHRASE_BYTES = 1024;
 // Existing vaults keep opening with passphrases of 7 or more characters; a
@@ -79,9 +86,11 @@ module.exports = {
   RECOVERY_KEY_CHARACTERS,
   RECOVERY_GROUP_SIZE,
   VAULT_SCHEMA_VERSION,
+  ORGANIZED_SCHEMA_VERSION,
   SEALED_SCHEMA_VERSION,
   LEGACY_VAULT_SCHEMA_VERSION,
   SEALED_AAD_VERSION,
+  NOTES_AAD_VERSION,
   KDF,
   KEY_BYTES,
   SALT_BYTES,
@@ -96,6 +105,7 @@ module.exports = {
   ENTRY_LIMITS,
   TEXT_FIELDS,
   MAX_SEALED_PASSWORD_BYTES,
+  MAX_SEALED_TEXT_BYTES,
   UUID_PATTERN,
   MAX_PASSPHRASE_BYTES,
   MIN_PASSPHRASE_CHARACTERS,

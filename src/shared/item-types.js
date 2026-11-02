@@ -4,6 +4,8 @@
 // kind: "text" (one line), "multiline", or "secret". Secret fields are sealed
 // per item in the vault and never sent to the renderer; they can be copied or
 // shown in a native dialog. `multiline` on a secret only affects the editor.
+// `sealed` on a text field: stored sealed per item like notes (schema 4) but
+// shown as text when the item is opened, like notes.
 const ITEM_TYPES = Object.freeze({
   card: Object.freeze({
     fields: Object.freeze([
@@ -20,7 +22,7 @@ const ITEM_TYPES = Object.freeze({
   }),
   note: Object.freeze({
     fields: Object.freeze([
-      { key: "body", kind: "multiline", max: 65536, copy: true },
+      { key: "body", kind: "multiline", max: 65536, copy: true, sealed: true },
     ]),
     derived: Object.freeze([]),
   }),
