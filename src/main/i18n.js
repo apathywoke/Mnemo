@@ -1,5 +1,5 @@
 // Translated messages for dialogs, and errors sent to the renderer.
-const { encodeIpcError } = require("../../src/renderer/shared/i18n/translate");
+const { encodeIpcError } = require("../shared/i18n/translate.js");
 
 function createTranslation(ctx) {
   const { state, translator } = ctx;

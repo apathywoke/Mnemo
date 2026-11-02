@@ -63,9 +63,12 @@ The renderer is organized by Feature-Sliced Design layers under
 
 Dependencies flow down from `app` to `pages`, `widgets` and `features`, then
 `entities` and `shared`. `index.html` stays at the project root as Electron's
-document entry point. Because this renderer has no bundler, its local slices
-register their APIs under an internal `window.mnemoRenderer` namespace and are
-loaded in dependency order there. The renderer has no Node.js access; sensitive
+document entry point. Every slice is a native ES module; there is no bundler.
+`index.html` loads one module script, `src/renderer/app/index.js`, whose
+imports pull in the rest, so what ships is exactly the source.
+`src/renderer/shared/lib/theme.js` is the only classic script: it runs in
+`<head>` to pick the light or dark palette before the first paint. The
+renderer has no Node.js access; sensitive
 operations still go through the narrow `vaultApp` preload API. `main.js` and
 `preload.js` remain outside the renderer feature layers because they belong to
 separate Electron processes.
@@ -81,9 +84,12 @@ root. The
 vault store is in `src/main/vault/`: `store.js` holds the file lifecycle, the
 `store-*.js` files add feature methods, and the other files hold the file
 format, crypto, and validation; `vault-store.js` only re-exports it.
-`src/shared/` holds code that both processes load: `password-tools.js`, the
-password strength estimate that the renderer shows and the main process
-enforces for new master passphrases.
+`src/shared/` holds ES modules that both processes load: the page imports
+them, and the main process loads them with `require()` (its `package.json`
+marks the folder as ES modules). They are the UI text catalog and translator
+(`i18n/`), the item type schema, the payment card rules, and
+`password-tools.js`, the password strength estimate that the renderer shows
+and the main process enforces for new master passphrases.
 
 ## Current security boundary
 

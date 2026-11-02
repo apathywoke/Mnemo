@@ -2,12 +2,12 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const test = require("node:test");
-const catalog = require("../src/renderer/shared/i18n/messages");
+const { catalog } = require("../src/shared/i18n/messages.js");
 const {
   createTranslator,
   decodeIpcError,
   encodeIpcError,
-} = require("../src/renderer/shared/i18n/translate");
+} = require("../src/shared/i18n/translate.js");
 
 const root = path.join(__dirname, "..");
 const translator = createTranslator(catalog);
@@ -113,8 +113,11 @@ test("every translation key used by the UI exists", async () => {
     html.matchAll(/data-i18n(?:-[a-z-]+)?="([^"]+)"/g),
     ([, key]) => key,
   ));
-  const rendererFiles = (await listFiles(path.join(root, "src", "renderer")))
-    .filter((file) => file.endsWith(".js") && !file.includes(`${path.sep}i18n${path.sep}`));
+  // Page code and the shared modules, except the catalog itself.
+  const rendererFiles = [
+    ...(await listFiles(path.join(root, "src", "renderer"))),
+    ...(await listFiles(path.join(root, "src", "shared"))),
+  ].filter((file) => file.endsWith(".js") && !file.includes(`${path.sep}i18n${path.sep}`));
   for (const file of [...rendererFiles, ...(await mainProcessFiles())]) {
     const source = await fs.readFile(file, "utf8");
     // Any "prefix.name" string with a known prefix is a key...
@@ -128,17 +131,16 @@ test("every translation key used by the UI exists", async () => {
   for (const key of keys) assert.ok(Object.hasOwn(english, key), `missing key ${key}`);
 });
 
-test("the language selector and its scripts are in the page", async () => {
+test("the language selector is in the page and translates from the shared catalog", async () => {
   const html = await fs.readFile(path.join(root, "index.html"), "utf8");
   assert.match(html, /<select id="settings-language"/);
-  const order = ["i18n/messages.js", "i18n/translate.js", "lib/i18n.js", "lib/dom.js"]
-    .map((name) => html.indexOf(name));
-  assert.deepEqual(order.slice().sort((a, b) => a - b), order);
-  assert.ok(order.every((index) => index > 0));
+  const i18n = await fs.readFile(path.join(root, "src", "renderer", "shared", "lib", "i18n.js"), "utf8");
+  assert.match(i18n, /from "\.\.\/\.\.\/\.\.\/shared\/i18n\/messages\.js"/);
+  assert.match(i18n, /from "\.\.\/\.\.\/\.\.\/shared\/i18n\/translate\.js"/);
 });
 
 test("every item type and field has a label", () => {
-  const { ITEM_TYPES } = require("../src/renderer/shared/item-types");
+  const { ITEM_TYPES } = require("../src/shared/item-types.js");
   for (const [type, schema] of Object.entries(ITEM_TYPES)) {
     assert.ok(english[`item.type.${type}`], type);
     for (const field of schema.fields) assert.ok(english[`item.field.${type}.${field.key}`], `${type}.${field.key}`);

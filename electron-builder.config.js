@@ -42,6 +42,8 @@ module.exports = {
     "src/main/**/*.js",
     "src/renderer/**/*.js",
     "src/shared/**/*.js",
+    // Marks src/shared/ as ES modules for the main process.
+    "src/shared/package.json",
   ],
   electronFuses,
   // Fail the build instead of producing an unsigned app.

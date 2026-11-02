@@ -1,0 +1,4 @@
+{
+  "//": "Files here are ES modules: the renderer imports them and the main process loads them with require().",
+  "type": "module"
+}

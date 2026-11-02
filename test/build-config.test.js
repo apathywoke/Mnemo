@@ -283,24 +283,57 @@ test("release builds include every module that main and preload require", async 
       queue.push(resolved.split(path.sep).join("/"));
     }
   }
-  const missing = [...seen].filter((file) => !patterns.some((pattern) => pattern.test(file)));
+  // A package.json below the root decides whether its files load as ES
+  // modules (src/shared/), so it has to ship with them.
+  const scopes = new Set();
+  for (const file of seen) {
+    for (let directory = path.posix.dirname(file); directory !== "."; directory = path.posix.dirname(directory)) {
+      const manifest = `${directory}/package.json`;
+      if (await fs.access(path.join(root, manifest)).then(() => true, () => false)) scopes.add(manifest);
+    }
+  }
+  const missing = [...seen, ...scopes].filter((file) => !patterns.some((pattern) => pattern.test(file)));
   assert.deepEqual(missing, []);
   assert.ok(seen.has("src/main/backup-file.js") && seen.has("vault-store.js"));
+  assert.ok(seen.has("src/shared/i18n/messages.js") && scopes.has("src/shared/package.json"));
 });
 
 
-// The page loads its scripts and styles by path, so a file moved out of
-// src/renderer must still exist and be packaged.
+// The page loads one module script, which imports the rest; theme.js and the
+// stylesheet are linked directly. Every file in that graph must exist and be
+// packaged, and imports are relative paths only (no bare package names).
 test("every script and stylesheet the page loads exists and is packaged", async () => {
   const root = path.join(__dirname, "..");
   const html = await fs.readFile(path.join(root, "index.html"), "utf8");
-  const assets = Array.from(
+  const linked = Array.from(
     html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)="\.\/([^"]+)"/g),
     ([, file]) => file,
   );
-  assert.ok(assets.includes("src/shared/password-tools.js") && assets.includes("styles.css"), assets.join(", "));
+  const scripts = Array.from(html.matchAll(/<script\b[^>]*>/g), ([tag]) => tag);
+  assert.deepEqual(scripts, [
+    '<script src="./src/renderer/shared/lib/theme.js">',
+    '<script type="module" src="./src/renderer/app/index.js">',
+  ]);
+
+  const seen = new Set();
+  const queue = [...linked];
+  while (queue.length > 0) {
+    const file = queue.shift();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    if (!file.endsWith(".js")) continue;
+    const source = await fs.readFile(path.join(root, file), "utf8");
+    for (const [, specifier] of source.matchAll(/^\s*(?:import|export)\b[^;]*?\bfrom\s+"([^"]+)";/gm)) {
+      assert.match(specifier, /^\.{1,2}\/.+\.js$/, `${file} imports ${specifier}`);
+      queue.push(path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier)));
+    }
+    assert.doesNotMatch(source, /\bimport\s*\(/, `${file} uses a dynamic import`);
+  }
+
+  assert.ok(seen.has("src/shared/password-tools.js") && seen.has("styles.css"), [...seen].join(", "));
+  assert.ok(seen.size > 40);
   const patterns = packagedPatterns();
-  for (const file of assets) {
+  for (const file of seen) {
     await fs.access(path.join(root, file));
     assert.ok(patterns.some((pattern) => pattern.test(file)), `${file} is not in files`);
   }

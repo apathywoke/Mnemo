@@ -3,7 +3,7 @@
 const {
   randomBytes,
 } = require("node:crypto");
-const { estimatePasswordStrength } = require("../../shared/password-tools");
+const { estimatePasswordStrength } = require("../../shared/password-tools.js");
 const {
   FORMAT,
   FORMAT_VERSION,

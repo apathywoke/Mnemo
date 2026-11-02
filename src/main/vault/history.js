@@ -2,7 +2,7 @@
 const {
   randomUUID,
 } = require("node:crypto");
-const { ITEM_TYPES } = require("../../renderer/shared/item-types");
+const { ITEM_TYPES } = require("../../shared/item-types.js");
 const {
   SEALED_SCHEMA_VERSION,
   UUID_PATTERN,
