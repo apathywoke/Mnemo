@@ -272,8 +272,11 @@ must not be used with real vaults on a shared machine.
    `build/entitlements.adhoc.plist` so library validation is back, check the
    new app's Team ID in the updater, and the Gatekeeper and Keychain prompts
    go away.
-10. **Update freshness.** Reject manifests older than a set age, or show the
-    date of the newest known release, to make freeze attacks visible.
+10. **Update freshness.** A freeze attack (serving an old, validly signed
+    release as the latest) is not detected. **Planned, deferred** while the
+    prototype has no users: `docs/design-update-freshness.md` (a short-lived
+    signed status from a separate key, checked for age and against the
+    manifest).
 11. **Attachments in memory.** Adding, saving, and verifying an attachment
     holds the whole file (up to 50 MB) in main-process memory; buffers are
     zeroed afterwards, but copies made by Node or the OS are not controlled.
