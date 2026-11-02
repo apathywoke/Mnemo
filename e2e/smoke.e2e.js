@@ -117,3 +117,18 @@ test("the page makes no network requests and has no WebRTC", async (t) => {
     await app.close();
   }
 });
+
+// package.json says "mnemo", but the Keychain item of the Touch ID files is
+// named after the app name, so main.js keeps the internal one.
+test("the app keeps its internal name, which names the Touch ID Keychain item", async (t) => {
+  const userDataDir = await createDataFolder();
+  t.after(() => removeDataFolder(userDataDir));
+
+  const { app } = await launchApp(userDataDir);
+  try {
+    assert.equal(require("../package.json").name, "mnemo");
+    assert.equal(await app.evaluate(({ app: electronApp }) => electronApp.getName()), "local-vault-prototype");
+  } finally {
+    await app.close();
+  }
+});

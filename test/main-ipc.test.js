@@ -30,6 +30,8 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   let saveSelection = { canceled: true, filePath: undefined };
   const app = Object.assign(appEvents, {
     requestSingleInstanceLock: () => true,
+    setName: () => {},
+    setAboutPanelOptions: () => {},
     whenReady: () => Promise.resolve(),
     // Paths behave like Electron's: setPath() changes what getPath() returns.
     paths: { appData: directory },

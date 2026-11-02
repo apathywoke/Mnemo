@@ -25,6 +25,7 @@ for (const name of ["remote-debugging-port", "remote-debugging-pipe"]) {
   test(`packaged app exits when launched with --${name}`, () => {
     const calls = [];
     const app = Object.assign(new EventEmitter(), {
+      setName: () => {},
       getPath: () => "/tmp/app-data",
       setPath: () => {},
       isPackaged: true,
@@ -43,14 +44,17 @@ for (const name of ["remote-debugging-port", "remote-debugging-pipe"]) {
   });
 }
 
-// The data folder must not follow package.json: a new "name" or an added
-// "productName" would otherwise point the app at an empty folder.
+// The internal name (which names the Touch ID Keychain item) and the data
+// folder must not follow package.json: a new "name" or an added "productName"
+// would otherwise lose the Keychain item or point the app at an empty folder.
+// The name is set first, before anything else runs.
 for (const name of ["local-vault-prototype", "mnemo", "Mnemo"]) {
-  test(`the data folder stays the same when the app is named ${name}`, () => {
+  test(`the internal name and data folder stay the same when package.json says ${name}`, () => {
     const calls = [];
     const app = Object.assign(new EventEmitter(), {
       name,
       getName: () => name,
+      setName: (value) => calls.push(["setName", value]),
       commandLine: { hasSwitch: () => false },
       getPath: (key) => (key === "appData" ? "/Users/test/Library/Application Support" : `/default/${name}`),
       setPath: (key, value) => calls.push(["setPath", key, value]),
@@ -59,7 +63,8 @@ for (const name of ["local-vault-prototype", "mnemo", "Mnemo"]) {
       whenReady: () => new Promise(() => {}),
     });
     loadMainWith(app);
-    assert.deepEqual(calls.slice(0, 2), [
+    assert.deepEqual(calls.slice(0, 3), [
+      ["setName", "local-vault-prototype"],
       ["setPath", "userData", path.join("/Users/test/Library/Application Support", "local-vault-prototype")],
       ["lock"],
     ]);
@@ -70,6 +75,7 @@ test("--user-data-dir still chooses the data folder", () => {
   const calls = [];
   const app = Object.assign(new EventEmitter(), {
     commandLine: { hasSwitch: (value) => value === "user-data-dir" },
+    setName: () => {},
     getPath: () => "/tmp/app-data",
     setPath: (key, value) => calls.push(["setPath", key, value]),
     requestSingleInstanceLock: () => calls.push(["lock"]) && false,

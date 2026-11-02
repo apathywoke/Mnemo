@@ -125,7 +125,7 @@ rollback designs (section 7, items 2–4).
 | --- | --- | --- |
 | SSRF to the local network or loopback | Public HTTPS hosts only; DNS resolved and a public IPv4 address pinned; redirects only to the same host or its `www` variant, at most three | IPv6-only sites cannot provide icons. |
 | Image-parser exploit or decompression bomb | Response size limit (512 KB). Images are decoded outside main, in a new `utilityProcess` per image (B7), by plain JavaScript PNG and ICO decoders: no native image codec parses website data, and JPEG and other formats are skipped. Dimensions are checked before decoding; inflated data is capped near the size the header declares; a hang is killed after 5 seconds, and a crash fails only that fetch. Main accepts only RGBA pixels of the expected icon size and encodes the PNG itself; the vault validates it again | The decoder process is not in Chromium's sandbox: an image that took it over would run with the user's rights (the vault files are encrypted, the key is not there). The decoders are memory-safe JavaScript, so this needs a bug in V8 or in Node's zlib. |
-| Tracking | Requires an explicit click with a confirmation dialog; no cookies or referrer; no third-party favicon service | The site learns the user's IP address and that the icon was requested. |
+| Tracking | Requires an explicit click with a confirmation dialog; no cookies or referrer; no third-party favicon service; the User-Agent `Mnemo (site icon)` carries no version | The site learns the user's IP address, that the icon was requested, and that the request came from Mnemo. |
 
 ### A3, compromised renderer
 

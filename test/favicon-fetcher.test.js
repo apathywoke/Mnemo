@@ -18,7 +18,7 @@ Module._load = function loadWithElectronStub(request, parent, isMain) {
   if (request === "electron") return { utilityProcess };
   return originalModuleLoad.call(this, request, parent, isMain);
 };
-const { fetchSiteFavicon, getFaviconHost } = require("../src/main/favicon-fetcher");
+const { FAVICON_USER_AGENT, fetchSiteFavicon, getFaviconHost } = require("../src/main/favicon-fetcher");
 Module._load = originalModuleLoad;
 
 function makeResponse(statusCode, contentType, body = Buffer.alloc(0), location = null) {
@@ -155,6 +155,27 @@ test("small direct favicons trigger homepage discovery and the sharpest actual c
   ]);
   assert.equal(requested.some(({ path: requestPath }) => requestPath === "/high.png"), true);
   assert.equal(requested.length <= 7, true);
+});
+
+test("site icon requests name Mnemo but not its version, and send no cookies or referrer", async (t) => {
+  installNetworkStubs(t, {
+    route: ({ path: requestPath }) => (requestPath === "/favicon.ico" ? pngResponse(64, 64) : makeResponse(404, "text/html")),
+  });
+  const stubbedGet = https.get;
+  const sentHeaders = [];
+  https.get = (options, callback) => {
+    sentHeaders.push(options.headers);
+    return stubbedGet(options, callback);
+  };
+
+  await fetchSiteFavicon("https://example.com");
+  assert.ok(sentHeaders.length > 0);
+  for (const headers of sentHeaders) {
+    assert.equal(headers["user-agent"], FAVICON_USER_AGENT);
+    assert.deepEqual(Object.keys(headers).map((name) => name.toLowerCase()).sort(), ["accept", "user-agent"]);
+  }
+  assert.equal(FAVICON_USER_AGENT, "Mnemo (site icon)");
+  assert.doesNotMatch(FAVICON_USER_AGENT, /\d/);
 });
 
 test("small icons are not enlarged, ICO DIB images are converted, and aspect ratio is preserved", async (t) => {

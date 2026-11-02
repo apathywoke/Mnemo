@@ -58,6 +58,8 @@ async function loadMain(t) {
 
   const app = Object.assign(new EventEmitter(), {
     requestSingleInstanceLock: () => true,
+    setName: () => {},
+    setAboutPanelOptions: () => {},
     whenReady: () => Promise.resolve(),
     // Paths behave like Electron's: setPath() changes what getPath() returns.
     paths: { appData: directory },
