@@ -93,7 +93,7 @@ function register(ctx) {
     const version = state.vaultStore.getHistory(id).find((item) => item.id === versionId);
     const when = new Intl.DateTimeFormat(state.language, { dateStyle: "medium", timeStyle: "short" })
       .format(new Date(version.updatedAt));
-    await showSecretDialog({
+    const { copied } = await showSecretDialog({
       entryName: entry.name,
       fieldLabel: tr("history.secretLabel", {
         field: entry.type === "login" ? tr("editor.password") : tr(`item.field.${entry.type}.${field}`),
@@ -101,7 +101,7 @@ function register(ctx) {
       }),
       value,
     });
-    return { shown: true };
+    return { shown: true, copied };
   });
 
   // Attachments: files are picked and saved through native dialogs here, so

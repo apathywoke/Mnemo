@@ -20,7 +20,8 @@ function init(ctx, { getEntry, renderEntryList, renderEntryDetail, updateSiteIco
     const entry = getEntry(state.selectedEntryId);
     if (!entry) return;
     try {
-      await ctx.api.revealPassword(entry.id);
+      const { copied } = await ctx.api.revealPassword(entry.id);
+      if (copied) showToast(t("toast.copied"));
     } catch (cause) {
       showToast(errorText(cause, "errors.showPassword"), { type: "error" });
     }

@@ -388,8 +388,13 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   await assert.rejects(invoke("vault:copy-entry-field", card.id, "last4"), /\[mnemo:errors\.copyValue\]/);
   await assert.rejects(invoke("vault:copy-entry-field", card.id, "pin"), /\[mnemo:errors\.copyValue\]/);
   messageBoxes.length = 0;
-  assert.deepEqual(await invoke("vault:reveal-field", card.id, "cvv"), { shown: true });
+  assert.deepEqual(await invoke("vault:reveal-field", card.id, "cvv"), { shown: true, copied: false });
   assert.equal(messageBoxes.at(-1).detail, "123");
+  // "Copy" in the window puts the value on the clipboard.
+  messageResponse = 1;
+  assert.deepEqual(await invoke("vault:reveal-field", card.id, "cvv"), { shown: true, copied: true });
+  messageResponse = 0;
+  assert.equal(clipboardText, "123");
   await invoke("vault:reveal-field", card.id, "number");
   assert.equal(messageBoxes.at(-1).detail, "4242 4242 4242 4242");
   assert.match(messageBoxes.at(-1).message, /^Visa · Card number\n/);
@@ -445,14 +450,19 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.deepEqual((await invoke("vault:get-entry", saved.id)).attachments, []);
 
   messageBoxes.length = 0;
-  assert.deepEqual(await invoke("vault:reveal-password", saved.id), { shown: true });
+  assert.deepEqual(await invoke("vault:reveal-password", saved.id), { shown: true, copied: false });
   assert.equal(messageBoxes.length, 1);
+  assert.deepEqual(messageBoxes[0].buttons, ["Done", "Copy"]);
+  assert.equal(messageBoxes[0].defaultId, 0);
   // The value is the whole detail text, so selecting it copies it exactly.
   assert.equal(messageBoxes[0].detail, "test-password-value");
   assert.match(messageBoxes[0].message, /^Example account · Password\n.*30 seconds/);
 
-  // A revealed password must not outlive the unlocked session.
+  // A revealed password must not outlive the unlocked session, and "Copy"
+  // clicked as the vault locks copies nothing.
   holdDialogs = true;
+  messageResponse = 1;
+  clipboardText = "";
   const pendingReveal = invoke("vault:reveal-password", saved.id);
   await new Promise((resolve) => setImmediate(resolve));
   const heldDialog = messageBoxes.at(-1);
@@ -460,8 +470,10 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   powerMonitor.emit("lock-screen");
   assert.equal(heldDialog.signal.aborted, true);
   assert.deepEqual(vaultEvents(), [["vault:auto-locked"]]);
-  await pendingReveal;
+  assert.deepEqual(await pendingReveal, { shown: true, copied: false });
+  assert.equal(clipboardText, "");
   holdDialogs = false;
+  messageResponse = 0;
   await invoke("vault:unlock", "correct horse battery staple");
   assert.equal((await invoke("vault:lock")).unlocked, false);
   await new Promise((resolve) => setImmediate(resolve));

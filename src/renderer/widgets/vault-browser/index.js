@@ -145,7 +145,8 @@ function create(ctx) {
 
   async function revealItemField(id, field) {
     try {
-      await ctx.api.revealField(id, field);
+      const { copied } = await ctx.api.revealField(id, field);
+      if (copied) showToast(t("toast.copied"));
     } catch (cause) {
       showToast(errorText(cause, "errors.showPassword"), { type: "error" });
     }

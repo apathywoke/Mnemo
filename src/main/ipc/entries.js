@@ -118,23 +118,23 @@ function register(ctx) {
     const raw = state.vaultStore.revealItemSecret(entry.id, field);
     // Card numbers are easier to read and compare in groups of four.
     const value = entry.type === "card" && field === "number" ? cardTools.formatNumber(raw) : raw;
-    await showSecretDialog({
+    const { copied } = await showSecretDialog({
       entryName: entry.name,
       fieldLabel: tr(`item.field.${entry.type}.${field}`),
       value,
     });
-    return { shown: true };
+    return { shown: true, copied };
   });
 
   registerHandler("vault:reveal-password", async (entryId) => {
     const entry = state.vaultStore.getEntry(entryId);
     const password = state.vaultStore.revealPassword(entry.id);
-    await showSecretDialog({
+    const { copied } = await showSecretDialog({
       entryName: entry.name,
       fieldLabel: tr("editor.password"),
       value: password,
     });
-    return { shown: true };
+    return { shown: true, copied };
   });
 }
 

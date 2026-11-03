@@ -54,7 +54,10 @@ passwords until the design has received independent security review.
   opening an entry says only whether it has any, and the text is sent only
   when the user chooses **Show** (or **Edit**, or opens an earlier version). Passwords never cross
   IPC: the main process decrypts one password when the user copies it, or
-  shows it in a native dialog owned by the main process. Editing a login
+  shows it in a native dialog owned by the main process. That window closes
+  after 30 seconds or when the vault locks; its **Copy** button copies the
+  value from the main process, like the copy buttons, and the page learns
+  only that it was copied. Editing a login
   leaves the password field empty, and an empty field keeps the stored value.
 - Inside the encrypted vault data (schema 2), each password is sealed again
   with AES-256-GCM under the vault key, with the entry ID as associated data,
