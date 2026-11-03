@@ -34,6 +34,7 @@ const { createDialogs } = require("./src/main/dialogs");
 const { createClipboard } = require("./src/main/clipboard");
 const { createLock } = require("./src/main/lock");
 const { createRecoveryKeys } = require("./src/main/recovery-keys");
+const { createAppMenu } = require("./src/main/app-menu");
 const { createNotesReveal } = require("./src/main/notes-reveal");
 const { createWindowManager } = require("./src/main/window");
 const { registerAppScheme } = require("./src/main/app-protocol");
@@ -80,11 +81,12 @@ Object.assign(ctx, createDialogs(ctx));
 Object.assign(ctx, createClipboard(ctx));
 Object.assign(ctx, createLock(ctx));
 Object.assign(ctx, createRecoveryKeys(ctx));
+Object.assign(ctx, createAppMenu(ctx));
 Object.assign(ctx, createNotesReveal(ctx));
 Object.assign(ctx, createWindowManager(ctx));
 Object.assign(ctx, createRegisterHandler(ctx));
 Object.assign(ctx, createUpdates(ctx));
-const { lockVault, createWindow, registerAppProtocol, scheduleUpdateCheck } = ctx;
+const { lockVault, createWindow, registerAppProtocol, scheduleUpdateCheck, buildAppMenu } = ctx;
 
 if (launchedWithRemoteDebugging) {
   app.exit(1);
@@ -163,6 +165,8 @@ if (launchedWithRemoteDebugging) {
     });
     void state.updater.cleanUpLeftovers();
     void state.settingsLoaded.then(() => scheduleUpdateCheck());
+    // In the saved language; settings:set-language builds it again.
+    void state.settingsLoaded.then(() => buildAppMenu());
     // Timers stand still while the Mac sleeps; re-plan from the clock.
     powerMonitor.on("resume", () => scheduleUpdateCheck());
 

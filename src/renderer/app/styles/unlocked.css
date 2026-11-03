@@ -6,10 +6,18 @@
   padding: 0;
 }
 
-/* The vault has its own header row; the access screens' header and footer
+/* The vault fills the window, and its header row is the title bar (the
+   window buttons sit at its left). The access screens' header and footer
    would only take height from the list. */
+.is-unlocked .app-shell {
+  padding: 0;
+  gap: 0;
+}
+
 .is-unlocked .workspace {
-  padding: 12px 16px 10px;
+  padding: 6px 14px 10px;
+  border: 0;
+  border-radius: 0;
 }
 
 .is-unlocked .workspace-header,

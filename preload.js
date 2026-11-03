@@ -110,6 +110,12 @@ contextBridge.exposeInMainWorld("vaultApp", {
     ipcRenderer.invoke("vault:restore-backup", credentials),
   lockVault: () => ipcRenderer.invoke("vault:lock"),
   reportActivity: () => ipcRenderer.send("vault:activity"),
+  // Menu bar commands (src/main/app-menu.js); only these names reach the page.
+  onMenuCommand: (callback) => {
+    ipcRenderer.on("menu:command", (_event, command) => {
+      if (["settings", "new-item", "find"].includes(command)) callback(command);
+    });
+  },
   onAutoLocked: (callback) => {
     ipcRenderer.on("vault:auto-locked", () => callback());
   },

@@ -1,15 +1,16 @@
-import { secondaryLabel, filter, inScope as isInScope, setItemIcon } from "../model/login.js";
+import { secondaryLabel, filter, setItemIcon } from "../model/login.js";
 import { setSiteIcon } from "./site-icon.js";
 import * as i18n from "../../../shared/lib/i18n.js";
 
-// `scope` narrows the list (all, favorites, a folder, or the trash);
-// `scopeEmptyText` is shown when the scope itself has nothing to list.
+// `scope` (all, favorites, a folder, or the trash) and `typeFilter` narrow
+// the list; `scopeEmptyText` is shown when they leave nothing to list,
+// before any search.
 function renderLoginList({
   entries, selectedId, query, typeFilter = "all", scope = { kind: "all" },
   container, count, empty, noResults, scopeEmptyText = "", onSelect,
 }) {
   const filteredEntries = filter(entries, query, typeFilter, scope);
-  const inScope = entries.filter((entry) => isInScope(entry, scope));
+  const inScope = filter(entries, "", typeFilter, scope);
   const vaultEmpty = !entries.some((entry) => !entry.deletedAt) && scope.kind !== "trash";
   container.replaceChildren();
   count.textContent = String(inScope.length);

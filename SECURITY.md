@@ -137,6 +137,11 @@ passwords until the design has received independent security review.
   are off; `OnlyLoadAppFromAsar` and embedded asar integrity validation are on;
   `GrantFileProtocolExtraPrivileges` is off.
   Packaged builds refuse to start with Chromium remote-debugging switches.
+  The app replaces Electron's default menu bar, which could reload the page
+  (leaving main unlocked behind a fresh page) or open the developer tools:
+  its own menu (`src/main/app-menu.js`) has neither in packaged builds. Lock
+  (⌘L) runs in the main process; other menu commands reach the page as one
+  of three fixed names.
   `npm run dist:mac` signs with a Developer ID certificate and the hardened
   runtime and notarizes. Releases published on GitHub are currently
   **ad-hoc signed with the hardened runtime** (no Developer ID, no

@@ -12,12 +12,21 @@
   animation: dashboard-enter 480ms 90ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* The title bar: it drags the window, except over its buttons. The left
+   padding keeps the vault name clear of the window buttons. */
 .dashboard-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 44px;
-  padding: 0 4px 8px 10px;
+  min-height: 40px;
+  padding: 0 4px 6px 74px;
   border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.dashboard-header button {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }

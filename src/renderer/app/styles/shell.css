@@ -20,7 +20,11 @@
   border-radius: 19px;
 }
 
+/* Decorative, so it can drag the window; the window buttons sit over its
+   top left corner. */
 .brand-panel {
+  -webkit-app-region: drag;
+  app-region: drag;
   position: relative;
   display: flex;
   flex-direction: column;

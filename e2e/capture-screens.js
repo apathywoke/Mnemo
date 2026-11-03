@@ -124,10 +124,12 @@ async function captureTheme(theme, folder) {
     await page.click("#close-history-dialog");
     await page.locator("#history-dialog[open]").waitFor({ state: "detached" });
 
-    await page.click("#scope-button");
-    await page.locator("#scope-menu:not([hidden])").waitFor();
-    await shot("10-scope-menu");
-    await page.locator("#scope-menu [role='menuitem']").last().click();
+    await page.click("#vault-sidebar .sidebar-item:has([data-type='card'])");
+    await page.locator("#vault-sidebar [aria-current='true']:has([data-type='card'])").waitFor();
+    await shot("10-sidebar-cards");
+    // Back to all items.
+    await page.click("#vault-sidebar .sidebar-item >> nth=0");
+    await page.click("#vault-sidebar .sidebar-item-folders");
     await page.locator("#folders-dialog[open]").waitFor();
     await shot("11-folders");
     await page.click("#close-folders-dialog");

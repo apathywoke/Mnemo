@@ -30,10 +30,16 @@ function createWindowManager(ctx) {
     state.mainWindow = new BrowserWindow({
       width: 1040,
       height: 720,
-      minWidth: 760,
+      // Room for the sidebar, the list, and the detail.
+      minWidth: 880,
       minHeight: 560,
       show: false,
       title: "Mnemo",
+      // The window buttons sit over the page: the vault header (or the brand
+      // panel) is the title bar and drags the window (styles: app-region).
+      ...(process.platform === "darwin"
+        ? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 18, y: 18 } }
+        : {}),
       webPreferences: {
         preload: path.join(APP_ROOT, "preload.js"),
         nodeIntegration: false,

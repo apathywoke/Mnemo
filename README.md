@@ -93,7 +93,8 @@ separate Electron processes.
 
 The main process lives in `src/main/`. `main.js` is its entry point: it pins
 the data folder, creates the shared `state` object and a `ctx` with the
-helpers from `src/main/` (dialogs, clipboard, lock, window, updates), and
+helpers from `src/main/` (dialogs, clipboard, lock, window, menu bar,
+updates), and
 registers the IPC handlers from `src/main/ipc/`, one file per feature. The
 other main-process modules (updater, importers, Touch ID, profiles, settings,
 backup files, favicons, TOTP, SSH keys, password reports) sit next to them in

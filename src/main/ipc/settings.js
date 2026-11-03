@@ -27,6 +27,7 @@ function register(ctx) {
     await state.settingsLoaded;
     const settings = await state.settingsStore.setLanguage(code);
     state.language = settings.language;
+    ctx.buildAppMenu();
     return settings;
   });
 }

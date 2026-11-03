@@ -12,14 +12,13 @@ const ICONS = Object.freeze({
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5"/></svg>',
 });
 
-// Folders, favorites, and the trash. Owns the scope menu above the list
-// (all items, favorites, a folder, the trash), the folders dialog, the
+// Folders, favorites, and the trash. Owns the sidebar (all items,
+// favorites, an item type, a folder, the trash), the folders dialog, the
 // favorite and folder controls in a detail, and the banner on items in the
 // trash. Main keeps the data; this only shows it and sends changes.
 function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetail, applySummary }) {
   const state = ctx.state.vault;
-  const scopeButton = $("#scope-button");
-  const scopeMenu = $("#scope-menu");
+  const sidebar = $("#vault-sidebar");
   const foldersDialog = $("#folders-dialog");
   const folderList = $("#folder-list");
   const folderInput = $("#folder-name-input");
@@ -39,7 +38,7 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
   const formatDate = (timestamp) => new Intl.DateTimeFormat(language, { dateStyle: "medium" })
     .format(new Date(timestamp));
 
-  // The list title for the scope, or null to use the type filter's title.
+  // The list title for the scope, or null to use the type's title.
   function scopeTitle() {
     if (state.scope.kind === "favorites") return t("organize.favorites");
     if (state.scope.kind === "trash") return t("trash.title");
@@ -48,6 +47,7 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
   }
 
   function scopeEmptyText() {
+    if (state.scope.kind === "all" && state.typeFilter !== "all") return t("sidebar.typeEmpty");
     if (state.scope.kind === "favorites") return t("organize.favoritesEmpty");
     if (state.scope.kind === "trash") return t("trash.emptyList");
     if (state.scope.kind === "folder") return t("organize.folderEmpty");
@@ -69,129 +69,126 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
     emptyTrashButton.disabled = countIn({ kind: "trash" }) === 0;
   }
 
-  function setScope(scope) {
+  // A sidebar choice sets both the scope and the type: a type shows that
+  // type among all items, anything else shows every type.
+  function setScope(scope, typeFilter = "all") {
     state.scope = scope;
-    setMenuOpen(false);
+    state.typeFilter = typeFilter;
     updateDock();
     renderEntryList();
     const selected = getEntry(state.selectedEntryId);
-    if (selected && !inScope(selected, scope)) renderEntryDetail(null);
+    const hiddenByType = typeFilter !== "all" && (selected?.type ?? "login") !== typeFilter;
+    if (selected && (!inScope(selected, scope) || hiddenByType)) renderEntryDetail(null);
   }
 
   // When an item that is not in the current scope is selected on purpose
   // (just saved, restored, or opened from a report), show all items.
   function revealEntry(entry) {
-    if (entry && !inScope(entry, state.scope)) {
+    const typeHidden = state.typeFilter !== "all" && (entry?.type ?? "login") !== state.typeFilter;
+    if (entry && (!inScope(entry, state.scope) || typeHidden)) {
       state.scope = entry.deletedAt ? { kind: "trash" } : { kind: "all" };
+      state.typeFilter = "all";
       updateDock();
     }
   }
 
-  // --- Scope menu ---------------------------------------------------------
+  // --- Sidebar ------------------------------------------------------------
 
-  function menuOption({ label, count = null, icon, selected = false, onSelect, role = "menuitemradio" }) {
-    const option = document.createElement("button");
-    option.type = "button";
-    option.className = "new-item-option scope-option";
-    option.setAttribute("role", role);
-    if (role === "menuitemradio") option.setAttribute("aria-checked", String(selected));
+  const TYPES = Object.freeze(["login", "card", "note", "identity", "ssh"]);
+  const typeLabel = (type) => t(`vault.filter${type[0].toUpperCase()}${type.slice(1)}`);
+
+  // `icon`: markup from ICONS, or an item type for its glyph.
+  function sidebarItem({ label, count = null, icon = null, type = null, selected = false, onSelect }) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "sidebar-item";
+    if (selected) item.setAttribute("aria-current", "true");
     const glyph = document.createElement("span");
-    glyph.className = "scope-option-icon";
-    glyph.innerHTML = icon;
+    if (type) {
+      glyph.className = "sidebar-item-icon item-type-glyph";
+      glyph.dataset.type = type;
+    } else {
+      glyph.className = "sidebar-item-icon";
+      glyph.innerHTML = icon;
+    }
+    glyph.setAttribute("aria-hidden", "true");
     const text = document.createElement("span");
-    text.className = "scope-option-label";
+    text.className = "sidebar-item-label";
     text.textContent = label;
-    option.append(glyph, text);
+    item.append(glyph, text);
     if (count !== null) {
       const number = document.createElement("span");
-      number.className = "scope-option-count";
+      number.className = "sidebar-item-count";
       number.textContent = String(count);
-      option.append(number);
+      item.append(number);
     }
-    option.addEventListener("click", onSelect);
-    return option;
+    item.addEventListener("click", onSelect);
+    return item;
   }
 
-  function renderScopeMenu() {
-    const scope = state.scope;
+  function sidebarHeading(text) {
+    const heading = document.createElement("p");
+    heading.className = "sidebar-heading";
+    heading.textContent = text;
+    return heading;
+  }
+
+  function renderSidebar() {
+    const { scope, typeFilter } = state;
+    const allTypes = typeFilter === "all";
+    const live = state.entries.filter((entry) => !entry.deletedAt);
     /** @type {HTMLElement[]} */
     const items = [
-      menuOption({
+      sidebarItem({
         label: t("vault.allItems"),
-        count: countIn({ kind: "all" }),
+        count: live.length,
         icon: ICONS.all,
-        selected: scope.kind === "all",
+        selected: scope.kind === "all" && allTypes,
         onSelect: () => setScope({ kind: "all" }),
       }),
-      menuOption({
+      sidebarItem({
         label: t("organize.favorites"),
         count: countIn({ kind: "favorites" }),
         icon: ICONS.star,
         selected: scope.kind === "favorites",
         onSelect: () => setScope({ kind: "favorites" }),
       }),
+      sidebarHeading(t("sidebar.types")),
+      ...TYPES.map((type) => sidebarItem({
+        label: typeLabel(type),
+        count: live.filter((entry) => (entry.type ?? "login") === type).length,
+        type,
+        selected: scope.kind === "all" && typeFilter === type,
+        onSelect: () => setScope({ kind: "all" }, type),
+      })),
+      sidebarHeading(t("organize.folders")),
+      ...state.folders.map((folder) => {
+        const folderScope = { kind: "folder", folderId: folder.id };
+        return sidebarItem({
+          label: folder.name,
+          count: countIn(folderScope),
+          icon: ICONS.folder,
+          selected: scope.kind === "folder" && scope.folderId === folder.id,
+          onSelect: () => setScope(folderScope),
+        });
+      }),
+      sidebarItem({
+        label: t(state.folders.length ? "folders.manage" : "folders.newFolder"),
+        icon: ICONS.manage,
+        onSelect: openFoldersDialog,
+      }),
+      sidebarItem({
+        label: t("trash.title"),
+        count: countIn({ kind: "trash" }),
+        icon: ICONS.trash,
+        selected: scope.kind === "trash",
+        onSelect: () => setScope({ kind: "trash" }),
+      }),
     ];
-    const heading = document.createElement("p");
-    heading.className = "scope-menu-label";
-    heading.setAttribute("role", "presentation");
-    heading.textContent = t("organize.folders");
-    items.push(heading);
-    for (const folder of state.folders) {
-      const folderScope = { kind: "folder", folderId: folder.id };
-      items.push(menuOption({
-        label: folder.name,
-        count: countIn(folderScope),
-        icon: ICONS.folder,
-        selected: scope.kind === "folder" && scope.folderId === folder.id,
-        onSelect: () => setScope(folderScope),
-      }));
-    }
-    items.push(menuOption({
-      label: t(state.folders.length ? "folders.manage" : "folders.newFolder"),
-      icon: ICONS.manage,
-      role: "menuitem",
-      onSelect: openFoldersDialog,
-    }));
-    const separator = document.createElement("hr");
-    separator.className = "scope-menu-separator";
-    items.push(separator);
-    items.push(menuOption({
-      label: t("trash.title"),
-      count: countIn({ kind: "trash" }),
-      icon: ICONS.trash,
-      selected: scope.kind === "trash",
-      onSelect: () => setScope({ kind: "trash" }),
-    }));
-    scopeMenu.replaceChildren(...items);
+    items.at(-1).classList.add("sidebar-item-trash");
+    items.at(-2).classList.add("sidebar-item-folders");
+    sidebar.replaceChildren(...items);
   }
-
-  function setMenuOpen(open) {
-    if (open) renderScopeMenu();
-    scopeMenu.hidden = !open;
-    scopeButton.setAttribute("aria-expanded", String(open));
-    if (open) {
-      (scopeMenu.querySelector("[aria-checked='true']") ?? scopeMenu.querySelector("[role^='menuitem']"))?.focus();
-    }
-  }
-
-  scopeButton.addEventListener("click", () => setMenuOpen(scopeMenu.hidden));
-  scopeMenu.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      setMenuOpen(false);
-      scopeButton.focus();
-      return;
-    }
-    const options = [...scopeMenu.querySelectorAll("[role^='menuitem']")];
-    const index = options.indexOf(document.activeElement);
-    const next = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: options.length - 1 }[event.key];
-    if (next === undefined) return;
-    event.preventDefault();
-    options[(next + options.length) % options.length].focus();
-  });
-  document.addEventListener("pointerdown", (event) => {
-    if (!scopeMenu.hidden && !/** @type {Element} */ (event.target).closest(".scope-picker")) setMenuOpen(false);
-  });
 
   // --- Folders dialog -----------------------------------------------------
 
@@ -312,7 +309,6 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
   }
 
   function openFoldersDialog() {
-    setMenuOpen(false);
     disarmDelete();
     foldersError.hidden = true;
     folderInput.value = "";
@@ -459,17 +455,17 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
   });
 
   function clear() {
-    setMenuOpen(false);
     disarmDelete();
     if (foldersDialog.open) foldersDialog.close();
     state.scope = { kind: "all" };
+    state.typeFilter = "all";
     state.folders = [];
     folderSelect.replaceChildren();
+    sidebar.replaceChildren();
     updateDock();
   }
 
   onChange(() => {
-    if (!scopeMenu.hidden) renderScopeMenu();
     if (foldersDialog.open) renderFolderList();
   });
 
@@ -477,6 +473,7 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
     attachDetail,
     checkScope,
     clear,
+    renderSidebar,
     revealEntry,
     scopeEmptyText,
     scopeTitle,
