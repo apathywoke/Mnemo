@@ -13,7 +13,9 @@ helper", A1, A4, A8; section 7, item 7), with the Keychain-based Touch ID
 removed after unlock was confirmed on real hardware, and for confirming
 new recovery keys (data table). Updated 2026-11-04 for flushing writes and
 telling damage from a wrong passphrase (B2, A1), and for the export without
-encryption (data table, A3).
+encryption (data table, A3), and the same day for local snapshots (data
+table, A1, A4; section 7, items 12–13), copies outside this Mac (data
+table, A1; section 7, item 13), and restoring from snapshots (A1).
 
 ## 1. What Mnemo protects
 
@@ -30,6 +32,8 @@ encryption (data table, A3).
 | Export without encryption (optional) | A plain JSON or CSV file wherever the user saves it, `0600`, written by main | Every secret in the clear, outside Mnemo's protection. Made only on request, after the master passphrase and a native warning. |
 | Attachments | `<vault>.attachments/<id>.bin`, each encrypted under its own key sealed inside the vault data; main-process memory while being added, saved, or verified; a plain copy wherever the user saves one | A file alone reveals only its size. |
 | Earlier versions (history) | Inside the encrypted vault data, sealed values kept sealed | Old passwords remain until 20 newer versions push them out or the item is deleted for good. |
+| Local snapshots | `<vault>.snapshots/`: byte-for-byte copies of the vault file with a plain description each (time, SHA-256, size, attachment IDs, verified, pinned), and a shared pool of attachment files | Each copy opens with the passphrase and recovery key valid when it was taken. Descriptions reveal when the vault changed and how many attachments it had. Deleted items stay in them until rotation removes them (30 days, 90 when pinned). |
+| Copies outside this Mac | `<chosen folder>/Mnemo/<profile ID>/`: the same files as the local snapshots (iCloud Drive, a cloud storage folder, or an external disk) | Whoever stores the folder (Apple, a cloud provider, whoever holds the disk) sees file sizes, the times of changes, and the number of attachments, never contents or the vault's name. Each copy opens with the passphrase and recovery key valid when it was taken. |
 | Encrypted backups (`.vault`) | Wherever the user saves them | Same envelope and passphrase as the local vault; with attachments, a container that also holds the encrypted attachment files. |
 | Profile registry (`profiles.json`) | Application support folder, `0600` | Profile names in plain text, not secret by design. |
 | Integrity of the shipped app | `Mnemo.app` in `/Applications`; ad-hoc signed when installed from GitHub releases | A modified app can steal everything the user types. |
@@ -216,15 +220,16 @@ passphrase replaces the vault key and makes them useless (A1).
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
 | Brute-force the recovery key | 256 random bits; the 24-bit checksum only detects typos and reveals nothing about the key | None known. |
-| Use a vault key learned once (an old recovery key with an old copy of the file, or an old Keychain-based Touch ID file with Keychain access) to read later versions | Every change of credentials replaces the vault key: all sealed values and attachments are encrypted again under new keys, and the Touch ID file is removed | Old backups and copies keep their old key and open with the credentials they had; rotation cannot reach them. Changing credentials is not automatic: the user has to do it after a suspected leak. |
+| Use a vault key learned once (an old recovery key with an old copy of the file, or an old Keychain-based Touch ID file with Keychain access) to read later versions | Every change of credentials replaces the vault key: all sealed values and attachments are encrypted again under new keys, and the Touch ID file is removed | Old backups and copies keep their old key and open with the credentials they had; rotation cannot reach them. Local snapshots taken before the change do too; a native dialog offers to delete them after the change, and keeping them is the default. Changing credentials is not automatic: the user has to do it after a suspected leak. |
 | Strip or replace the recovery wrap to plant a key the attacker knows | The recovery salt is in the AES-GCM associated data of the key wraps and the vault data; a missing or different recovery wrap cannot unwrap the real vault key, and the strict format check rejects the file | An attacker with write access can delete the recovery wrap together with the file (denial of service only). |
 | Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM; a passphrase being set must be at least 12 characters and rated Strong by the built-in estimate, checked in main | The estimate (a port of zxcvbn with English, German, and Russian dictionaries) models known attack strategies; a phrase that is predictable in ways it does not know, such as a quotation outside its dictionaries, can still pass. Vaults from before this rule may still have a 7-character passphrase until it is changed. |
 | Tamper with a vault or backup to plant data or downgrade parameters | AES-GCM with the header (format, version, KDF parameters, salt) as AAD; strict schema and size validation before and after decryption; fixed KDF parameters | None known. |
 | Swap sealed passwords between entries | Each password is sealed with the entry ID in its AAD; a swapped value fails authentication | None known. |
+| Read or alter copies in the folder outside this Mac (a cloud account, a stolen disk) | The copies are the encrypted vault files and attachment files as they are; descriptions hold times, hashes, sizes, and attachment IDs only; the subfolder is named by the profile ID. A copy that does not read back equal to the local one is a failure | Brute-forcing the passphrase of a copy is the same attack as on the vault file (scrypt). Whoever controls the folder can delete copies or put old ones back; a restore checks a copy with the passphrase that was valid then and decrypts every attachment, but an old genuine copy is accepted, and rollback is not detected (section 7, item 4). |
 | Read, alter, or swap attachment files | Each file is AES-256-GCM under its own key with the attachment ID as AAD; the key is sealed with the item and attachment IDs inside the vault data. A changed or swapped file fails to decrypt and is reported by name; backups are verified before they are written and before a restore replaces anything | File sizes and counts are visible. Deleting files is possible (denial of service); the vault then reports them as missing. |
 | Corrupt a backup to damage the vault it is restored into | The container must end exactly after its last file; every referenced attachment is decrypted before anything is written; the vault file is replaced last, in one rename | None known. |
 | Read the vault key from a copied Touch ID key file | The key is wrapped under a Secure Enclave key agreement; the blob opens only in this Mac's Secure Enclave, after Touch ID | Copies of version 1 files from earlier versions (in backups of the home folder) decrypt with the login Keychain and the login password, until a change of credentials replaces the vault key. |
-| Damage to the only copy of a vault (bad disk, power cut, sync tool) | AES-GCM detects any change. A file that does not parse, or whose key opens and whose data does not, is reported as damaged rather than as a wrong passphrase | A damaged key wrap looks like a wrong passphrase: AES-GCM cannot tell them apart. Mnemo cannot repair a file; the data is safe only if a backup exists. |
+| Damage to the only copy of a vault (bad disk, power cut, sync tool, a mistaken import or restore) | AES-GCM detects any change. A file that does not parse, or whose key opens and whose data does not, is reported as damaged rather than as a wrong passphrase. Local snapshots: verified copies (read back, same key wraps, decrypted, attachments present and decrypted), the 10 newest plus one a day for 30 days, pinned for 90 days before format upgrades, key changes, imports, and restores; old ones go only after a new one is verified | A damaged key wrap looks like a wrong passphrase: AES-GCM cannot tell them apart. Local snapshots sit on the same disk; copies outside this Mac (a folder the user chooses, read back after every write, with a reminder after 14 days without one) cover losing the disk or the Mac, but only once set up, and Mnemo cannot tell whether iCloud has uploaded them. A restore from a snapshot needs the passphrase or recovery key that was valid then. |
 | Recover deleted vaults | Not addressed: deletion unlinks the file | APFS snapshots, Time Machine, and SSD remapping may keep old encrypted copies. These remain protected by their passphrase. |
 
 ### A2, malicious website (favicon fetch)
@@ -265,7 +270,7 @@ passphrase replaces the vault key and makes them useless (A1).
 | Modify `app.asar` or plant `Resources/app/` to backdoor the app | `EnableEmbeddedAsarIntegrityValidation` and `OnlyLoadAppFromAsar` fuses on; the asar hash is inside the signed `Info.plist`; Developer ID builds add library validation | An attacker who can rewrite the whole bundle and re-sign it ad hoc produces an app that Gatekeeper does not trust; a quarantined download fails assessment, but a local unquarantined copy may still launch. Install in `/Applications` and keep it owned by an admin. |
 | Load a foreign library: `DYLD_INSERT_LIBRARIES` or another `DYLD_*` variable | Hardened runtime on the app and every helper, without `allow-dyld-environment-variables`; checked with an injected test library (`docs/RELEASING.md`) | None known for injection through the environment. |
 | Load a foreign library by replacing one inside the bundle (for example `Electron Framework`) | Developer ID builds: library validation refuses code from another Team ID | GitHub builds have `disable-library-validation` (an ad-hoc signature has no Team ID to compare), so a replaced, re-signed framework loads. This needs write access to the bundle, which already allows the re-signing attack in the row above. |
-| Replace the vault file or `profiles.json` | AES-GCM authentication; schema validation; registry validation | The attacker can delete or roll back vaults (old encrypted copy). Rollback is not detected. |
+| Replace the vault file or `profiles.json` | AES-GCM authentication; schema validation; registry validation | The attacker can delete or roll back vaults (old encrypted copy). Rollback is not detected. The same holds for snapshots: they can be deleted, and a planted copy that fails verification never counts, but an old genuine copy cannot be told from a new one by its description. |
 | Read the Touch ID key file and run the helper (or its own CryptoKit code) with its blob | The Secure Enclave performs the agreement only after a touch of a currently enrolled finger; the file is `0600` and bound to its profile ID ("Touch ID helper") | The key is not bound to Mnemo (no keychain access group without a Developer ID): a user who touches the sensor for such a prompt, whose name and reason the attacker chooses, gives away the vault key. |
 | Read clipboard leftovers | Copied values are cleared after 30 s, and on lock, if unchanged | Clipboard managers and Universal Clipboard may keep copies. |
 
@@ -393,9 +398,29 @@ must not be used with real vaults on a shared machine.
     zeroed afterwards, but copies made by Node or the OS are not controlled.
     Saved copies are plain files outside Mnemo.
 12. **History and deletion.** An old password stays in the vault (and in
-    backups made meanwhile) until 20 newer versions replace it or the item is
-    deleted for good. A per-item "clear history" action would let users drop
-    it sooner.
+    backups and snapshots made meanwhile) until 20 newer versions replace it
+    or the item is deleted for good. A per-item "clear history" action would
+    let users drop it sooner. Items deleted for good stay in local snapshots
+    until those are rotated out: up to 30 days, 90 in a pinned one.
+13. **Local snapshots and copies outside this Mac.** **Partly done** (data
+    safety plan, steps 3 and 4a).
+    - Snapshots are kept and verified on this Mac, copied to a folder the
+      user chooses outside it, and restored from the app (steps 3, 4a, 4b).
+      A restore is a deliberate rollback: when revision tracking lands
+      (`docs/design-rollback.md`, section 8) it follows the rules for
+      restoring an older backup.
+    - **Accepted:** Mnemo cannot see whether iCloud or another cloud folder
+      has uploaded a copy; it checks only that the file is in the folder and
+      reads back intact. A folder on this Mac's own disk is allowed, with a
+      warning.
+    - Unverified copies (taken at launch or before a restore while locked)
+      count only after the next unlock checks them.
+    - **Accepted:** descriptions are plain JSON, so the times of changes and
+      the number of attachments are visible to anyone who can read the
+      folder; the contents stay encrypted.
+    - **Accepted:** after a change of passphrase or recovery key, older
+      snapshots keep opening with the old one unless the user deletes them
+      in the dialog that follows the change.
 
 ## 8. Internal review (2026-10-26)
 

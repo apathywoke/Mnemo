@@ -89,6 +89,8 @@ class VaultStoreKeys {
   async rotateOpenVault(currentPassphrase, newPassphrase) {
     const sessionEpoch = this.sessionEpoch;
     await this.verifyPassphrase(currentPassphrase);
+    // The file as it is, under the old key, kept for 90 days.
+    await this.pinSnapshotBefore("rekey");
     if (this.sessionEpoch !== sessionEpoch) {
       throw new Error("The vault was locked while saving. Unlock it again.");
     }
@@ -106,6 +108,7 @@ class VaultStoreKeys {
     this.envelope = rotated.envelope;
     oldKey.fill(0);
     await this.deleteAttachmentFiles(rotated.replacedAttachmentIds);
+    this.queueSnapshotAfterUnlock();
     return rotated.recoveryKey;
   }
 
@@ -136,6 +139,8 @@ class VaultStoreKeys {
       const sessionEpoch = this.sessionEpoch;
       validateNewPassphrase(newPassphrase);
       const recoveryKeyBytes = decodeRecoveryKey(recoveryKeyText);
+      // Locked here, so the copy is checked at a later unlock with its key.
+      await this.pinSnapshotBefore("rekey");
       let opened = null;
       try {
         opened = await this.decryptVaultFile(this.filePath, { recoveryKeyBytes });
@@ -160,6 +165,7 @@ class VaultStoreKeys {
         this.envelope = rotated.envelope;
         await this.deleteAttachmentFiles(rotated.replacedAttachmentIds);
         await this.maintainNow();
+        this.queueSnapshotAfterUnlock();
         return { status: await this.getStatus(), recoveryKey: rotated.recoveryKey };
       } finally {
         opened.dataKey.fill(0);

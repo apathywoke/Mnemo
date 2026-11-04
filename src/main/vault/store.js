@@ -2,13 +2,14 @@
 // lock), the mutation queue, and atomic writes. Feature methods are added to
 // the prototype by ./index.js.
 const fs = require("node:fs/promises");
-const { describeWriteError, isDiskFullError, removeStaleTemporaryFiles, syncDirectory } = require("../durable-file");
+const { isDiskFullError, removeStaleTemporaryFiles, writeFileDurably } = require("../durable-file");
 const path = require("node:path");
 const {
   randomBytes,
 } = require("node:crypto");
 const { openVaultSource } = require("../backup-file");
 const {
+  FORMAT_VERSION,
   VAULT_SCHEMA_VERSION,
   KEY_BYTES,
   MAX_FILE_BYTES,
@@ -46,8 +47,24 @@ function newerVersionError(isBackup) {
 }
 
 class VaultStore {
-  constructor(filePath) {
+  // `snapshots`: keep local snapshots of this vault (store-snapshots.js).
+  // The app turns them on; most tests leave them off. `now` is their clock;
+  // `onSnapshot` hears of each verified one ({ pinned }), for copies outside.
+  /**
+   * @param {string} filePath
+   * @param {{ snapshots?: boolean, now?: () => number, onSnapshot?: (info: { pinned: boolean }) => void }} [options]
+   */
+  constructor(filePath, { snapshots = false, now = Date.now, onSnapshot = () => {} } = {}) {
     this.filePath = filePath;
+    this.snapshotOptions = { enabled: snapshots, now, onSnapshot };
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    this.snapshotTimer = null;
+    /** @type {number | null} */
+    this.lastSnapshotAt = null;
+    /** @type {number | null} */
+    this.snapshotFailedAt = null;
+    // The open file is in an older format that the next save replaces.
+    this.formatOutdated = false;
     /** @type {Buffer | null} */
     this.dataKey = null;
     this.vaultData = null;
@@ -140,7 +157,11 @@ class VaultStore {
     this.dataKey = opened.dataKey;
     this.vaultData = opened.vaultData;
     this.envelope = opened.envelope;
+    this.formatOutdated = opened.outdated;
+    // Before maintainNow, which may save the file in the newer format.
+    if (this.formatOutdated) await this.enqueueMutation(() => this.pinSnapshotBeforeNow("upgrade"));
     await this.enqueueMutation(() => this.maintainNow());
+    this.queueSnapshotAfterUnlock();
     return this.getStatus();
   }
 
@@ -163,7 +184,11 @@ class VaultStore {
     this.dataKey = opened.dataKey;
     this.vaultData = opened.vaultData;
     this.envelope = opened.envelope;
+    this.formatOutdated = opened.outdated;
+    // Before maintainNow, which may save the file in the newer format.
+    if (this.formatOutdated) await this.enqueueMutation(() => this.pinSnapshotBeforeNow("upgrade"));
     await this.enqueueMutation(() => this.maintainNow());
+    this.queueSnapshotAfterUnlock();
     return this.getStatus();
   }
 
@@ -189,6 +214,21 @@ class VaultStore {
     } catch {
       // Tried again on the next unlock.
     }
+  }
+
+  pinSnapshotBeforeNow(reason) {
+    return /** @type {import("./index").Instance} */ (/** @type {unknown} */ (this)).pinSnapshotBefore(reason);
+  }
+
+  // Checks waiting snapshots and takes one of the file just opened, without
+  // holding up the unlock. Also after a restore or a change of keys.
+  queueSnapshotAfterUnlock() {
+    // The snapshot methods come from store-snapshots.js.
+    const store = /** @type {import("./index").Instance} */ (/** @type {unknown} */ (this));
+    void store.queueSnapshotWork(async () => {
+      await store.snapshotAfterUnlockNow();
+      return true;
+    });
   }
 
   async maintain(now = Date.now()) {
@@ -236,6 +276,8 @@ class VaultStore {
       }
       this.envelope = nextEnvelope;
       this.vaultData = vaultData;
+      this.formatOutdated = false;
+      /** @type {import("./index").Instance} */ (/** @type {unknown} */ (this)).scheduleSnapshot();
     } finally {
       plaintext.fill(0);
     }
@@ -311,12 +353,14 @@ class VaultStore {
       if (isFromNewerVersion(vaultData)) throw newerVersionError(allowContainer);
       if (!validateVaultData(vaultData)) throw new Error("Invalid vault data");
 
-      /** @type {{ envelope: any, vaultData: any, dataKey: Buffer, container: any }} */
+      /** @type {{ envelope: any, vaultData: any, dataKey: Buffer, container: any, outdated: boolean }} */
       const opened = {
         envelope,
         vaultData: upgradeVaultData(vaultData, dataKey),
         dataKey,
         container: source.container,
+        // The next save writes a newer format than this file has.
+        outdated: envelope.version !== FORMAT_VERSION || vaultData.schemaVersion !== VAULT_SCHEMA_VERSION,
       };
       dataKey = null;
       return opened;
@@ -351,6 +395,8 @@ class VaultStore {
   lock() {
     this.sessionEpoch += 1;
     this.issuedRecoveryKey = null;
+    this.formatOutdated = false;
+    /** @type {import("./index").Instance} */ (/** @type {unknown} */ (this)).cancelScheduledSnapshot();
     this.dataKey?.fill(0);
     this.dataKey = null;
     this.vaultData = null;
@@ -371,25 +417,8 @@ class VaultStore {
     }
   }
 
-  async writeBytesAtomically(destinationPath, contents) {
-    const directory = path.dirname(destinationPath);
-    const temporaryPath = `${destinationPath}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
-    let fileHandle = null;
-
-    try {
-      await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-      fileHandle = await fs.open(temporaryPath, "wx", 0o600);
-      await fileHandle.writeFile(contents);
-      await fileHandle.sync();
-      await fileHandle.close();
-      fileHandle = null;
-      await fs.rename(temporaryPath, destinationPath);
-      await syncDirectory(directory);
-    } catch (error) {
-      if (fileHandle) await fileHandle.close().catch(() => {});
-      await fs.unlink(temporaryPath).catch(() => {});
-      throw describeWriteError(error);
-    }
+  writeBytesAtomically(destinationPath, contents) {
+    return writeFileDurably(destinationPath, contents);
   }
 }
 

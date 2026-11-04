@@ -15,6 +15,7 @@ function register(ctx) {
     issueRecoveryKey,
     confirmRecoveryKeySaved,
     registerHandler,
+    offerDeletingOldSnapshots,
   } = ctx;
   const { dialog, ipcMain } = ctx.electron;
 
@@ -99,6 +100,7 @@ function register(ctx) {
     const recoveryKey = await store.createRecoveryKey(passphrase);
     await forgetTouchIdKey(profileId);
     if (store !== state.vaultStore) throw new Error("Unlock the vault first.");
+    await offerDeletingOldSnapshots(store, "recovery");
     await issueRecoveryKey(recoveryKey);
     return { canceled: false, recoveryKey };
   });
@@ -118,6 +120,7 @@ function register(ctx) {
     const recoveryKey = await store.changePassphrase(currentPassphrase, newPassphrase);
     await forgetTouchIdKey(profileId);
     if (store !== state.vaultStore) throw new Error("Unlock the vault first.");
+    await offerDeletingOldSnapshots(store, "passphrase");
     await issueRecoveryKey(recoveryKey);
     return { canceled: false, recoveryKey };
   });

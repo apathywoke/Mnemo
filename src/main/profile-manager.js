@@ -40,12 +40,54 @@ function normalizeProfileName(value) {
 }
 
 class ProfileManager {
-  constructor(userDataPath) {
+  /**
+   * @param {string} userDataPath
+   * @param {{ onSnapshot?: (vaultPath: string, info: { pinned: boolean }) => void }} [options]
+   *   `onSnapshot`: a vault has a new verified snapshot.
+   */
+  constructor(userDataPath, { onSnapshot = () => {} } = {}) {
     this.userDataPath = userDataPath;
+    this.onSnapshot = onSnapshot;
     this.registryPath = path.join(userDataPath, "profiles.json");
     this.legacyVaultPath = path.join(userDataPath, "vault.json");
     this.vaultDirectory = path.join(userDataPath, "vaults");
     this.mutationQueue = Promise.resolve();
+  }
+
+  // The store for a vault file, with local snapshots on. Every store the app
+  // opens comes from here.
+  createStore(vaultPath) {
+    return new VaultStore(vaultPath, {
+      snapshots: true,
+      onSnapshot: (info) => this.onSnapshot(vaultPath, info),
+    });
+  }
+
+  // At launch: an unverified snapshot of each vault whose last changes may
+  // have none yet (the app quit before one was due). Checked at the next
+  // unlock. Never throws.
+  async snapshotVaultsAtLaunch() {
+    let profiles = [];
+    try {
+      profiles = await this.listProfiles();
+    } catch {
+      return [];
+    }
+    for (const profile of profiles) {
+      await VaultStore.copySnapshotAtLaunch(this.getVaultPath(profile.id));
+    }
+    return profiles.map((profile) => this.getVaultPath(profile.id));
+  }
+
+  // Whether a vault has local snapshots (they are deleted with it only after
+  // the user confirms).
+  async hasSnapshots(profileId) {
+    try {
+      return (await fs.readdir(VaultStore.snapshotDirectoryFor(this.getVaultPath(profileId)))).length > 0;
+    } catch (error) {
+      // Unreadable: ask rather than delete or keep silently.
+      return error.code !== "ENOENT";
+    }
   }
 
   // What a crash left while saving the profile list.
@@ -186,10 +228,11 @@ class ProfileManager {
     );
   }
 
-  async restoreProfile(name, sourcePath, passphrase) {
+  // `poolDirectory`: the source is a snapshot whose attachments are there.
+  async restoreProfile(name, sourcePath, passphrase, { poolDirectory = null } = {}) {
     return this.enqueueMutation(() =>
       this.createProfileWith(name, (store) =>
-        store.restoreBackup(sourcePath, passphrase),
+        store.restoreBackup(sourcePath, passphrase, { poolDirectory }),
       ),
     );
   }
@@ -226,7 +269,9 @@ class ProfileManager {
     });
   }
 
-  async deleteProfile(profileId) {
+  // `deleteSnapshots`: also delete the vault's local snapshots. Otherwise
+  // they stay in <vault>.snapshots for a later restore.
+  async deleteProfile(profileId, { deleteSnapshots = false } = {}) {
     return this.enqueueMutation(async () => {
       const profile = (await this.listProfiles()).find(
         (item) => item.id === profileId,
@@ -289,6 +334,21 @@ class ProfileManager {
         throw new Error("Could not delete this vault profile.");
       }
 
+      // After the vault is gone: a failure leaves snapshots, never a vault
+      // without them.
+      if (deleteSnapshots) {
+        const snapshotPath = VaultStore.snapshotDirectoryFor(vaultPath);
+        const stagedSnapshotPath = `${stagedPath}.snapshots`;
+        try {
+          await fs.rename(snapshotPath, stagedSnapshotPath);
+          await fs.rm(stagedSnapshotPath, { recursive: true, force: true });
+        } catch (error) {
+          if (error.code !== "ENOENT") {
+            throw new Error("The vault was deleted, but its local snapshots could not be.");
+          }
+        }
+      }
+
       return { deleted: true, profile: { id: profile.id, name: profile.name } };
     });
   }
@@ -314,7 +374,7 @@ class ProfileManager {
 
     const profile = { id: randomUUID(), name, lastOpenedAt: Date.now() };
     const vaultPath = this.getVaultPath(profile.id);
-    const store = new VaultStore(vaultPath);
+    const store = this.createStore(vaultPath);
     let ownsVaultPath = false;
 
     try {
@@ -331,6 +391,7 @@ class ProfileManager {
       if (ownsVaultPath) {
         await fs.unlink(vaultPath).catch(() => {});
         await fs.rm(VaultStore.attachmentDirectoryFor(vaultPath), { recursive: true, force: true }).catch(() => {});
+        await fs.rm(VaultStore.snapshotDirectoryFor(vaultPath), { recursive: true, force: true }).catch(() => {});
       }
       throw error;
     }

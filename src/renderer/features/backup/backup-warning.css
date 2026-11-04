@@ -61,3 +61,34 @@
   stroke-width: 1.8;
   stroke-linecap: round;
 }
+
+/* The reminder to keep a copy outside this Mac: its actions sit on one
+   line under the text, in the banner's own colors. */
+.backup-warning-dismiss[hidden] {
+  display: none;
+}
+
+.outside-copy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.outside-copy-actions .text-button {
+  margin-top: 0;
+  padding: 2px 0;
+  color: var(--c-e3d5a9);
+  font-size: 9px;
+  text-decoration-color: var(--c-554721);
+  text-underline-offset: 3px;
+}
+
+.outside-copy-actions .text-button:hover {
+  color: var(--c-e3d5a9);
+  text-decoration-color: var(--c-9a7d35);
+}
+
+.outside-copy-actions .text-button[hidden] {
+  display: none;
+}

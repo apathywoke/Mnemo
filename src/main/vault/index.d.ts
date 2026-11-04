@@ -8,6 +8,7 @@ import VaultStoreBackup = require("./store-backup");
 import VaultStoreEntries = require("./store-entries");
 import VaultStoreOrganize = require("./store-organize");
 import VaultStoreAttachments = require("./store-attachments");
+import VaultStoreSnapshots = require("./store-snapshots");
 
 declare namespace VaultStore {
   type Instance = VaultStoreBase &
@@ -15,14 +16,17 @@ declare namespace VaultStore {
     VaultStoreBackup &
     VaultStoreEntries &
     VaultStoreOrganize &
-    VaultStoreAttachments;
+    VaultStoreAttachments &
+    VaultStoreSnapshots;
 }
 
 declare const VaultStore: {
-  new (filePath: string): VaultStore.Instance;
+  new (filePath: string, options?: { snapshots?: boolean, now?: () => number, onSnapshot?: (info: { pinned: boolean }) => void }): VaultStore.Instance;
   prototype: VaultStore.Instance;
   readBackupLogins: typeof VaultStoreBackup.readBackupLogins;
   attachmentDirectoryFor: typeof VaultStoreAttachments.attachmentDirectoryFor;
+  copySnapshotAtLaunch: typeof VaultStoreSnapshots.copySnapshotAtLaunch;
+  snapshotDirectoryFor: typeof VaultStoreSnapshots.snapshotDirectoryFor;
 };
 
 export = VaultStore;

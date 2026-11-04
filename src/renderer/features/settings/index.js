@@ -145,6 +145,14 @@ function bind(ctx) {
     for (const hint of lockedHints) hint.hidden = unlocked;
   }
   const recoveryStatus = $("#settings-recovery-status");
+  const snapshotStatus = $("#settings-snapshot-status");
+  const outsideStatus = $("#settings-outside-status");
+  const outsideProblem = $("#settings-outside-problem");
+  const outsideWarning = $("#settings-outside-warning");
+  const outsideChoose = $("#settings-outside-choose");
+  const outsideCopy = $("#settings-outside-copy");
+  const outsideStop = $("#settings-outside-stop");
+  const outsideError = $("#settings-outside-error");
   const recoveryButton = $("#settings-recovery-button");
   const confirmForm = $("#settings-confirm-form");
   const confirmPrompt = $("#settings-confirm-prompt");
@@ -160,7 +168,11 @@ function bind(ctx) {
   let recoveryEnabled = null;
   let recoveryConfirmed = true;
   let touchId = null;
+  let snapshots = null;
+  let outside = null;
   let pendingAction = null;
+  const formatDateTime = (time) =>
+    new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeStyle: "short" }).format(new Date(time));
 
   function renderVault() {
     recoveryStatus.textContent = recoveryEnabled === null
@@ -177,6 +189,15 @@ function bind(ctx) {
       : i18n.t(!touchId.available
         ? "touchId.unavailable"
         : touchId.enabled ? "touchId.enabled" : "touchId.disabled");
+    snapshotStatus.textContent = snapshots === null
+      ? ""
+      : snapshots.failedAt !== null
+        ? i18n.t("settings.snapshotFailed")
+        : snapshots.lastVerifiedAt === null
+          ? i18n.t("settings.snapshotNone")
+          : i18n.t("settings.snapshotLast", { date: formatDateTime(snapshots.lastVerifiedAt) });
+    snapshotStatus.classList.toggle("settings-hint-warning", (snapshots?.failedAt ?? null) !== null);
+    renderOutside();
     touchIdEnable.hidden = !touchId?.available || touchId.enabled;
     touchIdDisable.hidden = !touchId?.available || !touchId.enabled;
     if (pendingAction) {
@@ -184,6 +205,61 @@ function bind(ctx) {
       confirmSubmit.textContent = i18n.t(PASSPHRASE_ACTIONS[pendingAction].confirm);
     }
   }
+
+  // The copy outside this Mac: where to, when it was last checked, and what
+  // went wrong.
+  function renderOutside() {
+    const folder = outside?.folderName ?? null;
+    outsideStatus.textContent = outside === null
+      ? ""
+      : folder === null
+        ? i18n.t("settings.outsideNone")
+        : outside.verifiedAt !== null
+          ? i18n.t("settings.outsideLast", { folder, date: formatDateTime(outside.verifiedAt) })
+          : i18n.t("settings.outsideNever", { folder });
+    const failed = folder !== null && outside.failedAt !== null &&
+      (outside.verifiedAt === null || outside.failedAt > outside.verifiedAt);
+    outsideProblem.hidden = !failed;
+    outsideProblem.textContent = failed
+      ? i18n.t("settings.outsideFailed", {
+        date: formatDateTime(outside.failedAt),
+        reason: i18n.t(`settings.outsideFailure${outside.failure.charAt(0).toUpperCase()}${outside.failure.slice(1)}`),
+      })
+      : "";
+    const warning = folder !== null ? outside.warning : null;
+    outsideWarning.hidden = warning === null;
+    outsideWarning.textContent = warning === "same-disk"
+      ? i18n.t("settings.outsideSameDisk")
+      : warning === "unreliable-disk" ? i18n.t("settings.outsideUnreliableDisk") : "";
+    outsideChoose.hidden = outside === null;
+    outsideChoose.textContent = i18n.t(folder === null ? "settings.outsideChoose" : "settings.outsideChange");
+    outsideCopy.hidden = folder === null;
+    outsideStop.hidden = folder === null;
+  }
+
+  async function runOutside(button, call) {
+    outsideError.hidden = true;
+    for (const other of [outsideChoose, outsideCopy, outsideStop]) other.disabled = true;
+    try {
+      const result = await call();
+      if (result?.canceled) return;
+      outside = result?.status ?? result;
+      renderOutside();
+    } catch (cause) {
+      ctx.setError(outsideError, i18n.errorText(cause, "errors.outsideCopy"));
+    } finally {
+      for (const other of [outsideChoose, outsideCopy, outsideStop]) other.disabled = false;
+      button.focus();
+    }
+  }
+
+  outsideChoose.addEventListener("click", () => runOutside(outsideChoose, () => ctx.api.chooseOutsideFolder()));
+  outsideCopy.addEventListener("click", () => runOutside(outsideCopy, () => ctx.api.copyOutsideNow()));
+  outsideStop.addEventListener("click", () => runOutside(outsideStop, () => ctx.api.stopOutsideCopies()));
+  $("#settings-restore-snapshot").addEventListener("click", () => {
+    dialog.close();
+    void ctx.pages.access.openSnapshotsForVault();
+  });
 
   resetVaultActions = () => {
     pendingAction = null;
@@ -212,10 +288,18 @@ function bind(ctx) {
     setVaultUnlocked(true);
     recoveryEnabled = null;
     touchId = null;
+    snapshots = null;
+    outside = null;
+    outsideError.hidden = true;
     renderVault();
     try {
       let recovery;
-      [recovery, touchId] = await Promise.all([ctx.api.getRecoveryStatus(), ctx.api.getTouchIdStatus()]);
+      [recovery, touchId, snapshots, outside] = await Promise.all([
+        ctx.api.getRecoveryStatus(),
+        ctx.api.getTouchIdStatus(),
+        ctx.api.getSnapshotStatus().catch(() => null),
+        ctx.api.getOutsideCopyStatus().catch(() => null),
+      ]);
       recoveryEnabled = recovery.enabled;
       recoveryConfirmed = recovery.confirmed !== false || recovery.pending === true;
       renderVault();
@@ -338,17 +422,20 @@ function bind(ctx) {
   dialog.addEventListener("close", resetVaultActions);
   i18n.onChange(renderVault);
 
-  // One button in the access screens' header, one in the vault's.
-  for (const button of [$("#settings-button"), $("#vault-settings-button")]) {
-    button.addEventListener("click", () => {
-      error.hidden = true;
-      themeError.hidden = true;
-      showSavedTheme();
-      selectTab(activeTab);
-      dialog.showModal();
-      void refreshVault();
-    });
+  function open(tab = activeTab) {
+    error.hidden = true;
+    themeError.hidden = true;
+    showSavedTheme();
+    selectTab(tab);
+    dialog.showModal();
+    void refreshVault();
   }
+  // One button in the access screens' header, one in the vault's; the
+  // reminder banners open a category directly.
+  for (const button of [$("#settings-button"), $("#vault-settings-button")]) {
+    button.addEventListener("click", () => open());
+  }
+  ctx.openSettings = open;
   $("#close-settings-dialog").addEventListener("click", () => dialog.close());
 }
 

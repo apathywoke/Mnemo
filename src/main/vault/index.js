@@ -11,6 +11,7 @@ const METHOD_GROUPS = [
   require("./store-entries"),
   require("./store-organize"),
   require("./store-attachments"),
+  require("./store-snapshots"),
 ];
 
 for (const group of METHOD_GROUPS) {

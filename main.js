@@ -24,9 +24,9 @@ const SettingsStore = require("./src/main/settings-store");
 const BiometricUnlock = require("./src/main/biometric-unlock");
 const { createTouchIdHelper } = require("./src/main/touch-id-helper");
 const { Updater } = require("./src/main/updater");
+const { OutsideCopies } = require("./src/main/outside-copies");
 const { catalog: i18nCatalog } = require("./src/shared/i18n/messages.js");
 const { createTranslator } = require("./src/shared/i18n/translate.js");
-const VaultStore = require("./vault-store");
 const { createState } = require("./src/main/state");
 const { createTranslation } = require("./src/main/i18n");
 const { createProfileHelpers } = require("./src/main/profiles");
@@ -49,6 +49,8 @@ const IPC_GROUPS = [
   require("./src/main/ipc/organize"),
   require("./src/main/ipc/reports"),
   require("./src/main/ipc/backup"),
+  require("./src/main/ipc/outside"),
+  require("./src/main/ipc/snapshots"),
 ];
 
 // Chromium's remote debugging switches have no Electron fuse. A local process
@@ -134,9 +136,11 @@ if (launchedWithRemoteDebugging) {
     powerMonitor.on("lock-screen", () => lockVault(true));
     powerMonitor.on("suspend", () => lockVault(true));
 
-    state.profileManager = new ProfileManager(app.getPath("userData"));
+    state.profileManager = new ProfileManager(app.getPath("userData"), {
+      onSnapshot: (vaultPath, info) => state.outsideCopies?.noteSnapshot(vaultPath, info),
+    });
     void state.profileManager.removeStaleTemporaryFiles();
-    state.vaultStore = new VaultStore(state.profileManager.legacyVaultPath);
+    state.vaultStore = state.profileManager.createStore(state.profileManager.legacyVaultPath);
     // The Touch ID helper sits next to app.asar when packaged and in
     // build/native/ for `npm start` (scripts/build-touch-id.js).
     const touchIdHelperPath = app.isPackaged
@@ -157,6 +161,17 @@ if (launchedWithRemoteDebugging) {
       state.language = settings.language;
       if (nativeTheme) nativeTheme.themeSource = settings.theme;
     });
+    state.outsideCopies = new OutsideCopies({
+      getFolder: () => state.settingsStore.getOutsideFolder(),
+      userDataPath: app.getPath("userData"),
+      homePath: app.getPath("home"),
+    });
+    // Changes saved shortly before the last quit may have no snapshot yet;
+    // then whatever is due goes to the folder outside this Mac.
+    void state.settingsLoaded
+      .then(() => state.profileManager.snapshotVaultsAtLaunch())
+      .then((vaultPaths) => state.outsideCopies.copyAtLaunch(vaultPaths))
+      .catch(() => {});
 
     state.updater = new Updater({
       currentVersion: app.getVersion(),

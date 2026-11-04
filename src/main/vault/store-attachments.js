@@ -49,15 +49,16 @@ class VaultStoreAttachments {
     return path.join(this.attachmentDirectory, `${attachmentId}.bin`);
   }
 
-  // The vault file and its attachment folder are never a source or target
-  // for user files.
+  // The vault file and its attachment and snapshot folders are never a
+  // source or target for user files.
   /** @this {Store} */
   isVaultPath(candidate) {
     const resolved = path.resolve(candidate);
-    const directory = path.resolve(this.attachmentDirectory);
     return resolved === path.resolve(this.filePath) ||
-      resolved === directory ||
-      resolved.startsWith(`${directory}${path.sep}`);
+      [this.attachmentDirectory, this.snapshotDirectory].some((folder) => {
+        const directory = path.resolve(folder);
+        return resolved === directory || resolved.startsWith(`${directory}${path.sep}`);
+      });
   }
 
   /** @this {Store} */

@@ -276,3 +276,48 @@ test("a new recovery key is confirmed by its last characters", async (t) => {
     await app.close();
   }
 });
+
+// Step 4b of the data safety plan: Settings → Backups locks the vault, lists
+// its snapshots, and restores one with the passphrase of its time. The
+// native confirmation is answered from the main process.
+test("a snapshot is restored from Settings through the restore form", async (t) => {
+  const userDataDir = await createDataFolder();
+  t.after(() => removeDataFolder(userDataDir));
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    await createVault(page);
+    // The first save is followed by a snapshot at once; later saves wait.
+    await addLogin(page, LOGIN);
+    await page.locator("#entry-list .entry-row-name", { hasText: LOGIN.name }).waitFor();
+    const second = { ...LOGIN, name: "Added after the snapshot" };
+    await addLogin(page, second);
+    await page.locator("#entry-list .entry-row-name", { hasText: second.name }).waitFor();
+
+    await page.click("#vault-settings-button");
+    await page.click("#settings-tab-backups");
+    await page.locator("#settings-snapshot-status", { hasText: "Newest checked snapshot" }).waitFor();
+    await page.click("#settings-restore-snapshot");
+    await page.locator("#snapshots-panel:not([hidden])").waitFor();
+    const rows = page.locator("#snapshot-list .profile-choice");
+    assert.equal(await rows.count(), 1);
+    assert.match(await rows.first().textContent(), /On this Mac/);
+
+    await app.evaluate(({ dialog }) => {
+      dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
+    });
+    await rows.first().click();
+    await page.locator("#restore-panel:not([hidden])").waitFor();
+    assert.match(await page.textContent("#restore-description"), /Restore the snapshot from/);
+    await page.fill("#restore-passphrase", TEST_PASSPHRASE);
+    await page.click("#restore-form button[type='submit']");
+    await page.locator("#open-panel:not([hidden])").waitFor();
+    await page.locator("#entry-list .entry-row-name", { hasText: LOGIN.name }).waitFor();
+    assert.equal(await page.locator("#entry-list .entry-row-name", { hasText: second.name }).count(), 0);
+
+    // The replaced state was kept: the list now has it, pinned.
+    const snapshots = await page.evaluate(() => window.vaultApp.listSnapshots());
+    assert.ok(snapshots.some((item) => item.pinned === "restore"));
+  } finally {
+    await app.close();
+  }
+});

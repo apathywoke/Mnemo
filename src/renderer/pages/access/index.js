@@ -1,8 +1,9 @@
 import * as profileList from "../../entities/vault-profile/ui/profile-list.js";
 import * as profileManagementFeature from "../../features/profile-management/index.js";
+import * as snapshotRestoreFeature from "../../features/snapshot-restore/index.js";
 import * as vaultAccessFeature from "../../features/vault-access/index.js";
 import { $ } from "../../shared/lib/dom.js";
-import { t, errorText, onChange } from "../../shared/lib/i18n.js";
+import { t, errorText, onChange, language } from "../../shared/lib/i18n.js";
 import { show as showToast } from "../../shared/ui/toast-notifications.js";
 
 function create(ctx) {
@@ -87,6 +88,7 @@ function create(ctx) {
         ctx.clearSensitiveFields();
         if (status.vaultExists) {
           $("#unlock-profile-name").textContent = state.selectedProfileName ?? "";
+          $("#unlock-snapshot-button").hidden = true;
           ctx.showPanel("unlock");
           const autoPrompt = state.offerTouchId === true;
           state.offerTouchId = false;
@@ -120,9 +122,12 @@ function create(ctx) {
     $("#profile-name").focus();
   }
 
-  async function openRestorePanel() {
-    state.restoringNewProfile = state.selectedProfileId === null;
-    if (state.restoringNewProfile) {
+  // `snapshot`: restore this snapshot (from the snapshot list) instead of a
+  // backup file chosen in the next step.
+  async function openRestorePanel({ snapshot = null } = {}) {
+    state.restoreSnapshot = snapshot;
+    state.restoringNewProfile = snapshot ? snapshot.location === "folder" : state.selectedProfileId === null;
+    if (state.restoringNewProfile && !snapshot) {
       try {
         state.availableProfiles = await ctx.api.chooseProfile();
         renderProfiles();
@@ -139,10 +144,18 @@ function create(ctx) {
     $("#restore-profile-name-field").hidden = !state.restoringNewProfile;
     $("#restore-profile-name").required = state.restoringNewProfile;
     const description = $("#restore-description");
-    description.dataset.i18n = state.restoringNewProfile
-      ? "restore.descriptionNew"
-      : "restore.descriptionReplace";
-    description.textContent = t(description.dataset.i18n);
+    if (snapshot) {
+      // The date is part of the text, so it is not re-translated by key.
+      delete description.dataset.i18n;
+      const date = new Intl.DateTimeFormat(language, { dateStyle: "medium", timeStyle: "short" })
+        .format(new Date(snapshot.createdAt));
+      description.textContent = t(state.restoringNewProfile ? "restore.descriptionSnapshotNew" : "restore.descriptionSnapshot", { date });
+    } else {
+      description.dataset.i18n = state.restoringNewProfile
+        ? "restore.descriptionNew"
+        : "restore.descriptionReplace";
+      description.textContent = t(description.dataset.i18n);
+    }
     ctx.showPanel("restore");
     $(state.restoringNewProfile ? "#restore-profile-name" : "#restore-passphrase").focus();
   }
@@ -163,6 +176,12 @@ function create(ctx) {
   async function cancelRestore() {
     ctx.clearSensitiveFields();
     $("#restore-error").hidden = true;
+    if (state.restoreSnapshot) {
+      // Back to the list the snapshot came from.
+      state.restoreSnapshot = null;
+      ctx.showPanel("snapshots");
+      return;
+    }
     if (state.selectedProfileId === null) await refreshProfiles();
     else await refreshState();
   }
@@ -183,13 +202,35 @@ function create(ctx) {
     refreshState,
   });
 
+  const snapshotRestore = snapshotRestoreFeature.bind(ctx, {
+    openRestore: (snapshot) => openRestorePanel({ snapshot }),
+    back: () => (state.selectedProfileId === null ? refreshProfiles() : refreshState()),
+  });
+
+  // From Settings → Backups: locks the vault first, then lists its
+  // snapshots.
+  async function openSnapshotsForVault() {
+    try {
+      await ctx.api.lockVault();
+    } catch (cause) {
+      showToast(errorText(cause, "errors.lockVault"), { type: "error" });
+      return;
+    }
+    ctx.clearVaultView();
+    ctx.clearSensitiveFields();
+    $("#unlock-profile-name").textContent = state.selectedProfileName ?? "";
+    await snapshotRestore.openForVault();
+  }
+
   onChange(renderProfiles);
 
   $("#new-profile-button").addEventListener("click", openNewProfile);
   $("#setup-back-button").addEventListener("click", chooseProfiles);
-  $("#restore-profile-button").addEventListener("click", openRestorePanel);
-  $("#setup-restore-button").addEventListener("click", openRestorePanel);
-  $("#unlock-restore-button").addEventListener("click", openRestorePanel);
+  $("#restore-profile-button").addEventListener("click", () => openRestorePanel());
+  $("#setup-restore-button").addEventListener("click", () => openRestorePanel());
+  $("#unlock-restore-button").addEventListener("click", () => openRestorePanel());
+  $("#unlock-snapshot-button").addEventListener("click", () => void snapshotRestore.openForVault());
+  $("#restore-snapshot-folder-button").addEventListener("click", () => void snapshotRestore.openForFolder());
   $("#unlock-recover-button").addEventListener("click", openRecoverPanel);
   $("#recover-cancel-button").addEventListener("click", () => void cancelRecover());
   $("#unlock-profiles-button").addEventListener("click", chooseProfiles);
@@ -203,6 +244,7 @@ function create(ctx) {
     closeProfileDeleteDialog: profileManagement.close,
     isProfileDeleteDialogOpen: () => profileManagement.isOpen,
     lockVault,
+    openSnapshotsForVault,
     refreshProfiles,
     refreshState,
   };

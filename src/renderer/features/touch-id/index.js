@@ -23,6 +23,7 @@ function init(ctx) {
       if (key === "errors.touchIdCanceled" && quietCancel) return;
       if (key === "errors.touchIdInvalid") button.hidden = true;
       ctx.setError($("#unlock-error"), errorText(cause, "errors.unlockVault"));
+      $("#unlock-snapshot-button").hidden = key !== "errors.vaultDamaged";
     } finally {
       inProgress = false;
       button.disabled = false;

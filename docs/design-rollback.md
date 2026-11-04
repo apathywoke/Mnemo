@@ -165,6 +165,15 @@ it also gets a new `vaultId` and `revisionKey`, written with one save,
 because it is a separate vault from then on; two profiles restored from one
 backup then do not trip each other's checks.
 
+**Restoring from a snapshot** (local, a copy outside this Mac, or a
+snapshot folder restored as a new profile; added with the data safety plan,
+2026-11-04) is a restore of a backup in every respect above: over the
+current profile it follows the "same `vaultId`" rules, including the
+confirmation for an older revision and the save at `record + 1`; as a new
+profile it gets a new `vaultId` and `revisionKey`. The pinned snapshot of
+the replaced state, taken before every restore, carries its own revision
+and is never taken for a newer copy.
+
 **Importing items from a backup** into the current vault is not affected.
 
 ## 9. Format and migration

@@ -4,7 +4,9 @@ const { randomBytes } = require("node:crypto");
 const { removeStaleTemporaryFiles } = require("./durable-file");
 
 const SETTINGS_VERSION = 1;
-const MAX_SETTINGS_BYTES = 4096;
+// Room for a folder path (up to 1024 bytes as JSON can escape it).
+const MAX_SETTINGS_BYTES = 16 * 1024;
+const MAX_FOLDER_PATH_LENGTH = 1024;
 const THEMES = Object.freeze(["system", "dark", "light"]);
 const DEFAULT_THEME = "system";
 const UPDATE_INTERVALS = Object.freeze(["30m", "1h", "6h", "1d", "off"]);
@@ -13,6 +15,15 @@ const DEFAULT_UPDATE_INTERVAL = "1d";
 // the file stays small.
 const MAX_UNCONFIRMED_RECOVERY_KEYS = 32;
 const PROFILE_ID_PATTERN = /^[0-9A-Za-z-]{1,64}$/;
+
+function isFolderPath(value) {
+  return typeof value === "string" &&
+    value.length > 1 &&
+    value.length <= MAX_FOLDER_PATH_LENGTH &&
+    path.isAbsolute(value) &&
+    // eslint-disable-next-line no-control-regex -- rejects control characters in paths
+    !/[\u0000-\u001f]/.test(value);
+}
 
 // Non-secret application preferences (interface language and theme), kept
 // next to the profile registry in the per-user application data folder.
@@ -36,6 +47,11 @@ class SettingsStore {
     // the list of profile IDs.
     /** @type {string[]} */
     this.unconfirmedRecoveryKeys = [];
+    // The folder outside this Mac that gets copies of the snapshots
+    // (outside-copies.js), or null. Not part of get(): the page sees only
+    // its name, through the copy status.
+    /** @type {string | null} */
+    this.outsideFolder = null;
     /** @type {Promise<unknown>} */
     this.writeQueue = Promise.resolve();
   }
@@ -58,6 +74,7 @@ class SettingsStore {
             : parsed.autoUpdate === false ? "off" : DEFAULT_UPDATE_INTERVAL,
           backupReminder: parsed.backupReminder !== false,
         };
+        if (isFolderPath(parsed.outsideFolder)) this.outsideFolder = parsed.outsideFolder;
         if (Array.isArray(parsed.unconfirmedRecoveryKeys)) {
           this.unconfirmedRecoveryKeys = parsed.unconfirmedRecoveryKeys
             .filter((id) => typeof id === "string" && PROFILE_ID_PATTERN.test(id))
@@ -113,8 +130,25 @@ class SettingsStore {
     const write = this.writeQueue.then(async () => {
       const others = this.unconfirmedRecoveryKeys.filter((id) => id !== profileId);
       const next = confirmed ? others : [...others, profileId].slice(-MAX_UNCONFIRMED_RECOVERY_KEYS);
-      await this.write(this.settings, next);
+      await this.write(this.settings, { unconfirmedRecoveryKeys: next });
       this.unconfirmedRecoveryKeys = next;
+    });
+    this.writeQueue = write.catch(() => {});
+    return write;
+  }
+
+  getOutsideFolder() {
+    return this.outsideFolder;
+  }
+
+  // An absolute folder path, or null to stop copying.
+  setOutsideFolder(folder) {
+    if (folder !== null && !isFolderPath(folder)) {
+      return Promise.reject(new Error("Could not save the settings."));
+    }
+    const write = this.writeQueue.then(async () => {
+      await this.write(this.settings, { outsideFolder: folder });
+      this.outsideFolder = folder;
     });
     this.writeQueue = write.catch(() => {});
     return write;
@@ -124,7 +158,7 @@ class SettingsStore {
   update(patch) {
     const write = this.writeQueue.then(async () => {
       const next = { ...this.settings, ...patch };
-      await this.write(next, this.unconfirmedRecoveryKeys);
+      await this.write(next);
       this.settings = next;
       return this.get();
     });
@@ -132,14 +166,16 @@ class SettingsStore {
     return write;
   }
 
-  async write(settings, unconfirmedRecoveryKeys) {
+  // `changes`: the values kept outside get() that this write changes.
+  async write(settings, changes = {}) {
+    const { unconfirmedRecoveryKeys = this.unconfirmedRecoveryKeys, outsideFolder = this.outsideFolder } = changes;
     const directory = path.dirname(this.filePath);
     const temporaryPath = `${this.filePath}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
     try {
       await fs.mkdir(directory, { recursive: true, mode: 0o700 });
       await fs.writeFile(
         temporaryPath,
-        JSON.stringify({ version: SETTINGS_VERSION, ...settings, unconfirmedRecoveryKeys }),
+        JSON.stringify({ version: SETTINGS_VERSION, ...settings, unconfirmedRecoveryKeys, outsideFolder }),
         { mode: 0o600, flag: "wx" },
       );
       await fs.rename(temporaryPath, this.filePath);

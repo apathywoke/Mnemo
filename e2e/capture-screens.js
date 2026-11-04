@@ -143,7 +143,7 @@ async function captureTheme(theme, folder) {
 
     await page.click("#vault-settings-button");
     await page.locator("#settings-dialog[open]").waitFor();
-    for (const [index, tab] of ["general", "updates", "security", "data", "vault"].entries()) {
+    for (const [index, tab] of ["general", "updates", "security", "data", "backups", "vault"].entries()) {
       await page.click(`#settings-tab-${tab}`);
       await page.locator(`#settings-pane-${tab}:not([hidden])`).waitFor();
       await shot(`${13 + index}-settings-${tab}`);
@@ -153,10 +153,10 @@ async function captureTheme(theme, folder) {
 
     await page.click("#lock-button");
     await page.locator("#unlock-panel:not([hidden])").waitFor();
-    await shot("18-unlock");
+    await shot("19-unlock");
     await page.click("#unlock-profiles-button");
     await page.locator("#profiles-panel:not([hidden])").waitFor();
-    await shot("19-profiles", [".profile-choice-meta"]);
+    await shot("20-profiles", [".profile-choice-meta"]);
   } finally {
     await app.close();
     await removeDataFolder(userDataDir);
