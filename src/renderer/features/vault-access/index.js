@@ -60,6 +60,8 @@ function bind(ctx, access) {
       showToast(t("toast.vaultUnlocked"));
     } catch (cause) {
       ctx.setError($("#unlock-error"), errorText(cause, "errors.unlockVault"));
+      // A damaged file: its snapshots are the way back.
+      $("#unlock-snapshot-button").hidden = errorKey(cause) !== "errors.vaultDamaged";
       $("#unlock-passphrase").value = "";
       $("#unlock-passphrase").focus();
     } finally {
@@ -145,7 +147,17 @@ function bind(ctx, access) {
     button.textContent = t("restore.checking");
     const restoringNewProfile = ctx.state.access.restoringNewProfile;
     try {
-      if (restoringNewProfile) {
+      const snapshot = ctx.state.access.restoreSnapshot;
+      if (restoringNewProfile && snapshot) {
+        const restored = await ctx.api.restoreSnapshotAsProfile(
+          $("#restore-profile-name").value,
+          snapshot.id,
+          credentials,
+        );
+        ctx.state.access.selectedProfileId = restored.profile.id;
+        ctx.state.access.selectedProfileName = restored.profile.name;
+        recoveryKey = restored.recoveryKey;
+      } else if (restoringNewProfile) {
         const restored = await ctx.api.restoreNewProfile(
           $("#restore-profile-name").value,
           credentials,
@@ -158,10 +170,13 @@ function bind(ctx, access) {
         ctx.state.access.selectedProfileName = restored.profile.name;
         recoveryKey = restored.recoveryKey;
       } else {
-        const restored = await ctx.api.restoreBackup(credentials);
+        const restored = snapshot
+          ? await ctx.api.restoreSnapshot(snapshot.id, credentials)
+          : await ctx.api.restoreBackup(credentials);
         if (restored.canceled) return;
         recoveryKey = restored.recoveryKey;
       }
+      ctx.state.access.restoreSnapshot = null;
       ctx.clearSensitiveFields();
       await access.refreshState();
       if (recoveryKey) await ctx.recoveryKey.show(recoveryKey);

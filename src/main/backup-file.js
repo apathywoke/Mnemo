@@ -115,9 +115,37 @@ async function openVaultSource(filePath, limits) {
 }
 
 // The encrypted bytes of one attachment from a container.
+// The attachment files of a snapshot, in its pool folder
+// (<vault>.snapshots/attachments/ or a copy outside this Mac), shaped like a
+// container so that a restore reads them the same way. Files that are
+// missing or too large are left out; the restore then reports the snapshot
+// as incomplete.
+async function openAttachmentPool(directory, ids, maxFileBytes) {
+  const blobs = new Map();
+  for (const id of ids) {
+    if (typeof id !== "string" || !UUID_PATTERN.test(id)) throw invalid();
+    try {
+      const stats = await fs.stat(path.join(directory, `${id}.bin`));
+      if (stats.isFile() && stats.size > 0 && stats.size <= maxFileBytes) blobs.set(id, { size: stats.size });
+    } catch {
+      // Missing: left out.
+    }
+  }
+  return { poolDirectory: directory, blobs };
+}
+
 async function readContainerFile(container, id) {
   const blob = container.blobs.get(id);
   if (!blob) throw invalid();
+  if (container.poolDirectory) {
+    const handle = await fs.open(path.join(container.poolDirectory, `${id}.bin`), "r");
+    try {
+      if ((await handle.stat()).size !== blob.size) throw invalid();
+      return await readExactly(handle, 0, blob.size);
+    } finally {
+      await handle.close();
+    }
+  }
   const handle = await fs.open(container.filePath, "r");
   try {
     return await readExactly(handle, blob.offset, blob.size);
@@ -167,4 +195,4 @@ async function writeContainer(destinationPath, envelope, attachments) {
   }
 }
 
-module.exports = { BACKUP_MAGIC, openVaultSource, readContainerFile, writeContainer };
+module.exports = { BACKUP_MAGIC, openVaultSource, openAttachmentPool, readContainerFile, writeContainer };

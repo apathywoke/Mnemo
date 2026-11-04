@@ -95,7 +95,22 @@
             <button id="restore-profile-button" type="button" class="text-button" data-i18n="profiles.restore">
               Restore a backup as a new vault
             </button>
+            <button id="restore-snapshot-folder-button" type="button" class="text-button" data-i18n="profiles.restoreSnapshot">
+              Restore a vault from a snapshot folder
+            </button>
           </div>
+        </section>
+
+        <section id="snapshots-panel" class="vault-panel profiles-panel" hidden>
+          <p class="eyebrow section-label" data-i18n="restore.eyebrow">RESTORE</p>
+          <h2 data-i18n="snapshots.title">Restore from a snapshot</h2>
+          <p id="snapshots-description" class="description" data-i18n="snapshots.description">
+            Each snapshot opens with the master passphrase or recovery key that was valid when it was taken.
+          </p>
+          <div id="snapshot-list" class="profile-list"></div>
+          <p id="snapshots-empty" class="description" data-i18n="snapshots.empty" hidden>There are no snapshots to restore.</p>
+          <p id="snapshots-error" class="form-error" role="alert" hidden></p>
+          <button id="snapshots-back-button" type="button" class="text-button" data-i18n="common.back">Back</button>
         </section>
 
         <section id="setup-panel" class="vault-panel" hidden>
@@ -221,6 +236,9 @@
             </button>
             <button id="unlock-restore-button" type="button" class="text-button" data-i18n="common.restoreFromBackup">
               Restore from backup
+            </button>
+            <button id="unlock-snapshot-button" type="button" class="text-button" data-i18n="unlock.restoreSnapshot" hidden>
+              Restore from a snapshot
             </button>
           </div>
         </section>
@@ -422,6 +440,20 @@
               <p data-i18n="vault.backupWarningBody">Every backup opens with the master passphrase or the recovery key that was valid when it was made. Keep both somewhere safe.</p>
             </div>
             <button id="dismiss-backup-warning" class="backup-warning-dismiss" type="button" aria-label="Dismiss this warning" data-i18n-aria-label="vault.dismissWarning" title="Dismiss this warning" data-i18n-title="vault.dismissWarning">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div id="outside-copy-banner" class="recovery-warning backup-recovery-warning" role="note" hidden>
+            <span class="recovery-warning-mark" aria-hidden="true">!</span>
+            <div>
+              <strong id="outside-copy-banner-title"></strong>
+              <p id="outside-copy-banner-body"></p>
+              <div class="outside-copy-actions">
+                <button id="outside-copy-banner-action" type="button" class="text-button"></button>
+                <button id="outside-copy-banner-later" type="button" class="text-button" data-i18n="vault.outsideLater" hidden>Later</button>
+              </div>
+            </div>
+            <button id="dismiss-outside-copy-banner" class="backup-warning-dismiss" type="button" aria-label="Dismiss this warning" data-i18n-aria-label="vault.dismissWarning" title="Dismiss this warning" data-i18n-title="vault.dismissWarning">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
             </button>
           </div>
@@ -844,6 +876,7 @@
             <button id="settings-tab-updates" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-updates" tabindex="-1" data-settings-tab="updates"><span data-i18n="updates.title">Updates</span><span id="settings-updates-dot" class="settings-tab-dot" hidden></span></button>
             <button id="settings-tab-security" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-security" tabindex="-1" data-settings-tab="security" data-i18n="settings.tabSecurity">Security</button>
             <button id="settings-tab-data" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-data" tabindex="-1" data-settings-tab="data" data-i18n="settings.tabData">Data</button>
+            <button id="settings-tab-backups" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-backups" tabindex="-1" data-settings-tab="backups" data-i18n="settings.tabBackups">Backups</button>
             <button id="settings-tab-vault" type="button" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-pane-vault" tabindex="-1" data-settings-tab="vault" data-i18n="settings.tabVault">Vault</button>
           </nav>
           <div class="settings-panes">
@@ -942,7 +975,6 @@
                 <section class="settings-field settings-section" aria-labelledby="settings-backup-title">
                   <h4 id="settings-backup-title" class="settings-section-title" data-i18n="settings.backupTitle">Backups and import</h4>
                   <p class="settings-hint" data-i18n="settings.backupHint">A backup opens with your master passphrase or recovery key. Import adds logins from Bitwarden, 1Password, or another Mnemo backup to this vault.</p>
-                  <p id="settings-snapshot-status" class="settings-hint" role="status"></p>
                   <div class="settings-actions">
                     <button id="settings-export-button" type="button" class="secondary-button" data-settings-action="export" data-i18n="settings.exportButton">Export backup…</button>
                     <button id="settings-import-button" type="button" class="secondary-button" data-i18n="settings.importButton">Import…</button>
@@ -954,6 +986,37 @@
                   <div class="settings-actions">
                     <button id="settings-export-json-button" type="button" class="secondary-button" data-settings-action="exportJson" data-i18n="settings.exportJsonButton">Export JSON…</button>
                     <button id="settings-export-csv-button" type="button" class="secondary-button" data-settings-action="exportCsv" data-i18n="settings.exportCsvButton">Export CSV…</button>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <section id="settings-pane-backups" class="settings-pane" role="tabpanel" aria-labelledby="settings-tab-backups" hidden>
+              <p class="settings-hint settings-pane-locked" data-i18n="settings.vaultLocked">Open a vault to manage its recovery key, backups, import, or deletion. Each vault has its own settings.</p>
+              <div class="settings-pane-body" hidden>
+                <section class="settings-field settings-section" aria-labelledby="settings-snapshots-title">
+                  <h4 id="settings-snapshots-title" class="settings-section-title" data-i18n="settings.snapshotsTitle">Snapshots on this Mac</h4>
+                  <p class="settings-hint" data-i18n="settings.snapshotsHint">After changes, Mnemo keeps encrypted snapshots of this vault: the last ten, one a day for 30 days, and one before each import, restore, or change of keys. Each opens with the master passphrase that was valid when it was taken.</p>
+                  <p id="settings-snapshot-status" class="settings-hint" role="status"></p>
+                </section>
+                <section class="settings-field settings-section" aria-labelledby="settings-outside-title">
+                  <h4 id="settings-outside-title" class="settings-section-title" data-i18n="settings.outsideTitle">Copy outside this Mac</h4>
+                  <p class="settings-hint" data-i18n="settings.outsideHint">Snapshots are copied, still encrypted, to a folder you choose in iCloud Drive or on an external disk, and checked after each copy. If this Mac is lost, the vault can be restored from there.</p>
+                  <p id="settings-outside-status" class="settings-hint" role="status"></p>
+                  <p id="settings-outside-problem" class="settings-hint settings-hint-warning" hidden></p>
+                  <p id="settings-outside-warning" class="settings-hint settings-hint-warning" hidden></p>
+                  <div class="settings-actions">
+                    <button id="settings-outside-choose" type="button" class="secondary-button"></button>
+                    <button id="settings-outside-copy" type="button" class="secondary-button" data-i18n="settings.outsideCopyNow" hidden>Copy now</button>
+                    <button id="settings-outside-stop" type="button" class="secondary-button" data-i18n="settings.outsideStop" hidden>Stop copying</button>
+                  </div>
+                  <p id="settings-outside-error" class="form-error" role="alert" hidden></p>
+                </section>
+                <section class="settings-field settings-section" aria-labelledby="settings-restore-snapshot-title">
+                  <h4 id="settings-restore-snapshot-title" class="settings-section-title" data-i18n="settings.restoreSnapshotTitle">Restore</h4>
+                  <p class="settings-hint" data-i18n="settings.restoreSnapshotHint">The vault locks first. A snapshot opens with the master passphrase or recovery key that was valid when it was taken, and the vault as it is now is kept as a snapshot.</p>
+                  <div class="settings-actions">
+                    <button id="settings-restore-snapshot" type="button" class="secondary-button" data-i18n="settings.restoreSnapshotButton">Restore a snapshot…</button>
                   </div>
                 </section>
               </div>

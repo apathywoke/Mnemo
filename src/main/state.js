@@ -18,6 +18,8 @@ function createState(translator) {
     mainWindow: null,
     vaultStore: null,
     profileManager: null,
+    // Copies of snapshots in the folder outside this Mac (outside-copies.js).
+    outsideCopies: null,
     activeProfileId: null,
     lockEpoch: 0,
     // Password health: a per-unlock key for password fingerprints, and breach
@@ -37,6 +39,10 @@ function createState(translator) {
     // A parsed import waiting for the user's confirmation. The logins hold plain
     // passwords, so they are dropped on commit, cancel, or lock.
     pendingImport: null,
+    // Snapshot folders found under the folder picked on the profile screen,
+    // for restoring a new vault from them (ipc/snapshots.js).
+    /** @type {string[]} */
+    pickedSnapshotFolders: [],
     // One reveal of notes, granted by the last real key or mouse press
     // (notes-reveal.js); dropped on lock.
     notesRevealGrant: null,

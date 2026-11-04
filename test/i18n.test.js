@@ -91,7 +91,7 @@ test("every English error thrown by the main process has a translation", async (
   const sources = await mainProcessFiles();
   const names = sources.map((file) => path.relative(root, file));
   assert.ok(names.includes("main.js") && names.includes("vault-store.js"), names.join(", "));
-  const internalOnly = new Set(["Invalid vault file", "Invalid vault data", "Invalid profile registry", "mismatch", "missing password", "invalid csv", "invalid", "Invalid key", "truncated", "Invalid version", "Update key ${name} is not an Ed25519 public key", "Invalid password hash", "Invalid attachment", "snapshot interrupted", "snapshot key", "snapshot damaged"]);
+  const internalOnly = new Set(["Invalid vault file", "Invalid vault data", "Invalid profile registry", "mismatch", "missing password", "invalid csv", "invalid", "Invalid key", "truncated", "Invalid version", "Update key ${name} is not an Ed25519 public key", "Invalid password hash", "Invalid attachment", "snapshot interrupted", "snapshot key", "snapshot damaged", "outside copy ${failure}"]);
   let checked = 0;
   for (const file of sources) {
     const source = await fs.readFile(file, "utf8");

@@ -138,18 +138,54 @@ passwords until the design has received independent security review.
   removed only after a new one is verified, the newest verified one never,
   and pool files only when no snapshot refers to them. A snapshot that cannot
   be saved (a full disk, for example) never stops the vault from saving;
-  Settings says so.
+  Settings → Backups says so.
+- **Copies outside this Mac.** In Settings → Backups the user can choose a
+  folder (iCloud Drive, a cloud storage folder, an external disk) in a native
+  dialog; the page never sends a path and sees only the folder's name
+  (`src/main/outside-copies.js`). Verified snapshots — the newest one, pinned
+  ones, and the newest of each recent day — are copied there, still
+  encrypted, into `<folder>/Mnemo/<profile ID>/` (the vault's name does not
+  leave the Mac), at most once an hour and at once for a pinned one. Copying
+  needs no key and runs while locked too. Every file is read back and must
+  equal the local one byte for byte; files are only added, never rewritten
+  in place, and old copies are removed by the same rules as local ones, only
+  after a new copy is verified. A folder that is missing (an unplugged
+  disk), a full disk, a file that does not read back, or an iCloud
+  placeholder (a file whose data is not on this Mac) is a failure, never a
+  success. Settings shows the last checked copy, the reason of a failure, and
+  a warning when the folder is on this Mac's own disk (it does not survive
+  losing the Mac) or on exFAT, FAT, or a network volume (writes may not be
+  flushed). The vault screen offers to set it up for a new vault, and
+  reminds after 14 days without a checked copy outside. A folder inside
+  Mnemo's own data is refused. Mnemo cannot tell whether iCloud has actually
+  uploaded a file; checking that the folder syncs is up to the user.
 - **What snapshots keep:** each snapshot opens with the master passphrase
   and recovery key that were valid when it was taken. After a change of
   passphrase or recovery key, a native dialog offers to delete the snapshots
   that open with the old one (keeping them is the default; delete them if
-  the old one may be known to someone). Items deleted for good, and old
+  the old one may be known to someone); deleting them also deletes their
+  copies in the folder outside this Mac, except files iCloud keeps only in
+  the cloud, which cannot be checked. Items deleted for good, and old
   passwords pushed out of the history, stay in snapshots until those
   snapshots are removed: up to 30 days, or 90 days in a pinned one. Deleting a
   vault asks in a separate native dialog whether to delete its snapshots too;
-  kept snapshots stay in the folder for a later restore. Restoring from a
-  snapshot comes in a later version; until then the files are there but the
-  app has no button for them.
+  kept snapshots stay in the folder for a later restore. Copies outside this
+  Mac are never deleted with the vault.
+- **Restoring from a snapshot** goes through the same checks as restoring a
+  backup (`src/main/snapshot-sources.js`, `ipc/snapshots.js`): the snapshot
+  must open with the master passphrase or recovery key that was valid when
+  it was taken (a recovery key also needs a new passphrase and gives the
+  vault a new key), every attachment it refers to must be in its pool and
+  decrypt, and only then are the files copied and the vault file replaced in
+  one rename; a missing or damaged piece restores nothing. A native dialog
+  confirms the replacement, the current state is kept as a pinned snapshot
+  first, and the snapshot being restored is pinned so it cannot be rotated
+  away. Touch ID is turned off afterwards. The list (Settings → Backups,
+  which locks the vault first, or the unlock screen after a damaged file)
+  shows the vault's snapshots on this Mac and its copies outside it; on the
+  profile screen a picked snapshot folder (copies another Mac made) can be
+  restored as a new vault. The page sends snapshot IDs from those lists,
+  never paths.
 - So nobody is locked in, Settings can export the vault **without encryption**
   in Bitwarden's format, which most password managers import: JSON with every
   item type and folder, or CSV with logins only. Attachments, earlier versions,

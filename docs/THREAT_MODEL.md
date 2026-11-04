@@ -14,7 +14,8 @@ removed after unlock was confirmed on real hardware, and for confirming
 new recovery keys (data table). Updated 2026-11-04 for flushing writes and
 telling damage from a wrong passphrase (B2, A1), and for the export without
 encryption (data table, A3), and the same day for local snapshots (data
-table, A1, A4; section 7, items 12–13).
+table, A1, A4; section 7, items 12–13), copies outside this Mac (data
+table, A1; section 7, item 13), and restoring from snapshots (A1).
 
 ## 1. What Mnemo protects
 
@@ -32,6 +33,7 @@ table, A1, A4; section 7, items 12–13).
 | Attachments | `<vault>.attachments/<id>.bin`, each encrypted under its own key sealed inside the vault data; main-process memory while being added, saved, or verified; a plain copy wherever the user saves one | A file alone reveals only its size. |
 | Earlier versions (history) | Inside the encrypted vault data, sealed values kept sealed | Old passwords remain until 20 newer versions push them out or the item is deleted for good. |
 | Local snapshots | `<vault>.snapshots/`: byte-for-byte copies of the vault file with a plain description each (time, SHA-256, size, attachment IDs, verified, pinned), and a shared pool of attachment files | Each copy opens with the passphrase and recovery key valid when it was taken. Descriptions reveal when the vault changed and how many attachments it had. Deleted items stay in them until rotation removes them (30 days, 90 when pinned). |
+| Copies outside this Mac | `<chosen folder>/Mnemo/<profile ID>/`: the same files as the local snapshots (iCloud Drive, a cloud storage folder, or an external disk) | Whoever stores the folder (Apple, a cloud provider, whoever holds the disk) sees file sizes, the times of changes, and the number of attachments, never contents or the vault's name. Each copy opens with the passphrase and recovery key valid when it was taken. |
 | Encrypted backups (`.vault`) | Wherever the user saves them | Same envelope and passphrase as the local vault; with attachments, a container that also holds the encrypted attachment files. |
 | Profile registry (`profiles.json`) | Application support folder, `0600` | Profile names in plain text, not secret by design. |
 | Integrity of the shipped app | `Mnemo.app` in `/Applications`; ad-hoc signed when installed from GitHub releases | A modified app can steal everything the user types. |
@@ -223,10 +225,11 @@ passphrase replaces the vault key and makes them useless (A1).
 | Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM; a passphrase being set must be at least 12 characters and rated Strong by the built-in estimate, checked in main | The estimate (a port of zxcvbn with English, German, and Russian dictionaries) models known attack strategies; a phrase that is predictable in ways it does not know, such as a quotation outside its dictionaries, can still pass. Vaults from before this rule may still have a 7-character passphrase until it is changed. |
 | Tamper with a vault or backup to plant data or downgrade parameters | AES-GCM with the header (format, version, KDF parameters, salt) as AAD; strict schema and size validation before and after decryption; fixed KDF parameters | None known. |
 | Swap sealed passwords between entries | Each password is sealed with the entry ID in its AAD; a swapped value fails authentication | None known. |
+| Read or alter copies in the folder outside this Mac (a cloud account, a stolen disk) | The copies are the encrypted vault files and attachment files as they are; descriptions hold times, hashes, sizes, and attachment IDs only; the subfolder is named by the profile ID. A copy that does not read back equal to the local one is a failure | Brute-forcing the passphrase of a copy is the same attack as on the vault file (scrypt). Whoever controls the folder can delete copies or put old ones back; a restore checks a copy with the passphrase that was valid then and decrypts every attachment, but an old genuine copy is accepted, and rollback is not detected (section 7, item 4). |
 | Read, alter, or swap attachment files | Each file is AES-256-GCM under its own key with the attachment ID as AAD; the key is sealed with the item and attachment IDs inside the vault data. A changed or swapped file fails to decrypt and is reported by name; backups are verified before they are written and before a restore replaces anything | File sizes and counts are visible. Deleting files is possible (denial of service); the vault then reports them as missing. |
 | Corrupt a backup to damage the vault it is restored into | The container must end exactly after its last file; every referenced attachment is decrypted before anything is written; the vault file is replaced last, in one rename | None known. |
 | Read the vault key from a copied Touch ID key file | The key is wrapped under a Secure Enclave key agreement; the blob opens only in this Mac's Secure Enclave, after Touch ID | Copies of version 1 files from earlier versions (in backups of the home folder) decrypt with the login Keychain and the login password, until a change of credentials replaces the vault key. |
-| Damage to the only copy of a vault (bad disk, power cut, sync tool, a mistaken import or restore) | AES-GCM detects any change. A file that does not parse, or whose key opens and whose data does not, is reported as damaged rather than as a wrong passphrase. Local snapshots: verified copies (read back, same key wraps, decrypted, attachments present and decrypted), the 10 newest plus one a day for 30 days, pinned for 90 days before format upgrades, key changes, imports, and restores; old ones go only after a new one is verified | A damaged key wrap looks like a wrong passphrase: AES-GCM cannot tell them apart. Snapshots sit on the same disk, so losing the disk or the Mac loses them too (copies outside the Mac come later). Restoring from a snapshot has no button yet. |
+| Damage to the only copy of a vault (bad disk, power cut, sync tool, a mistaken import or restore) | AES-GCM detects any change. A file that does not parse, or whose key opens and whose data does not, is reported as damaged rather than as a wrong passphrase. Local snapshots: verified copies (read back, same key wraps, decrypted, attachments present and decrypted), the 10 newest plus one a day for 30 days, pinned for 90 days before format upgrades, key changes, imports, and restores; old ones go only after a new one is verified | A damaged key wrap looks like a wrong passphrase: AES-GCM cannot tell them apart. Local snapshots sit on the same disk; copies outside this Mac (a folder the user chooses, read back after every write, with a reminder after 14 days without one) cover losing the disk or the Mac, but only once set up, and Mnemo cannot tell whether iCloud has uploaded them. A restore from a snapshot needs the passphrase or recovery key that was valid then. |
 | Recover deleted vaults | Not addressed: deletion unlinks the file | APFS snapshots, Time Machine, and SSD remapping may keep old encrypted copies. These remain protected by their passphrase. |
 
 ### A2, malicious website (favicon fetch)
@@ -399,9 +402,17 @@ must not be used with real vaults on a shared machine.
     or the item is deleted for good. A per-item "clear history" action would
     let users drop it sooner. Items deleted for good stay in local snapshots
     until those are rotated out: up to 30 days, 90 in a pinned one.
-13. **Local snapshots.** **Partly done** (data safety plan, step 3).
-    - Snapshots are kept and verified on this Mac only; a copy in a folder
-      outside the Mac, its status, and restoring from the app come next.
+13. **Local snapshots and copies outside this Mac.** **Partly done** (data
+    safety plan, steps 3 and 4a).
+    - Snapshots are kept and verified on this Mac, copied to a folder the
+      user chooses outside it, and restored from the app (steps 3, 4a, 4b).
+      A restore is a deliberate rollback: when revision tracking lands
+      (`docs/design-rollback.md`, section 8) it follows the rules for
+      restoring an older backup.
+    - **Accepted:** Mnemo cannot see whether iCloud or another cloud folder
+      has uploaded a copy; it checks only that the file is in the folder and
+      reads back intact. A folder on this Mac's own disk is allowed, with a
+      warning.
     - Unverified copies (taken at launch or before a restore while locked)
       count only after the next unlock checks them.
     - **Accepted:** descriptions are plain JSON, so the times of changes and

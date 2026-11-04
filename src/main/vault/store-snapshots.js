@@ -27,14 +27,12 @@ const {
 const {
   MIN_INTERVAL_MS,
   INCOMPLETE_GRACE_MS,
-  MAX_DESCRIPTION_BYTES,
   snapshotDirectoryFor,
   snapshotName,
-  groupSnapshotFiles,
   sha256Hex,
-  parseDescription,
   describeSnapshot,
   snapshotsToRemove,
+  listSnapshotDirectory,
 } = require("./snapshots");
 
 /** @typedef {import("./index").Instance} Store */
@@ -86,30 +84,8 @@ class VaultStoreSnapshots {
   // Complete snapshots ({ name, description }), newest first, and
   // incomplete ones (a copy without a description, or the reverse).
   /** @this {Store} */
-  async listSnapshots() {
-    let fileNames;
-    try {
-      fileNames = await fs.readdir(this.snapshotDirectory);
-    } catch (error) {
-      if (error.code === "ENOENT") return { complete: [], incomplete: [] };
-      throw error;
-    }
-    const complete = [];
-    const incomplete = [];
-    for (const group of groupSnapshotFiles(fileNames)) {
-      let description = null;
-      if (group.hasData && group.hasDescription) {
-        try {
-          description = parseDescription(await readFileWithLimit(this.snapshotFile(group.name, "json"), MAX_DESCRIPTION_BYTES));
-        } catch {
-          description = null;
-        }
-      }
-      if (description) complete.push({ name: group.name, description });
-      else incomplete.push(group);
-    }
-    complete.sort((a, b) => b.description.createdAt - a.description.createdAt || b.name.localeCompare(a.name));
-    return { complete, incomplete };
+  listSnapshots() {
+    return listSnapshotDirectory(this.snapshotDirectory);
   }
 
   /** @this {Store} */
@@ -328,7 +304,10 @@ class VaultStoreSnapshots {
         }
       }
       if (same) {
-        if (pinReason) await this.pinSnapshot(newest, pinReason);
+        if (pinReason) {
+          await this.pinSnapshot(newest, pinReason);
+          this.snapshotOptions.onSnapshot({ pinned: true });
+        }
         this.lastSnapshotAt = newest.description.createdAt;
         return newest.name;
       }
@@ -366,6 +345,7 @@ class VaultStoreSnapshots {
       this.lastSnapshotAt = written.description.createdAt;
       check();
       await this.rotateSnapshotsNow();
+      this.snapshotOptions.onSnapshot({ pinned: Boolean(pinReason) });
       return written.name;
     } finally {
       bytes.fill(0);
@@ -499,6 +479,19 @@ class VaultStoreSnapshots {
     return other;
   }
 
+  // Whether a copy of a vault file (a snapshot outside this Mac) opens with
+  // other secrets than the open vault. A file that does not parse counts as
+  // other.
+  /** @this {Store} */
+  isOtherKeyBytes(bytes) {
+    this.requireUnlocked();
+    try {
+      return keyMaterialOf(readEnvelope(bytes).envelope) !== keyMaterialOf(this.envelope);
+    } catch {
+      return true;
+    }
+  }
+
   // Deletes the snapshots that open with an earlier passphrase or recovery
   // key. The open vault's own snapshots stay.
   /** @this {Store} */
@@ -509,6 +502,17 @@ class VaultStoreSnapshots {
       await this.removeUnreferencedPoolFiles();
       return { deleted: names.length };
     });
+  }
+
+  // Pins a local snapshot that is about to be restored, so that the snapshot
+  // taken of the current state first cannot rotate it away. Never throws.
+  /** @this {Store} */
+  async keepSnapshotForRestore(name) {
+    await this.enqueueMutation(() => this.runSnapshotWork(async () => {
+      const { complete } = await this.listSnapshots();
+      const snapshot = complete.find((item) => item.name === name);
+      if (snapshot) await this.pinSnapshot(snapshot, "restore");
+    }));
   }
 
   // --- Scheduling --------------------------------------------------------------------

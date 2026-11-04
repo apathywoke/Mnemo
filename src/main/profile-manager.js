@@ -40,8 +40,14 @@ function normalizeProfileName(value) {
 }
 
 class ProfileManager {
-  constructor(userDataPath) {
+  /**
+   * @param {string} userDataPath
+   * @param {{ onSnapshot?: (vaultPath: string, info: { pinned: boolean }) => void }} [options]
+   *   `onSnapshot`: a vault has a new verified snapshot.
+   */
+  constructor(userDataPath, { onSnapshot = () => {} } = {}) {
     this.userDataPath = userDataPath;
+    this.onSnapshot = onSnapshot;
     this.registryPath = path.join(userDataPath, "profiles.json");
     this.legacyVaultPath = path.join(userDataPath, "vault.json");
     this.vaultDirectory = path.join(userDataPath, "vaults");
@@ -51,7 +57,10 @@ class ProfileManager {
   // The store for a vault file, with local snapshots on. Every store the app
   // opens comes from here.
   createStore(vaultPath) {
-    return new VaultStore(vaultPath, { snapshots: true });
+    return new VaultStore(vaultPath, {
+      snapshots: true,
+      onSnapshot: (info) => this.onSnapshot(vaultPath, info),
+    });
   }
 
   // At launch: an unverified snapshot of each vault whose last changes may
@@ -62,11 +71,12 @@ class ProfileManager {
     try {
       profiles = await this.listProfiles();
     } catch {
-      return;
+      return [];
     }
     for (const profile of profiles) {
       await VaultStore.copySnapshotAtLaunch(this.getVaultPath(profile.id));
     }
+    return profiles.map((profile) => this.getVaultPath(profile.id));
   }
 
   // Whether a vault has local snapshots (they are deleted with it only after
@@ -218,10 +228,11 @@ class ProfileManager {
     );
   }
 
-  async restoreProfile(name, sourcePath, passphrase) {
+  // `poolDirectory`: the source is a snapshot whose attachments are there.
+  async restoreProfile(name, sourcePath, passphrase, { poolDirectory = null } = {}) {
     return this.enqueueMutation(() =>
       this.createProfileWith(name, (store) =>
-        store.restoreBackup(sourcePath, passphrase),
+        store.restoreBackup(sourcePath, passphrase, { poolDirectory }),
       ),
     );
   }

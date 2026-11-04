@@ -93,6 +93,16 @@ contextBridge.exposeInMainWorld("vaultApp", {
     ipcRenderer.invoke("vault:recover", recoveryKey, newPassphrase),
   getRecoveryStatus: () => ipcRenderer.invoke("vault:get-recovery-status"),
   getSnapshotStatus: () => ipcRenderer.invoke("vault:get-snapshot-status"),
+  getOutsideCopyStatus: () => ipcRenderer.invoke("outside:get-status"),
+  chooseOutsideFolder: () => ipcRenderer.invoke("outside:choose-folder"),
+  stopOutsideCopies: () => ipcRenderer.invoke("outside:stop"),
+  copyOutsideNow: () => ipcRenderer.invoke("outside:copy-now"),
+  dismissOutsideCopyOffer: () => ipcRenderer.invoke("outside:dismiss-offer"),
+  listSnapshots: () => ipcRenderer.invoke("snapshots:list"),
+  restoreSnapshot: (id, credentials) => ipcRenderer.invoke("snapshots:restore", id, credentials),
+  chooseSnapshotFolder: () => ipcRenderer.invoke("snapshots:choose-folder"),
+  restoreSnapshotAsProfile: (name, id, credentials) =>
+    ipcRenderer.invoke("profiles:restore-snapshot", name, id, credentials),
   createRecoveryKey: (passphrase) =>
     ipcRenderer.invoke("vault:create-recovery-key", passphrase),
   copyRecoveryKey: () => ipcRenderer.invoke("recovery:copy"),

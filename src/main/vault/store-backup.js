@@ -5,10 +5,10 @@ const path = require("node:path");
 const { toOtpauthUri } = require("../totp");
 const { ITEM_TYPES } = require("../../shared/item-types.js");
 const { toBitwardenCsv, toBitwardenJson } = require("../bitwarden-format");
-const { readContainerFile, writeContainer } = require("../backup-file");
+const { openAttachmentPool, readContainerFile, writeContainer } = require("../backup-file");
 const { isDiskFullError } = require("../durable-file");
 const VaultStore = require("./store");
-const { MAX_FILE_BYTES } = require("./constants");
+const { MAX_FILE_BYTES, MAX_ATTACHMENT_BYTES } = require("./constants");
 const { hasExactKeys } = require("./records");
 const { decodeRecoveryKey } = require("./recovery-key");
 const { openTotp, openPassword, openItemSecret, openNotes } = require("./crypto");
@@ -178,8 +178,15 @@ class VaultStoreBackup {
   // { recoveryKey, newPassphrase } when that passphrase is forgotten. With a
   // recovery key the backup is re-encrypted under the new passphrase and a new
   // recovery key, available afterwards from takeIssuedRecoveryKey().
-  /** @this {Store} */
-  async restoreBackup(sourcePath, credentials) {
+  // `poolDirectory`: the source is a snapshot, a plain vault file whose
+  // attachment files are in this folder (see snapshots.js).
+  /**
+   * @this {Store}
+   * @param {string} sourcePath
+   * @param {any} credentials
+   * @param {{ poolDirectory?: string | null }} [options]
+   */
+  async restoreBackup(sourcePath, credentials, { poolDirectory = null } = {}) {
     return this.enqueueMutation(async () => {
       const sessionEpoch = this.sessionEpoch;
       // The key is handed to the store below; `dataKey` is then set to null.
@@ -190,6 +197,7 @@ class VaultStoreBackup {
         validatePassphrase(credentials);
         opened = await this.decryptVaultFile(sourcePath, credentials, { allowContainer: true });
         envelope = opened.envelope;
+        if (poolDirectory) opened.container = await this.snapshotPool(opened, poolDirectory);
       } else {
         if (!hasExactKeys(credentials, ["recoveryKey", "newPassphrase"])) {
           throw new Error("The recovery key is not valid. Check it and try again.");
@@ -201,6 +209,7 @@ class VaultStoreBackup {
         } finally {
           recoveryKeyBytes.fill(0);
         }
+        if (poolDirectory) opened.container = await this.snapshotPool(opened, poolDirectory);
         await this.pinSnapshotBefore("restore");
         return this.restoreWithNewKey(opened, credentials.newPassphrase, sessionEpoch);
       }
@@ -243,6 +252,13 @@ class VaultStoreBackup {
         opened.dataKey?.fill(0);
       }
     });
+  }
+
+  // The attachment files a decrypted snapshot refers to, from its pool.
+  /** @this {Store} */
+  async snapshotPool(opened, poolDirectory) {
+    const ids = attachmentsOf(opened.vaultData).map(({ attachment }) => attachment.id);
+    return openAttachmentPool(poolDirectory, ids, MAX_ATTACHMENT_BYTES + ATTACHMENT_OVERHEAD);
   }
 
   // Restoring with the recovery key: the backup's vault key is known to anyone

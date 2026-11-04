@@ -13,6 +13,8 @@
 // key, with every attachment it refers to present and decrypted. Attachment
 // files never change after they are written, and key rotation gives them new
 // IDs, so one pool file per ID serves every snapshot that refers to it.
+const fs = require("node:fs/promises");
+const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { hasExactKeys } = require("./records");
 const { UUID_PATTERN, MAX_ENTRIES, MAX_ATTACHMENTS_PER_ENTRY } = require("./constants");
@@ -149,6 +151,47 @@ function snapshotsToRemove(snapshots, now) {
   return snapshots.filter((item) => !keep.has(item.name)).map((item) => item.name);
 }
 
+// Reads a whole file, refusing anything larger than `limit` bytes.
+async function readSmallFile(filePath, limit) {
+  const handle = await fs.open(filePath, "r");
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile() || stats.size > limit) throw new Error("invalid");
+    return await handle.readFile();
+  } finally {
+    await handle.close();
+  }
+}
+
+// The snapshots in `directory`: complete ones ({ name, description }),
+// newest first, and incomplete ones (a copy without a description, or the
+// reverse). A missing folder has none.
+async function listSnapshotDirectory(directory) {
+  let fileNames;
+  try {
+    fileNames = await fs.readdir(directory);
+  } catch (error) {
+    if (error.code === "ENOENT") return { complete: [], incomplete: [] };
+    throw error;
+  }
+  const complete = [];
+  const incomplete = [];
+  for (const group of groupSnapshotFiles(fileNames)) {
+    let description = null;
+    if (group.hasData && group.hasDescription) {
+      try {
+        description = parseDescription(await readSmallFile(path.join(directory, `${group.name}.json`), MAX_DESCRIPTION_BYTES));
+      } catch {
+        description = null;
+      }
+    }
+    if (description) complete.push({ name: group.name, description });
+    else incomplete.push(group);
+  }
+  complete.sort(newestFirst);
+  return { complete, incomplete };
+}
+
 module.exports = {
   DAY_MS,
   KEEP_RECENT,
@@ -166,4 +209,6 @@ module.exports = {
   parseDescription,
   describeSnapshot,
   snapshotsToRemove,
+  newestFirst,
+  listSnapshotDirectory,
 };

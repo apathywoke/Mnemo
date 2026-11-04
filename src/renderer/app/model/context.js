@@ -15,6 +15,9 @@ function createContext() {
         selectedProfileId: null,
         selectedProfileName: null,
         restoringNewProfile: false,
+        // The snapshot being restored, from the snapshot list; null when
+        // restoring a backup file.
+        restoreSnapshot: null,
       },
       vault: {
         entries: [],
@@ -35,6 +38,9 @@ function createContext() {
       },
     },
     pages: Object.create(null),
+    // Opens Settings at a category; set by the settings slice.
+    /** @type {(tab?: string) => void} */
+    openSettings: () => {},
     setError(element, message) {
       setElementError(element, message);
     },
@@ -45,6 +51,7 @@ function createContext() {
         setup: $("#setup-panel"),
         unlock: $("#unlock-panel"),
         restore: $("#restore-panel"),
+        snapshots: $("#snapshots-panel"),
         recover: $("#recover-panel"),
         open: $("#open-panel"),
         fatal: $("#fatal-panel"),

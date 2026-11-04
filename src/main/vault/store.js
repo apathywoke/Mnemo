@@ -2,7 +2,7 @@
 // lock), the mutation queue, and atomic writes. Feature methods are added to
 // the prototype by ./index.js.
 const fs = require("node:fs/promises");
-const { describeWriteError, isDiskFullError, removeStaleTemporaryFiles, syncDirectory } = require("../durable-file");
+const { isDiskFullError, removeStaleTemporaryFiles, writeFileDurably } = require("../durable-file");
 const path = require("node:path");
 const {
   randomBytes,
@@ -48,10 +48,15 @@ function newerVersionError(isBackup) {
 
 class VaultStore {
   // `snapshots`: keep local snapshots of this vault (store-snapshots.js).
-  // The app turns them on; most tests leave them off. `now` is their clock.
-  constructor(filePath, { snapshots = false, now = Date.now } = {}) {
+  // The app turns them on; most tests leave them off. `now` is their clock;
+  // `onSnapshot` hears of each verified one ({ pinned }), for copies outside.
+  /**
+   * @param {string} filePath
+   * @param {{ snapshots?: boolean, now?: () => number, onSnapshot?: (info: { pinned: boolean }) => void }} [options]
+   */
+  constructor(filePath, { snapshots = false, now = Date.now, onSnapshot = () => {} } = {}) {
     this.filePath = filePath;
-    this.snapshotOptions = { enabled: snapshots, now };
+    this.snapshotOptions = { enabled: snapshots, now, onSnapshot };
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.snapshotTimer = null;
     /** @type {number | null} */
@@ -412,25 +417,8 @@ class VaultStore {
     }
   }
 
-  async writeBytesAtomically(destinationPath, contents) {
-    const directory = path.dirname(destinationPath);
-    const temporaryPath = `${destinationPath}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
-    let fileHandle = null;
-
-    try {
-      await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-      fileHandle = await fs.open(temporaryPath, "wx", 0o600);
-      await fileHandle.writeFile(contents);
-      await fileHandle.sync();
-      await fileHandle.close();
-      fileHandle = null;
-      await fs.rename(temporaryPath, destinationPath);
-      await syncDirectory(directory);
-    } catch (error) {
-      if (fileHandle) await fileHandle.close().catch(() => {});
-      await fs.unlink(temporaryPath).catch(() => {});
-      throw describeWriteError(error);
-    }
+  writeBytesAtomically(destinationPath, contents) {
+    return writeFileDurably(destinationPath, contents);
   }
 }
 

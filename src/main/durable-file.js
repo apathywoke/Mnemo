@@ -4,6 +4,7 @@
 // F_FULLFSYNC there, falling back to F_BARRIERFSYNC and fsync.
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { randomBytes } = require("node:crypto");
 
 const DISK_FULL_MESSAGE = "There is not enough free disk space. Free some space and try again.";
 
@@ -50,4 +51,29 @@ async function removeStaleTemporaryFiles(destinationPath) {
   return removed;
 }
 
-module.exports = { describeWriteError, isDiskFullError, removeStaleTemporaryFiles, syncDirectory };
+// Writes `contents` to `destinationPath` through a temporary file in the same
+// folder (mode 0600), flushed before the rename and the folder after it. A
+// crash leaves the old file or the new one; removeStaleTemporaryFiles cleans
+// up the temporary file.
+async function writeFileDurably(destinationPath, contents) {
+  const directory = path.dirname(destinationPath);
+  const temporaryPath = `${destinationPath}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
+  let fileHandle = null;
+
+  try {
+    await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+    fileHandle = await fs.open(temporaryPath, "wx", 0o600);
+    await fileHandle.writeFile(contents);
+    await fileHandle.sync();
+    await fileHandle.close();
+    fileHandle = null;
+    await fs.rename(temporaryPath, destinationPath);
+    await syncDirectory(directory);
+  } catch (error) {
+    if (fileHandle) await fileHandle.close().catch(() => {});
+    await fs.unlink(temporaryPath).catch(() => {});
+    throw describeWriteError(error);
+  }
+}
+
+module.exports = { describeWriteError, isDiskFullError, removeStaleTemporaryFiles, syncDirectory, writeFileDurably };

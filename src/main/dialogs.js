@@ -81,6 +81,10 @@ function createDialogs(ctx) {
     });
     if (response !== 1 || store !== state.vaultStore || state.lockEpoch !== epoch) return;
     await store.deleteSnapshotsWithOtherKeys();
+    // Their copies outside this Mac go too: that is where an old key matters
+    // most (iCloud).
+    if (store !== state.vaultStore || state.lockEpoch !== epoch) return;
+    await state.outsideCopies?.deleteWithOtherKeys(store.filePath, (bytes) => store.isOtherKeyBytes(bytes));
   }
 
   return { showVaultDialog, showSecretDialog, confirmDeletingSnapshots, offerDeletingOldSnapshots };
