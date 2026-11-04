@@ -5,6 +5,7 @@ const path = require("node:path");
 const { toOtpauthUri } = require("../totp");
 const { ITEM_TYPES } = require("../../shared/item-types.js");
 const { readContainerFile, writeContainer } = require("../backup-file");
+const { isDiskFullError } = require("../durable-file");
 const VaultStore = require("./store");
 const { MAX_FILE_BYTES } = require("./constants");
 const { hasExactKeys } = require("./records");
@@ -120,7 +121,8 @@ class VaultStoreBackup {
           await writeContainer(resolvedDestination, envelope, attachments);
         }
         return { exported: true, attachments: attachments.length };
-      } catch {
+      } catch (error) {
+        if (isDiskFullError(error)) throw error;
         throw new Error("Could not create the encrypted backup.");
       } finally {
         encryptedFile?.fill(0);

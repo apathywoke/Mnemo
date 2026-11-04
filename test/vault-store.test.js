@@ -146,7 +146,7 @@ test("backup export and restore reject tampering and wrong passphrases", async (
   );
   await assert.rejects(
     restored.restoreBackup(tamperedPath, PASSPHRASE),
-    /Could not open the vault/,
+    /not a Mnemo backup, or it is damaged/,
   );
   assert.equal(await restored.fileExists(), false);
 
@@ -337,7 +337,7 @@ test("tampering with the recovery wrap or header is detected", async (t) => {
   const stripped = JSON.parse(original);
   delete stripped.recoveryWrap;
   await fs.writeFile(store.filePath, JSON.stringify(stripped));
-  await assert.rejects(store.unlock(PASSPHRASE), /Could not open the vault/);
+  await assert.rejects(store.unlock(PASSPHRASE), /vault file is damaged/);
 
   const resalted = JSON.parse(original);
   resalted.recovery.salt = Buffer.alloc(16, 7).toString("base64");

@@ -105,7 +105,7 @@ test("profile restore refuses a backup with another passphrase", async (t) => {
   await fs.writeFile(damagedPath, "not a valid encrypted vault");
   await assert.rejects(
     manager.restoreProfile("Damaged backup", damagedPath, PASSPHRASE),
-    /Could not open the vault/,
+    /not a Mnemo backup, or it is damaged/,
   );
   assert.deepEqual(await manager.listProfiles(), []);
   assert.deepEqual(await fs.readdir(manager.vaultDirectory), []);

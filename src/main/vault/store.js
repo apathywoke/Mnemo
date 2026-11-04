@@ -2,6 +2,7 @@
 // lock), the mutation queue, and atomic writes. Feature methods are added to
 // the prototype by ./index.js.
 const fs = require("node:fs/promises");
+const { describeWriteError, isDiskFullError, removeStaleTemporaryFiles, syncDirectory } = require("../durable-file");
 const path = require("node:path");
 const {
   randomBytes,
@@ -115,7 +116,7 @@ class VaultStore {
       dataKey = null;
       return this.getStatus();
     } catch (error) {
-      if (error.message === "A vault already exists on this Mac.") throw error;
+      if (error.message === "A vault already exists on this Mac." || isDiskFullError(error)) throw error;
       if (error.message === "Creation was interrupted because the vault was locked.") {
         throw error;
       }
@@ -169,12 +170,14 @@ class VaultStore {
   // --- Housekeeping -------------------------------------------------------------------
 
   // After the vault opens (inside the mutation queue): removes items that
-  // have been in the trash for 30 days and attachment files no item refers
-  // to. Failures are left for the next time.
+  // have been in the trash for 30 days, attachment files no item refers to,
+  // and temporary files a crash left next to the vault. Failures are left
+  // for the next time.
   async maintainNow(now = Date.now()) {
     // The cleanup methods come from store-attachments.js and store-entries.js.
     const store = /** @type {import("./index").Instance} */ (/** @type {unknown} */ (this));
     if (!store.isUnlocked()) return;
+    await removeStaleTemporaryFiles(this.filePath);
     const cutoff = now - TRASH_RETENTION_MS;
     try {
       await store.removeEntries((entry) => Boolean(entry.deletedAt) && entry.deletedAt <= cutoff);
@@ -249,6 +252,10 @@ class VaultStore {
     let plaintext = null;
     let salt = null;
     let rawFile = null;
+    // How far opening got decides what a failure means: the file does not
+    // parse, the secret does not open the key (a wrong secret or damage,
+    // which AES-GCM cannot tell apart), or the key opened and the data did not.
+    let stage = "file";
 
     try {
       const source = await openVaultSource(filePath, {
@@ -263,6 +270,7 @@ class VaultStore {
       const envelope = source.container ? source.envelope : JSON.parse(/** @type {Buffer} */ (rawFile).toString("utf8"));
       if (isNewerEnvelope(envelope)) throw newerVersionError(allowContainer);
       const parsed = parseEnvelope(envelope);
+      stage = "key";
       if (usingDataKey) {
         parsed.salt.fill(0);
         parsed.recoverySalt?.fill(0);
@@ -293,6 +301,7 @@ class VaultStore {
           KEY_BYTES,
         );
       }
+      if (!usingDataKey) stage = "data";
       plaintext = decryptGcm(
         envelope.data,
         dataKey,
@@ -313,6 +322,15 @@ class VaultStore {
       return opened;
     } catch (error) {
       if (error?.userFacing) throw new Error(error.message);
+      // Errors with a code come from the system (a missing or unreadable
+      // file), and say nothing about what the file holds.
+      if (stage === "data" || (stage === "file" && !error?.code)) {
+        throw new Error(
+          allowContainer
+            ? "This file is not a Mnemo backup, or it is damaged."
+            : "This vault file is damaged and cannot be opened. Restore it from a backup.",
+        );
+      }
       if (usingDataKey) {
         throw new Error("Touch ID can no longer unlock this vault. Unlock it with your master passphrase and turn Touch ID on again.");
       }
@@ -366,10 +384,11 @@ class VaultStore {
       await fileHandle.close();
       fileHandle = null;
       await fs.rename(temporaryPath, destinationPath);
+      await syncDirectory(directory);
     } catch (error) {
       if (fileHandle) await fileHandle.close().catch(() => {});
       await fs.unlink(temporaryPath).catch(() => {});
-      throw error;
+      throw describeWriteError(error);
     }
   }
 }

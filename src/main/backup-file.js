@@ -12,7 +12,9 @@
 // container is decrypted or re-encrypted to write it; the keys for the
 // attachments live inside the encrypted vault data.
 const fs = require("node:fs/promises");
+const path = require("node:path");
 const { randomBytes } = require("node:crypto");
+const { describeWriteError, syncDirectory } = require("./durable-file");
 
 const BACKUP_MAGIC = Buffer.from("MNEMOBK1", "ascii");
 const BACKUP_FORMAT = "mnemo-backup";
@@ -155,10 +157,11 @@ async function writeContainer(destinationPath, envelope, attachments) {
     await handle.close();
     handle = null;
     await fs.rename(temporaryPath, destinationPath);
+    await syncDirectory(path.dirname(destinationPath));
   } catch (error) {
     if (handle) await handle.close().catch(() => {});
     await fs.unlink(temporaryPath).catch(() => {});
-    throw error;
+    throw describeWriteError(error);
   } finally {
     header.fill(0);
   }

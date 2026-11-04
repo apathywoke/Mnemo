@@ -135,6 +135,7 @@ if (launchedWithRemoteDebugging) {
     powerMonitor.on("suspend", () => lockVault(true));
 
     state.profileManager = new ProfileManager(app.getPath("userData"));
+    void state.profileManager.removeStaleTemporaryFiles();
     state.vaultStore = new VaultStore(state.profileManager.legacyVaultPath);
     // The Touch ID helper sits next to app.asar when packaged and in
     // build/native/ for `npm start` (scripts/build-touch-id.js).

@@ -1,4 +1,5 @@
 const fs = require("node:fs/promises");
+const { describeWriteError, isDiskFullError, removeStaleTemporaryFiles, syncDirectory } = require("./durable-file");
 const path = require("node:path");
 const { randomUUID, randomBytes } = require("node:crypto");
 const VaultStore = require("./vault/index");
@@ -45,6 +46,11 @@ class ProfileManager {
     this.legacyVaultPath = path.join(userDataPath, "vault.json");
     this.vaultDirectory = path.join(userDataPath, "vaults");
     this.mutationQueue = Promise.resolve();
+  }
+
+  // What a crash left while saving the profile list.
+  removeStaleTemporaryFiles() {
+    return this.enqueueMutation(() => removeStaleTemporaryFiles(this.registryPath));
   }
 
   enqueueMutation(operation) {
@@ -356,10 +362,12 @@ class ProfileManager {
       await fileHandle.close();
       fileHandle = null;
       await fs.rename(temporaryPath, this.registryPath);
-    } catch {
+      await syncDirectory(this.userDataPath);
+    } catch (error) {
       if (fileHandle) await fileHandle.close().catch(() => {});
       await fs.unlink(temporaryPath).catch(() => {});
-      throw new Error("Could not save the local vault profile list.");
+      const described = describeWriteError(error);
+      throw isDiskFullError(described) ? described : new Error("Could not save the local vault profile list.");
     } finally {
       contents.fill(0);
     }

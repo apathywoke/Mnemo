@@ -11,7 +11,8 @@ the same day for revealing notes only after real user input (A3; section 7,
 item 2 done) and for Touch ID backed by the Secure Enclave (B8, "Touch ID
 helper", A1, A4, A8; section 7, item 7), with the Keychain-based Touch ID
 removed after unlock was confirmed on real hardware, and for confirming
-new recovery keys (data table).
+new recovery keys (data table). Updated 2026-11-04 for flushing writes and
+telling damage from a wrong passphrase (B2, A1).
 
 ## 1. What Mnemo protects
 
@@ -63,6 +64,9 @@ new recovery keys (data table).
   process.
 - **B2, main → disk.** Everything secret is encrypted before it is written.
   Writes are atomic (temp file plus rename) with restrictive permissions.
+  The temp file is flushed to the disk before the rename (`F_FULLFSYNC`, through
+  libuv), and the folder after it, so a power cut leaves the old or the new
+  file. A full disk leaves the old file in place and says so.
 - **B3, main → clipboard.** Leaves the app's control once written.
 - **B4, main → network.** Only the explicit "Load site icon" action, the
   breach check in Reports (5-character SHA-1 prefixes to Have I Been Pwned,
@@ -218,6 +222,7 @@ passphrase replaces the vault key and makes them useless (A1).
 | Read, alter, or swap attachment files | Each file is AES-256-GCM under its own key with the attachment ID as AAD; the key is sealed with the item and attachment IDs inside the vault data. A changed or swapped file fails to decrypt and is reported by name; backups are verified before they are written and before a restore replaces anything | File sizes and counts are visible. Deleting files is possible (denial of service); the vault then reports them as missing. |
 | Corrupt a backup to damage the vault it is restored into | The container must end exactly after its last file; every referenced attachment is decrypted before anything is written; the vault file is replaced last, in one rename | None known. |
 | Read the vault key from a copied Touch ID key file | The key is wrapped under a Secure Enclave key agreement; the blob opens only in this Mac's Secure Enclave, after Touch ID | Copies of version 1 files from earlier versions (in backups of the home folder) decrypt with the login Keychain and the login password, until a change of credentials replaces the vault key. |
+| Damage to the only copy of a vault (bad disk, power cut, sync tool) | AES-GCM detects any change. A file that does not parse, or whose key opens and whose data does not, is reported as damaged rather than as a wrong passphrase | A damaged key wrap looks like a wrong passphrase: AES-GCM cannot tell them apart. Mnemo cannot repair a file; the data is safe only if a backup exists. |
 | Recover deleted vaults | Not addressed: deletion unlinks the file | APFS snapshots, Time Machine, and SSD remapping may keep old encrypted copies. These remain protected by their passphrase. |
 
 ### A2, malicious website (favicon fetch)

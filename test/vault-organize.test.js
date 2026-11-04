@@ -360,7 +360,7 @@ test("backups carry attachments and are restored only when every file checks out
   await assert.rejects(target.restoreBackup(damagedPath, PASSPHRASE), /incomplete or damaged/);
   const truncatedPath = path.join(directory, "truncated.vault");
   await fs.writeFile(truncatedPath, backup.subarray(0, backup.length - 1));
-  await assert.rejects(target.restoreBackup(truncatedPath, PASSPHRASE), /Could not open the vault/);
+  await assert.rejects(target.restoreBackup(truncatedPath, PASSPHRASE), /not a Mnemo backup, or it is damaged/);
   await reopen(target);
   assert.deepEqual(target.listEntries().map((entry) => entry.name), ["Own"]);
   assert.equal(await exists(ownFile), true);
@@ -375,7 +375,7 @@ test("backups carry attachments and are restored only when every file checks out
   // A vault file is never read as a container, and a plain backup stays plain.
   await fs.copyFile(backupPath, store.filePath);
   store.lock();
-  await assert.rejects(store.unlock(PASSPHRASE), /Could not open the vault/);
+  await assert.rejects(store.unlock(PASSPHRASE), /vault file is damaged/);
   const plain = new VaultStore(path.join(directory, "plain.vault"));
   await plain.create(PASSPHRASE);
   await plain.saveEntry(makeLogin());
