@@ -4,6 +4,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { toOtpauthUri } = require("../totp");
 const { ITEM_TYPES } = require("../../shared/item-types.js");
+const { toBitwardenCsv, toBitwardenJson } = require("../bitwarden-format");
 const { readContainerFile, writeContainer } = require("../backup-file");
 const { isDiskFullError } = require("../durable-file");
 const VaultStore = require("./store");
@@ -15,6 +16,38 @@ const { validatePassphrase, validateNewPassphrase, parseEnvelope } = require("./
 const { ATTACHMENT_OVERHEAD, attachmentsOf } = require("./attachments");
 
 /** @typedef {import("./index").Instance} Store */
+
+// One item with its secrets open: a login, or { type, name, notes, fields }.
+function plainEntry(entry, dataKey) {
+  const text = (record, field) => (record ? openNotes(record, dataKey, entry.id, field) : "");
+  if (entry.type !== "login") {
+    return {
+      type: entry.type,
+      name: entry.name,
+      notes: text(entry.notes, "notes"),
+      fields: Object.fromEntries(
+        ITEM_TYPES[entry.type].fields.map((field) => [
+          field.key,
+          field.kind === "secret"
+            ? (entry.secrets[field.key]
+              ? openItemSecret(entry.secrets[field.key], dataKey, entry.id, field.key)
+              : "")
+            : field.sealed
+              ? text(entry.fields[field.key], field.key)
+              : entry.fields[field.key] ?? "",
+        ]),
+      ),
+    };
+  }
+  return {
+    name: entry.name,
+    username: entry.username,
+    password: openPassword(entry.password, dataKey, entry.id),
+    url: entry.url,
+    notes: text(entry.notes, "notes"),
+    totp: entry.totp ? toOtpauthUri(openTotp(entry.totp, dataKey, entry.id)) : "",
+  };
+}
 
 class VaultStoreBackup {
   // Reads the logins of a Mnemo backup for import, using its passphrase or
@@ -45,37 +78,48 @@ class VaultStoreBackup {
       // sealed under the backup's key.
       const entries = opened.vaultData.entries.filter((entry) => !entry.deletedAt);
       const attachments = entries.reduce((sum, entry) => sum + (entry.attachments?.length ?? 0), 0);
-      const text = (entry, record, field) => (record ? openNotes(record, opened.dataKey, entry.id, field) : "");
-      const logins = entries.map((entry) => entry.type !== "login"
-        ? {
-          type: entry.type,
-          name: entry.name,
-          notes: text(entry, entry.notes, "notes"),
-          fields: Object.fromEntries(
-            ITEM_TYPES[entry.type].fields.map((field) => [
-              field.key,
-              field.kind === "secret"
-                ? (entry.secrets[field.key]
-                  ? openItemSecret(entry.secrets[field.key], opened.dataKey, entry.id, field.key)
-                  : "")
-                : field.sealed
-                  ? text(entry, entry.fields[field.key], field.key)
-                  : entry.fields[field.key] ?? "",
-            ]),
-          ),
-        }
-        : {
-        name: entry.name,
-        username: entry.username,
-        password: openPassword(entry.password, opened.dataKey, entry.id),
-        url: entry.url,
-        notes: text(entry, entry.notes, "notes"),
-        totp: entry.totp ? toOtpauthUri(openTotp(entry.totp, opened.dataKey, entry.id)) : "",
-      });
+      const logins = entries.map((entry) => plainEntry(entry, opened.dataKey));
       return { logins, attachments };
     } finally {
       opened.dataKey.fill(0);
     }
+  }
+
+  // Writes the open vault's items without encryption, in Bitwarden's format:
+  // `format` is "json" (all types) or "csv" (logins). Attachments, earlier
+  // versions, and the trash are left out. The caller has checked the master
+  // passphrase and warned the user.
+  /** @this {Store} */
+  async exportOpenFormat(destinationPath, format) {
+    return this.enqueueMutation(async () => {
+      this.requireUnlocked();
+      const resolvedDestination = path.resolve(destinationPath);
+      if (this.isVaultPath(resolvedDestination)) {
+        throw new Error("Choose a different location for the backup.");
+      }
+      const items = this.vaultData.entries
+        .filter((entry) => !entry.deletedAt)
+        .map((entry) => ({
+          ...plainEntry(entry, this.dataKey),
+          id: entry.id,
+          folderId: entry.folderId ?? null,
+          favorite: entry.favorite === true,
+          fingerprint: entry.fields?.fingerprint ?? "",
+          createdAt: entry.createdAt,
+          updatedAt: entry.updatedAt,
+        }));
+      const vault = { items, folders: this.vaultData.folders ?? [] };
+      const contents = Buffer.from(format === "csv" ? toBitwardenCsv(vault) : toBitwardenJson(vault), "utf8");
+      try {
+        await this.writeBytesAtomically(resolvedDestination, contents);
+      } catch (error) {
+        if (isDiskFullError(error)) throw error;
+        throw new Error("Could not export the vault.");
+      } finally {
+        contents.fill(0);
+      }
+      return { exported: items.length };
+    });
   }
 
   // Copies the encrypted vault file, plus its encrypted attachment files when

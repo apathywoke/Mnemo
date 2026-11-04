@@ -32,6 +32,16 @@ const PASSPHRASE_ACTIONS = Object.freeze({
     confirm: "settings.exportConfirm",
     error: "errors.saveBackup",
   },
+  exportJson: {
+    prompt: "settings.exportOpenPrompt",
+    confirm: "settings.exportOpenConfirm",
+    error: "errors.exportOpen",
+  },
+  exportCsv: {
+    prompt: "settings.exportOpenPrompt",
+    confirm: "settings.exportOpenConfirm",
+    error: "errors.exportOpen",
+  },
   delete: {
     prompt: "settings.deletePrompt",
     confirm: "settings.deleteConfirm",
@@ -264,6 +274,10 @@ function bind(ctx) {
       const result = await ctx.api.exportBackup(passphrase);
       resetVaultActions();
       if (!result.canceled) showToast(i18n.t("toast.backupSaved"));
+    } else if (action === "exportJson" || action === "exportCsv") {
+      const result = await ctx.api.exportOpenFormat(passphrase, action === "exportJson" ? "json" : "csv");
+      resetVaultActions();
+      if (!result.canceled) showToast(i18n.t("toast.exportedOpen"));
     } else if (action === "delete") {
       const result = await ctx.api.deleteActiveVault(passphrase);
       resetVaultActions();

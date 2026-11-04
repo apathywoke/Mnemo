@@ -14,6 +14,7 @@ contextBridge.executeInMainWorld?.({
 // never expose ipcRenderer, filesystem access, or arbitrary IPC channels.
 contextBridge.exposeInMainWorld("vaultApp", {
   getVersion: () => ipcRenderer.invoke("app:get-version"),
+  exportOpenFormat: (passphrase, format) => ipcRenderer.invoke("vault:export-open-format", passphrase, format),
   getSettings: () => ipcRenderer.invoke("settings:get"),
   setLanguage: (code) => ipcRenderer.invoke("settings:set-language", code),
   dismissBackupReminder: () => ipcRenderer.invoke("settings:dismiss-backup-reminder"),
