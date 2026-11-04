@@ -201,10 +201,14 @@ class VaultStoreBackup {
         } finally {
           recoveryKeyBytes.fill(0);
         }
+        await this.pinSnapshotBefore("restore");
         return this.restoreWithNewKey(opened, credentials.newPassphrase, sessionEpoch);
       }
 
       try {
+        // The vault being replaced, kept for 90 days (verified when it is
+        // open, copied for a later check when it is not).
+        await this.pinSnapshotBefore("restore");
         if (this.sessionEpoch !== sessionEpoch) {
           throw new Error("Restore was interrupted because the vault was locked.");
         }
@@ -233,6 +237,7 @@ class VaultStoreBackup {
         opened.dataKey = null;
         // The replaced vault's files are no longer referenced.
         await this.maintainNow();
+        this.queueSnapshotAfterUnlock();
         return this.getStatus();
       } finally {
         opened.dataKey?.fill(0);
@@ -277,6 +282,7 @@ class VaultStoreBackup {
       this.issuedRecoveryKey = rotated.recoveryKey;
       // The replaced vault's files are no longer referenced.
       await this.maintainNow();
+      this.queueSnapshotAfterUnlock();
       return this.getStatus();
     } finally {
       opened.dataKey.fill(0);

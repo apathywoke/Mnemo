@@ -393,7 +393,7 @@ test("deleting a profile removes its attachment files too", async (t) => {
   assert.equal(await exists(attachmentDirectory), true);
   vaultStore.lock();
 
-  await manager.deleteProfile(profile.id);
+  await manager.deleteProfile(profile.id, { deleteSnapshots: true });
   assert.equal(await exists(attachmentDirectory), false);
   assert.deepEqual(
     (await fs.readdir(path.join(directory, "vaults"))).filter((name) => !name.startsWith(".")),

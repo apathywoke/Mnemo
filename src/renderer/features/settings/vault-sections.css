@@ -90,3 +90,8 @@
   background: var(--c-c45c5c);
   color: var(--c-ffffff);
 }
+
+/* A local snapshot that could not be saved. */
+.settings-hint.settings-hint-warning {
+  color: var(--error);
+}

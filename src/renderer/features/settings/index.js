@@ -145,6 +145,7 @@ function bind(ctx) {
     for (const hint of lockedHints) hint.hidden = unlocked;
   }
   const recoveryStatus = $("#settings-recovery-status");
+  const snapshotStatus = $("#settings-snapshot-status");
   const recoveryButton = $("#settings-recovery-button");
   const confirmForm = $("#settings-confirm-form");
   const confirmPrompt = $("#settings-confirm-prompt");
@@ -160,6 +161,7 @@ function bind(ctx) {
   let recoveryEnabled = null;
   let recoveryConfirmed = true;
   let touchId = null;
+  let snapshots = null;
   let pendingAction = null;
 
   function renderVault() {
@@ -177,6 +179,17 @@ function bind(ctx) {
       : i18n.t(!touchId.available
         ? "touchId.unavailable"
         : touchId.enabled ? "touchId.enabled" : "touchId.disabled");
+    snapshotStatus.textContent = snapshots === null
+      ? ""
+      : snapshots.failedAt !== null
+        ? i18n.t("settings.snapshotFailed")
+        : snapshots.lastVerifiedAt === null
+          ? i18n.t("settings.snapshotNone")
+          : i18n.t("settings.snapshotLast", {
+            date: new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeStyle: "short" })
+              .format(new Date(snapshots.lastVerifiedAt)),
+          });
+    snapshotStatus.classList.toggle("settings-hint-warning", (snapshots?.failedAt ?? null) !== null);
     touchIdEnable.hidden = !touchId?.available || touchId.enabled;
     touchIdDisable.hidden = !touchId?.available || !touchId.enabled;
     if (pendingAction) {
@@ -212,10 +225,15 @@ function bind(ctx) {
     setVaultUnlocked(true);
     recoveryEnabled = null;
     touchId = null;
+    snapshots = null;
     renderVault();
     try {
       let recovery;
-      [recovery, touchId] = await Promise.all([ctx.api.getRecoveryStatus(), ctx.api.getTouchIdStatus()]);
+      [recovery, touchId, snapshots] = await Promise.all([
+        ctx.api.getRecoveryStatus(),
+        ctx.api.getTouchIdStatus(),
+        ctx.api.getSnapshotStatus().catch(() => null),
+      ]);
       recoveryEnabled = recovery.enabled;
       recoveryConfirmed = recovery.confirmed !== false || recovery.pending === true;
       renderVault();

@@ -26,7 +26,6 @@ const { createTouchIdHelper } = require("./src/main/touch-id-helper");
 const { Updater } = require("./src/main/updater");
 const { catalog: i18nCatalog } = require("./src/shared/i18n/messages.js");
 const { createTranslator } = require("./src/shared/i18n/translate.js");
-const VaultStore = require("./vault-store");
 const { createState } = require("./src/main/state");
 const { createTranslation } = require("./src/main/i18n");
 const { createProfileHelpers } = require("./src/main/profiles");
@@ -136,7 +135,9 @@ if (launchedWithRemoteDebugging) {
 
     state.profileManager = new ProfileManager(app.getPath("userData"));
     void state.profileManager.removeStaleTemporaryFiles();
-    state.vaultStore = new VaultStore(state.profileManager.legacyVaultPath);
+    state.vaultStore = state.profileManager.createStore(state.profileManager.legacyVaultPath);
+    // Changes saved shortly before the last quit may have no snapshot yet.
+    void state.profileManager.snapshotVaultsAtLaunch();
     // The Touch ID helper sits next to app.asar when packaged and in
     // build/native/ for `npm start` (scripts/build-touch-id.js).
     const touchIdHelperPath = app.isPackaged

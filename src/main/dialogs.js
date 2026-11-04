@@ -44,7 +44,46 @@ function createDialogs(ctx) {
     return { copied: true };
   }
 
-  return { showVaultDialog, showSecretDialog };
+  // Before a vault is deleted: whether its local snapshots go with it. Asked
+  // only when there are some; keeping them is the default.
+  async function confirmDeletingSnapshots(profile) {
+    if (!(await state.profileManager.hasSnapshots(profile.id))) return false;
+    const { response } = await dialog.showMessageBox(state.mainWindow, {
+      type: "warning",
+      title: tr("dialog.deleteSnapshotsTitle"),
+      message: tr("dialog.deleteSnapshotsMessage", { name: profile.name }),
+      detail: tr("dialog.deleteSnapshotsDetail"),
+      buttons: [tr("dialog.keepSnapshots"), tr("dialog.deleteSnapshotsConfirm")],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    return response === 1;
+  }
+
+  // After a change of passphrase (`kind` "passphrase") or recovery key
+  // ("recovery"): snapshots taken before it still open with the old one.
+  // Offers to delete them; keeping them is the default.
+  async function offerDeletingOldSnapshots(store, kind) {
+    const epoch = state.lockEpoch;
+    const names = await store.snapshotsWithOtherKeys().catch(() => []);
+    if (names.length === 0 || store !== state.vaultStore || state.lockEpoch !== epoch) return;
+    const { response } = await showVaultDialog({
+      type: "warning",
+      title: tr("dialog.oldSnapshotsTitle"),
+      message: tr(kind === "passphrase" ? "dialog.oldSnapshotsPassphraseMessage" : "dialog.oldSnapshotsRecoveryMessage",
+        { count: names.length }),
+      detail: tr("dialog.oldSnapshotsDetail"),
+      buttons: [tr("dialog.keepSnapshots"), tr("dialog.deleteSnapshotsConfirm")],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    if (response !== 1 || store !== state.vaultStore || state.lockEpoch !== epoch) return;
+    await store.deleteSnapshotsWithOtherKeys();
+  }
+
+  return { showVaultDialog, showSecretDialog, confirmDeletingSnapshots, offerDeletingOldSnapshots };
 }
 
 module.exports = { createDialogs };

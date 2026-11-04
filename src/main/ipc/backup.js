@@ -20,6 +20,7 @@ function register(ctx) {
     lockVault,
     issueRecoveryKey,
     registerHandler,
+    confirmDeletingSnapshots,
   } = ctx;
   const { dialog, shell } = ctx.electron;
 
@@ -35,6 +36,14 @@ function register(ctx) {
     await store.exportBackup(selection.filePath);
     return { canceled: false };
   }
+
+  // Local snapshots of the open vault: when the newest verified one was
+  // taken, and whether the last attempt failed. Times only.
+  registerHandler("vault:get-snapshot-status", async () => {
+    state.vaultStore.requireUnlocked();
+    const { lastVerifiedAt, failedAt } = await state.vaultStore.getSnapshotStatus();
+    return { lastVerifiedAt, failedAt };
+  });
 
   // Exporting copies every secret in the vault, so it asks for the master
   // passphrase again even though the vault is open.
@@ -180,10 +189,14 @@ function register(ctx) {
     if (store !== state.vaultStore || state.activeProfileId !== profileId) {
       throw new Error("Unlock the vault first.");
     }
+    const deleteSnapshots = await confirmDeletingSnapshots({ id: profileId, name: profileName });
+    if (store !== state.vaultStore || state.activeProfileId !== profileId) {
+      throw new Error("Unlock the vault first.");
+    }
     lockVault(false);
     state.activeProfileId = null;
-    state.vaultStore = new VaultStore(state.profileManager.legacyVaultPath);
-    await state.profileManager.deleteProfile(profileId);
+    state.vaultStore = state.profileManager.createStore(state.profileManager.legacyVaultPath);
+    await state.profileManager.deleteProfile(profileId, { deleteSnapshots });
     await state.biometricUnlock.disable(profileId).catch(() => {});
     return { deleted: true };
   });

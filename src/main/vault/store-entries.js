@@ -284,6 +284,8 @@ class VaultStoreEntries {
     return this.enqueueMutation(async () => {
       this.requireUnlocked();
       if (!Array.isArray(logins)) throw new Error("Invalid login entry.");
+      await this.pinSnapshotBefore("import");
+      this.requireUnlocked();
       const entries = this.vaultData.entries.slice();
       const existingKeys = new Map();
       for (const entry of entries) {

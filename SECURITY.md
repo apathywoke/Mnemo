@@ -112,6 +112,44 @@ passwords until the design has received independent security review.
   only then does it copy the files and replace the vault file in one rename.
   A damaged or truncated backup leaves the current vault and its files as
   they were.
+- Mnemo keeps **local snapshots** of each vault next to it, in
+  `<vault>.snapshots/` (folder `0700`, files `0600`), so a damaged file or a
+  mistake can be undone (`src/main/vault/snapshots.js`,
+  `store-snapshots.js`). A snapshot is a byte-for-byte copy of the encrypted
+  vault file, never overwritten, plus a small description (its time, SHA-256,
+  size, the IDs of the attachments it refers to, and whether it is verified
+  or pinned). It is taken after a save, at most once every 10 minutes; a
+  change saved in between is taken when the 10 minutes are over or at the next
+  unlock. Attachment files go once into a shared pool
+  (`<vault>.snapshots/attachments/`); they never change after they are
+  written and key rotation gives them new IDs, so one copy serves every
+  snapshot. A snapshot counts as **verified** only after it is read back and
+  equals the file, its header and key wraps equal those of the vault that is
+  open, its data decrypts with the vault key, and every attachment it refers
+  to is in the pool and decrypts (new pool files always; files already there
+  by size, and fully on the first snapshot of each day). A copy made without
+  the vault key — at launch, for changes saved shortly before the app quit,
+  or before a restore while locked — is unverified until the next unlock
+  checks it; a copy that fails the check never counts. Kept: the 10 newest
+  verified snapshots, the newest verified one of each of the last 30 days,
+  and pinned ones for 90 days. Snapshots are pinned before the file's format
+  is upgraded, before every change of keys (new passphrase, new recovery
+  key, recovery), and before an import or a restore. Old snapshots are
+  removed only after a new one is verified, the newest verified one never,
+  and pool files only when no snapshot refers to them. A snapshot that cannot
+  be saved (a full disk, for example) never stops the vault from saving;
+  Settings says so.
+- **What snapshots keep:** each snapshot opens with the master passphrase
+  and recovery key that were valid when it was taken. After a change of
+  passphrase or recovery key, a native dialog offers to delete the snapshots
+  that open with the old one (keeping them is the default; delete them if
+  the old one may be known to someone). Items deleted for good, and old
+  passwords pushed out of the history, stay in snapshots until those
+  snapshots are removed: up to 30 days, or 90 days in a pinned one. Deleting a
+  vault asks in a separate native dialog whether to delete its snapshots too;
+  kept snapshots stay in the folder for a later restore. Restoring from a
+  snapshot comes in a later version; until then the files are there but the
+  app has no button for them.
 - So nobody is locked in, Settings can export the vault **without encryption**
   in Bitwarden's format, which most password managers import: JSON with every
   item type and folder, or CSV with logins only. Attachments, earlier versions,
@@ -346,7 +384,8 @@ passwords until the design has received independent security review.
   when the vault opens. Saving an attachment writes a plain copy where the
   user chooses; that copy is outside Mnemo's protection.
 - Deleting a profile unlinks its encrypted vault file and removes its
-  attachment folder. It does not guarantee secure erasure from APFS
+  attachment folder, and its snapshot folder if the user agrees. It does not
+  guarantee secure erasure from APFS
   snapshots, Time Machine backups, SSD remapping, or other copies of those
   files.
 

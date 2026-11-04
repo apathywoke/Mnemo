@@ -92,6 +92,7 @@ contextBridge.exposeInMainWorld("vaultApp", {
   recoverVault: (recoveryKey, newPassphrase) =>
     ipcRenderer.invoke("vault:recover", recoveryKey, newPassphrase),
   getRecoveryStatus: () => ipcRenderer.invoke("vault:get-recovery-status"),
+  getSnapshotStatus: () => ipcRenderer.invoke("vault:get-snapshot-status"),
   createRecoveryKey: (passphrase) =>
     ipcRenderer.invoke("vault:create-recovery-key", passphrase),
   copyRecoveryKey: () => ipcRenderer.invoke("recovery:copy"),

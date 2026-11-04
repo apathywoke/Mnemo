@@ -1,21 +1,20 @@
 // IPC handlers. Profiles: choosing, creating, restoring, and deleting vaults.
-const VaultStore = require("../../../vault-store");
 
 function register(ctx) {
-  const { state, tr, toRestoreCredentials, lockVault, issueRecoveryKey, registerHandler } = ctx;
+  const { state, tr, toRestoreCredentials, lockVault, issueRecoveryKey, registerHandler, confirmDeletingSnapshots } = ctx;
   const { dialog } = ctx.electron;
 
   registerHandler("profiles:choose", () => {
     lockVault(false);
     state.activeProfileId = null;
-    state.vaultStore = new VaultStore(state.profileManager.legacyVaultPath);
+    state.vaultStore = state.profileManager.createStore(state.profileManager.legacyVaultPath);
     return state.profileManager.listProfiles();
   });
 
   registerHandler("profiles:select", async (profileId) => {
     const profile = await state.profileManager.getProfile(profileId);
     lockVault(false);
-    state.vaultStore = new VaultStore(state.profileManager.getVaultPath(profile.id));
+    state.vaultStore = state.profileManager.createStore(state.profileManager.getVaultPath(profile.id));
     state.activeProfileId = profile.id;
     return state.vaultStore.getStatus();
   });
@@ -24,7 +23,9 @@ function register(ctx) {
     if (state.activeProfileId !== null || state.vaultStore?.isUnlocked()) {
       throw new Error("Lock the current vault before deleting a profile.");
     }
-    const deleted = await state.profileManager.deleteProfile(profileId);
+    const profile = await state.profileManager.getProfile(profileId);
+    const deleteSnapshots = await confirmDeletingSnapshots(profile);
+    const deleted = await state.profileManager.deleteProfile(profileId, { deleteSnapshots });
     await state.biometricUnlock.disable(profileId).catch(() => {});
     return deleted;
   });
