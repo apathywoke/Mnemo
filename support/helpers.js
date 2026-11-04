@@ -5,7 +5,8 @@ const path = require("node:path");
 
 async function makeTempDirectory(t, prefix = "local-vault-test-") {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), prefix));
-  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  // Retries: a store's queued work (a snapshot) may still be writing in it.
+  t.after(() => fs.rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
   return directory;
 }
 

@@ -167,9 +167,12 @@ test("copies outside this Mac restore a new vault on another Mac", async (t) => 
     opened.dataKey.fill(0);
     if (opened.vaultData.entries[0].name !== "Kept") continue;
     const restored = await manager.restoreProfile("From iCloud", source.file, PASSPHRASE, { poolDirectory: source.poolDirectory });
-    t.after(() => restored.vaultStore.lock());
     restoredName = restored.vaultStore.vaultData.entries[0].name;
     assert.equal(await attachmentText(restored.vaultStore), "attachment from then");
+    // The restore queues a snapshot of the new vault; let it finish before
+    // the folder is removed.
+    await restored.vaultStore.enqueueMutation(async () => {});
+    restored.vaultStore.lock();
     break;
   }
   assert.equal(restoredName, "Kept");
