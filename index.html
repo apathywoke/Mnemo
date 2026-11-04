@@ -443,6 +443,17 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
             </button>
           </div>
+          <div id="key-check-banner" class="recovery-warning backup-recovery-warning" role="note" hidden>
+            <span class="recovery-warning-mark" aria-hidden="true">!</span>
+            <div>
+              <strong data-i18n="vault.keyCheckTitle">Check your recovery key</strong>
+              <p data-i18n="vault.keyCheckBody">If you forget the master passphrase, the recovery key is the only way back in. Make sure you still have it; checking changes nothing.</p>
+              <div class="outside-copy-actions">
+                <button id="key-check-banner-now" type="button" class="text-button" data-i18n="vault.keyCheckNow">Check now</button>
+                <button id="key-check-banner-later" type="button" class="text-button" data-i18n="vault.keyCheckLater">Later</button>
+              </div>
+            </div>
+          </div>
           <div id="outside-copy-banner" class="recovery-warning backup-recovery-warning" role="note" hidden>
             <span class="recovery-warning-mark" aria-hidden="true">!</span>
             <div>
@@ -957,6 +968,7 @@
                   <p class="settings-hint" data-i18n="settings.passphraseHint">Changing it also replaces the vault key and the recovery key, and turns Touch ID off. Backups you saved earlier still open with the old passphrase.</p>
                   <div class="settings-actions">
                     <button id="settings-passphrase-button" type="button" class="secondary-button" data-settings-action="passphrase" data-i18n="settings.passphraseChange">Change passphrase…</button>
+                    <button id="settings-check-passphrase-button" type="button" class="secondary-button" data-settings-action="checkPassphrase" data-i18n="settings.checkPassphraseButton">Check passphrase…</button>
                   </div>
                 </section>
                 <section class="settings-field settings-section" aria-labelledby="settings-recovery-title">
@@ -964,7 +976,18 @@
                   <p id="settings-recovery-status" class="settings-hint"></p>
                   <div class="settings-actions">
                     <button id="settings-recovery-button" type="button" class="secondary-button" data-settings-action="recovery"></button>
+                    <button id="settings-check-key-button" type="button" class="secondary-button" data-i18n="settings.checkKeyButton" hidden>Check recovery key…</button>
                   </div>
+                  <form id="settings-check-key-form" class="settings-confirm-form" hidden>
+                    <p class="settings-hint" data-i18n="settings.checkKeyHint">Type the key from where you keep it. Nothing changes: Mnemo only checks that it opens this vault.</p>
+                    <label for="settings-check-key-input" data-i18n="recover.keyLabel">Recovery key</label>
+                    <input id="settings-check-key-input" class="recovery-key-input import-text-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="200" placeholder="XXXX-XXXX-XXXX-…" required />
+                    <p id="settings-check-key-error" class="form-error" role="alert" hidden></p>
+                    <div class="dialog-actions">
+                      <button id="settings-check-key-cancel" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
+                      <button id="settings-check-key-submit" type="submit" class="dialog-save-button" data-i18n="settings.checkSubmit">Check</button>
+                    </div>
+                  </form>
                 </section>
               </div>
             </section>

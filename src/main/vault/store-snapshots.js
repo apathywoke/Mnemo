@@ -13,6 +13,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { randomBytes } = require("node:crypto");
 const VaultStore = require("./store");
+const { removeCrashedTemporaryFiles } = require("../durable-file");
 const { MAX_FILE_BYTES, MAX_ATTACHMENT_BYTES, UUID_PATTERN } = require("./constants");
 const { decryptGcm } = require("./crypto");
 const { headerOf, getAad, parseEnvelope } = require("./envelope");
@@ -390,6 +391,9 @@ class VaultStoreSnapshots {
   /** @this {Store} */
   async snapshotAfterUnlockNow() {
     const epoch = this.sessionEpoch;
+    // What a run killed while writing a snapshot left behind.
+    await removeCrashedTemporaryFiles(this.snapshotDirectory);
+    await removeCrashedTemporaryFiles(this.snapshotPoolDirectory);
     const { complete } = await this.listSnapshots();
     for (const snapshot of complete) {
       if (snapshot.description.verifiedAt !== null) continue;

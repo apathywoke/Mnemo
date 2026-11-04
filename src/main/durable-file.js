@@ -51,6 +51,27 @@ async function removeStaleTemporaryFiles(destinationPath) {
   return removed;
 }
 
+// Removes temporary files (`<name>.<pid>.<16 hex>.tmp`) that another process
+// left in `directory` when it was killed while writing. Files of this
+// process may belong to a write that is still running and are kept; Mnemo
+// runs one instance at a time, so another PID means a crashed run. Failures
+// are left for the next time.
+async function removeCrashedTemporaryFiles(directory) {
+  let names;
+  try {
+    names = await fs.readdir(directory);
+  } catch {
+    return 0;
+  }
+  let removed = 0;
+  for (const name of names) {
+    const match = name.match(/\.(\d+)\.[0-9a-f]{16}\.tmp$/);
+    if (!match || Number(match[1]) === process.pid) continue;
+    await fs.unlink(path.join(directory, name)).then(() => { removed += 1; }, () => {});
+  }
+  return removed;
+}
+
 // Writes `contents` to `destinationPath` through a temporary file in the same
 // folder (mode 0600), flushed before the rename and the folder after it. A
 // crash leaves the old file or the new one; removeStaleTemporaryFiles cleans
@@ -76,4 +97,11 @@ async function writeFileDurably(destinationPath, contents) {
   }
 }
 
-module.exports = { describeWriteError, isDiskFullError, removeStaleTemporaryFiles, syncDirectory, writeFileDurably };
+module.exports = {
+  describeWriteError,
+  isDiskFullError,
+  removeCrashedTemporaryFiles,
+  removeStaleTemporaryFiles,
+  syncDirectory,
+  writeFileDurably,
+};

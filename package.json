@@ -9,6 +9,7 @@
     "test": "node --test --test-timeout=120000",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.strict.json",
+    "test:durability": "MNEMO_DURABILITY=full node --test --test-timeout=3600000 test/durability.test.js",
     "test:e2e": "node --test --test-concurrency=1 --test-timeout=120000 \"e2e/**/*.e2e.js\"",
     "check": "npm run lint && npm run typecheck && npm test",
     "dist:mac": "node scripts/build-touch-id.js && electron-builder --mac --config electron-builder.config.js",

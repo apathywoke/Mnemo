@@ -310,6 +310,15 @@ passwords until the design has received independent security review.
   from the clipboard after 30 seconds) or saved as a text file with mode
   `0600`. Anyone who holds it can open the vault; it is a second secret of the
   same strength as the vault key, not a weaker one.
+- **Checking without changing anything.** Settings → Security can check
+  the recovery key (it must unwrap the vault key in use) and the master
+  passphrase. Nothing is written; a mistyped key is caught by its checksum.
+  A key that checks out counts as saved, which also clears the reminder for
+  a key never confirmed. Every 90 days after the key was confirmed or last
+  checked, the vault screen asks the user to check it ("Later" asks again
+  in 14 days). This is also how damage to the recovery wrap shows up: the
+  wrap is not used when the vault opens with the passphrase, and AES-GCM
+  only catches its damage when the recovery key is used.
 - Changing the master passphrase or creating a new recovery key replaces the
   recovery key. Both ask first in a native dialog drawn by macOS (after the
   passphrase is checked), which says that the current key will stop opening

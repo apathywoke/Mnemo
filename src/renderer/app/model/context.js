@@ -39,7 +39,7 @@ function createContext() {
     },
     pages: Object.create(null),
     // Opens Settings at a category; set by the settings slice.
-    /** @type {(tab?: string) => void} */
+    /** @type {(tab?: string, options?: { checkKey?: boolean }) => void} */
     openSettings: () => {},
     setError(element, message) {
       setElementError(element, message);
@@ -74,6 +74,7 @@ function createContext() {
         "settings-confirm-passphrase",
         "settings-new-passphrase",
         "settings-confirm-new-passphrase",
+        "settings-check-key-input",
         "import-passphrase",
         "import-recovery-key",
         "profile-name",

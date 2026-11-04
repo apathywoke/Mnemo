@@ -8,6 +8,9 @@ import * as i18n from "../../shared/lib/i18n.js";
 // - A recovery key that was never confirmed as saved (the vault locked or
 //   the app quit first): shown until a new key is confirmed, and cannot be
 //   closed. It takes the place of the backup reminder.
+// - The recovery key check: every 90 days, a reminder to make sure the key
+//   is still at hand. "Check now" opens the check in Settings; "Later" asks
+//   again in 14 days. Not shown while a new key waits for its confirmation.
 // - The copy outside this Mac: offered once for a new vault ("Later" is
 //   remembered), and a reminder after 14 days without a checked copy, which
 //   closes only until the next unlock.
@@ -21,6 +24,7 @@ function bind(ctx) {
   const outsideAction = $("#outside-copy-banner-action");
   const outsideLater = $("#outside-copy-banner-later");
   const outsideDismiss = $("#dismiss-outside-copy-banner");
+  const keyCheck = $("#key-check-banner");
   let outside = null;
 
   function renderOutside() {
@@ -53,6 +57,7 @@ function bind(ctx) {
     ]);
     unconfirmed.hidden = recovery?.confirmed !== false || recovery.pending;
     warning.hidden = !unconfirmed.hidden || settings?.backupReminder === false;
+    keyCheck.hidden = !unconfirmed.hidden || recovery?.pending === true || recovery?.checkDue !== true;
     outside = outsideStatus;
     renderOutside();
   }
@@ -91,10 +96,17 @@ function bind(ctx) {
     outsideBanner.hidden = true;
   });
 
+  $("#key-check-banner-now").addEventListener("click", () => ctx.openSettings("security", { checkKey: true }));
+  $("#key-check-banner-later").addEventListener("click", () => {
+    keyCheck.hidden = true;
+    ctx.api.snoozeKeyCheck().catch(() => {});
+  });
+
   i18n.onChange(renderOutside);
   warning.hidden = true;
   unconfirmed.hidden = true;
   outsideBanner.hidden = true;
+  keyCheck.hidden = true;
   return { refresh };
 }
 

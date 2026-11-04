@@ -14,6 +14,9 @@ function register(ctx) {
     showVaultDialog,
     issueRecoveryKey,
     confirmRecoveryKeySaved,
+    isKeyCheckDue,
+    recordKeyChecked,
+    snoozeKeyCheck,
     registerHandler,
     offerDeletingOldSnapshots,
   } = ctx;
@@ -60,11 +63,32 @@ function register(ctx) {
   registerHandler("vault:get-recovery-status", async () => {
     await state.settingsLoaded;
     const profileId = state.activeProfileId;
+    const enabled = state.vaultStore.hasRecoveryKey();
     return {
-      enabled: state.vaultStore.hasRecoveryKey(),
+      enabled,
       confirmed: profileId === null || state.settingsStore.isRecoveryKeyConfirmed(profileId),
       pending: profileId !== null && state.pendingRecoveryKey?.profileId === profileId,
+      // Time to make sure the key is still at hand (the vault screen asks).
+      checkDue: enabled && await isKeyCheckDue(profileId),
     };
+  });
+
+  // Checks a recovery key or the master passphrase against the open vault.
+  // Nothing changes; a key that opens it counts as saved.
+  registerHandler("vault:check-recovery-key", async (recoveryKey) => {
+    const store = state.vaultStore;
+    const profileId = state.activeProfileId;
+    const result = await store.checkRecoveryKey(recoveryKey);
+    if (store === state.vaultStore) await recordKeyChecked(profileId);
+    return result;
+  });
+
+  registerHandler("vault:check-passphrase", (passphrase) => state.vaultStore.checkPassphrase(passphrase));
+
+  registerHandler("recovery:snooze-check", async () => {
+    state.vaultStore.requireUnlocked();
+    await snoozeKeyCheck(state.activeProfileId);
+    return { snoozed: true };
   });
 
   // Replacing a recovery key is confirmed in a native dialog, after the
