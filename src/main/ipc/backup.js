@@ -2,6 +2,7 @@
 const path = require("node:path");
 const { parseImportFile } = require("../importers");
 const VaultStore = require("../../../vault-store");
+const { validatePassphrase } = require("../vault/envelope");
 
 const IMPORT_SOURCES = Object.freeze({
   bitwarden: { filterKey: "dialog.importFilterBitwarden", extensions: ["json", "csv"] },
@@ -49,6 +50,41 @@ function register(ctx) {
   registerHandler("vault:export-backup-new-key", async () => {
     if (!state.pendingRecoveryKey) throw new Error("Unlock the vault first.");
     return saveBackup(state.vaultStore);
+  });
+
+  // Writes every secret without encryption, so besides the master passphrase
+  // it needs a native confirmation that a compromised renderer cannot click
+  // through. The file is written by main; its contents never reach the page.
+  registerHandler("vault:export-open-format", async (passphrase, format) => {
+    if (format !== "json" && format !== "csv") throw new Error("Could not export the vault.");
+    const store = state.vaultStore;
+    const epoch = state.lockEpoch;
+    store.requireUnlocked();
+    validatePassphrase(passphrase);
+    await store.verifyPassphrase(passphrase);
+    const confirmation = await showVaultDialog({
+      type: "warning",
+      title: tr("dialog.exportOpenTitle"),
+      message: tr("dialog.exportOpenMessage"),
+      detail: tr(format === "csv" ? "dialog.exportOpenDetailCsv" : "dialog.exportOpenDetailJson"),
+      buttons: [tr("common.cancel"), tr("dialog.exportOpenConfirm")],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    if (confirmation.response !== 1) return { canceled: true };
+    const isStale = () => store !== state.vaultStore || state.lockEpoch !== epoch;
+    if (isStale()) throw new Error("Unlock the vault first.");
+    const selection = await dialog.showSaveDialog(state.mainWindow, {
+      title: tr("dialog.exportOpenSaveTitle"),
+      buttonLabel: tr("dialog.exportOpenSaveButton"),
+      defaultPath: `${tr("dialog.exportOpenFileName")}.${format}`,
+      filters: [{ name: format.toUpperCase(), extensions: [format] }],
+    });
+    if (selection.canceled || !selection.filePath) return { canceled: true };
+    if (isStale()) throw new Error("Unlock the vault first.");
+    const { exported } = await store.exportOpenFormat(selection.filePath, format);
+    return { canceled: false, exported };
   });
 
   registerHandler("import:choose-file", async (source, credentials) => {

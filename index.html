@@ -947,6 +947,14 @@
                     <button id="settings-import-button" type="button" class="secondary-button" data-i18n="settings.importButton">Import…</button>
                   </div>
                 </section>
+                <section class="settings-field settings-section" aria-labelledby="settings-export-open-title">
+                  <h4 id="settings-export-open-title" class="settings-section-title" data-i18n="settings.exportOpenTitle">Export without encryption</h4>
+                  <p class="settings-hint" data-i18n="settings.exportOpenHint">To move to another password manager. The file holds your secrets as plain text, in Bitwarden’s format, which most password managers import. JSON has every item type; CSV has logins only.</p>
+                  <div class="settings-actions">
+                    <button id="settings-export-json-button" type="button" class="secondary-button" data-settings-action="exportJson" data-i18n="settings.exportJsonButton">Export JSON…</button>
+                    <button id="settings-export-csv-button" type="button" class="secondary-button" data-settings-action="exportCsv" data-i18n="settings.exportCsvButton">Export CSV…</button>
+                  </div>
+                </section>
               </div>
             </section>
 

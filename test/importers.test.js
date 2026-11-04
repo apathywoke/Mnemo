@@ -57,24 +57,35 @@ test("CSV parser handles quotes, commas, newlines, and a BOM", () => {
   );
 });
 
-test("Bitwarden JSON imports logins and counts what it skips", async (t) => {
+test("Bitwarden JSON imports its item types and counts what it skips", async (t) => {
   const filePath = await writeFile(t, "bitwarden.json", JSON.stringify({
     encrypted: false,
     items: [
       { type: 1, name: "Bank", notes: "n", login: { username: "alice", password: "pw1", totp: "otpauth://x", uris: [{ uri: "androidapp://bank" }, { uri: "https://bank.example/login" }] } },
       { type: 1, name: "", login: { username: "bob", password: "pw2", totp: "JBSWY3DPEHPK3PXP", uris: [{ uri: "mail.example" }] } },
       { type: 1, name: "No password", login: { username: "c", password: "" } },
-      { type: 2, name: "Secure note" },
-      { type: 3, name: "Card" },
+      { type: 2, name: "Secure note", notes: "text" },
+      { type: 3, name: "", notes: "n", card: { cardholderName: "A", number: "4242", expMonth: "7", expYear: "2031", code: "1" } },
+      { type: 4, name: "Me", identity: { firstName: "A", address1: "1 Main St", city: "Town", passportNumber: "P1" } },
+      { type: 5, name: "Key", sshKey: { publicKey: "pub" }, fields: [{ name: "Passphrase", value: "pp" }, null] },
+      { type: 99, name: "Unknown" },
+      null,
     ],
   }));
   const result = await parseImportFile("bitwarden", filePath);
-  assert.deepEqual(result.logins, [
+  const others = result.logins.filter((item) => item.type);
+  assert.deepEqual(others, [
+    { type: "note", name: "Secure note", notes: "", fields: { body: "text" } },
+    { type: "card", name: "Imported login", notes: "n", fields: { cardholder: "A", number: "4242", expiry: "07/31", cvv: "1", pin: "" } },
+    { type: "identity", name: "Me", notes: "", fields: { firstName: "A", lastName: "", email: "", phone: "", address: "1 Main St\nTown", birthDate: "", documentNumber: "P1" } },
+    { type: "ssh", name: "Key", notes: "", fields: { privateKey: "", publicKey: "pub", passphrase: "pp" } },
+  ]);
+  assert.deepEqual(result.logins.filter((item) => !item.type), [
     { name: "Bank", username: "alice", password: "pw1", url: "https://bank.example/login", notes: "n", totp: "" },
     { name: "mail.example", username: "bob", password: "pw2", url: "mail.example", notes: "", totp: "JBSWY3DPEHPK3PXP" },
   ]);
   // "otpauth://x" is not a valid TOTP link, so it is counted and dropped.
-  assert.deepEqual(result.stats, { found: 3, nonLogin: 2, noPassword: 1, archived: 0, withTotp: 1, totpNotImported: 1 });
+  assert.deepEqual(result.stats, { found: 7, nonLogin: 2, noPassword: 1, archived: 0, withTotp: 1, totpNotImported: 1 });
 });
 
 test("Bitwarden encrypted exports and wrong files are rejected clearly", async (t) => {

@@ -12,7 +12,8 @@ item 2 done) and for Touch ID backed by the Secure Enclave (B8, "Touch ID
 helper", A1, A4, A8; section 7, item 7), with the Keychain-based Touch ID
 removed after unlock was confirmed on real hardware, and for confirming
 new recovery keys (data table). Updated 2026-11-04 for flushing writes and
-telling damage from a wrong passphrase (B2, A1).
+telling damage from a wrong passphrase (B2, A1), and for the export without
+encryption (data table, A3).
 
 ## 1. What Mnemo protects
 
@@ -26,6 +27,7 @@ telling damage from a wrong passphrase (B2, A1).
 | Master passphrase | Typed into the renderer, sent once over IPC, then dropped | Never stored. |
 | Recovery key (256-bit) | Shown once in the renderer; kept in main memory until the user confirms it is saved (by typing its last 4 characters, checked in main) or the vault locks; optionally in a user-saved text file; on paper | Opens the vault and resets the passphrase. Replacing it (new passphrase or new key) is confirmed in a native dialog first; a key never confirmed leaves a reminder (`settings.json` lists the profile ID, nothing secret). |
 | Vault data key (256-bit) | Wrapped in the vault file; main-process `Buffer` while unlocked, zeroed on lock; if Touch ID is on, also in `biometric/<profile>.key`, encrypted under a Secure Enclave key agreement | Unwraps everything. The Touch ID file opens only on this Mac, after a touch of an enrolled finger ("Touch ID helper"). |
+| Export without encryption (optional) | A plain JSON or CSV file wherever the user saves it, `0600`, written by main | Every secret in the clear, outside Mnemo's protection. Made only on request, after the master passphrase and a native warning. |
 | Attachments | `<vault>.attachments/<id>.bin`, each encrypted under its own key sealed inside the vault data; main-process memory while being added, saved, or verified; a plain copy wherever the user saves one | A file alone reveals only its size. |
 | Earlier versions (history) | Inside the encrypted vault data, sealed values kept sealed | Old passwords remain until 20 newer versions push them out or the item is deleted for good. |
 | Encrypted backups (`.vault`) | Wherever the user saves them | Same envelope and passphrase as the local vault; with attachments, a container that also holds the encrypted attachment files. |
@@ -248,6 +250,7 @@ passphrase replaces the vault key and makes them useless (A1).
 | Spoof IPC from another frame | Handlers accept only the main frame whose URL is `app://mnemo/index.html`; `file://` and other origins are refused | None known. |
 | Read local files through the page's origin | The page is served from `app://mnemo/`, not `file://`; `GrantFileProtocolExtraPrivileges` is off; the `app://` handler serves only HTML, JavaScript, and CSS files inside the app folder and rejects traversal (percent-encoded `..`, backslashes, NUL) after normalizing the path and checking its prefix | In development (`npm start`) the app folder is the repository, so any `.html`, `.js`, or `.css` file in it, including `node_modules`, can be read by the page. Packaged builds serve only what is in `app.asar`. |
 | Destroy data through trash, history, or attachments | Deleting moves items to the trash (restorable for 30 days); deleting for good, emptying the trash, and deleting an attachment need a native confirmation in main; restoring a version keeps the replaced content as a version | It can move items to the trash, change folders and favorites, and restore older versions without a click. |
+| Export the whole vault without encryption | Needs the master passphrase, then a native warning the page cannot click through, then a native save dialog; main writes the file and returns only a count | A page that has captured the passphrase still needs the user to confirm twice in native dialogs. A user who confirms a prompt they did not start exposes everything. |
 | Read attachments or plant files | Files are chosen and saved only through native open and save dialogs in main; the renderer never sends a path and never receives contents | It can open those dialogs, which the user must still complete. |
 | Use Reports to learn about passwords | Main returns entry IDs, breach counts, and weak/reused flags only; fingerprints use a per-unlock HMAC key and never leave main | The renderer learns which entries share a password, which are weak, and (after a check) which are breached. It can start a breach check without a click, which sends 5-character SHA-1 prefixes to Have I Been Pwned. |
 | Learn passwords from the breach check (network observer or Have I Been Pwned) | Only the first 5 hex characters of each SHA-1 are sent, over HTTPS, with padded responses; matching is local | The prefixes and the number of distinct passwords are visible to Have I Been Pwned. A prefix narrows a password's SHA-1 to one of about a million hashes, which matters only for a password already in a guess list. |

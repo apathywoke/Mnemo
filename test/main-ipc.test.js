@@ -340,6 +340,28 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.deepEqual(await invoke("vault:restore-backup", "correct horse battery staple"), { canceled: true });
   await assert.rejects(invoke("vault:restore-backup", 42), /\[mnemo:errors\.enterPassphrase\]/);
 
+  // An export without encryption needs the passphrase, then a native warning,
+  // then a file chosen in a native dialog; only the count reaches the page.
+  await assert.rejects(invoke("vault:export-open-format", "wrong passphrase", "json"), /\[mnemo:errors\.passphraseIncorrect\]/);
+  await assert.rejects(invoke("vault:export-open-format", "correct horse battery staple", "xml"), /\[mnemo:errors\.exportOpen\]/);
+  const boxesBeforeExport = messageBoxes.length;
+  assert.deepEqual(await invoke("vault:export-open-format", "correct horse battery staple", "json"), { canceled: true });
+  assert.equal(messageBoxes.length, boxesBeforeExport + 1);
+  assert.equal(messageBoxes.at(-1).title, "Export without encryption?");
+  assert.equal(messageBoxes.at(-1).defaultId, 0);
+  assert.equal(messageBoxes.at(-1).cancelId, 0);
+  messageResponse = 1;
+  assert.deepEqual(await invoke("vault:export-open-format", "correct horse battery staple", "json"), { canceled: true });
+  const openExport = path.join(directory, "open-export.json");
+  saveSelection = { canceled: false, filePath: openExport };
+  const exportResult = await invoke("vault:export-open-format", "correct horse battery staple", "json");
+  assert.equal(exportResult.canceled, false);
+  assert.equal(JSON.stringify(exportResult).includes("password"), false);
+  assert.equal(JSON.parse(await require("node:fs/promises").readFile(openExport, "utf8")).encrypted, false);
+  await require("node:fs/promises").unlink(openExport);
+  messageResponse = 0;
+  saveSelection = { canceled: true, filePath: undefined };
+
   assert.equal(handlers.has("clipboard:copy-secret"), false);
   assert.deepEqual(await invoke("vault:copy-entry-field", saved.id, "username"), { clearsAfterMs: 30000 });
   assert.equal(clipboardText, "user@example.com");

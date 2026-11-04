@@ -112,6 +112,16 @@ passwords until the design has received independent security review.
   only then does it copy the files and replace the vault file in one rename.
   A damaged or truncated backup leaves the current vault and its files as
   they were.
+- So nobody is locked in, Settings can export the vault **without encryption**
+  in Bitwarden's format, which most password managers import: JSON with every
+  item type and folder, or CSV with logins only. Attachments, earlier versions,
+  and the trash are left out. It needs the master passphrase and a warning in
+  a native dialog that a compromised page cannot click through. The main
+  process writes the file (`0600`), and its contents never reach the page.
+  From then on the file is outside Mnemo's protection: anyone or anything that
+  can read it, including a folder sync, can read every secret. Values are
+  written exactly, so a spreadsheet could treat one starting with `=` as a
+  formula; the warning says not to open the file in one.
 - The in-memory vault locks after five minutes without keyboard or pointer
   activity, when macOS reports screen lock or suspend, when the window closes,
   and when the app exits.

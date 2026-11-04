@@ -5,6 +5,7 @@
 // Mnemo stores logins only, so other item types are counted and skipped.
 // One-time code (TOTP) settings come along when they are standard; others,
 // such as Steam Guard, are counted and left out.
+const { bitwardenToItem } = require("./bitwarden-format");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const zlib = require("node:zlib");
@@ -207,9 +208,15 @@ function parseBitwardenJson(contents, fallbackName) {
 
   const result = { logins: [], stats: emptyStats() };
   for (const item of data.items) {
-    // Bitwarden item types: 1 login, 2 secure note, 3 card, 4 identity.
+    // Bitwarden item types: 1 login, 2 secure note, 3 card, 4 identity, 5 SSH key.
     if (item?.type !== 1 || typeof item.login !== "object" || item.login === null) {
-      result.stats.nonLogin += 1;
+      const other = item && typeof item === "object" ? bitwardenToItem(item) : null;
+      if (other) {
+        result.stats.found += 1;
+        result.logins.push({ ...other, name: other.name.trim() || fallbackName });
+      } else {
+        result.stats.nonLogin += 1;
+      }
       continue;
     }
     addLogin(result, {

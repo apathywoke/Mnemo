@@ -76,6 +76,7 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
     "enableTouchId",
     "exportBackup",
     "exportBackupWithNewKey",
+    "exportOpenFormat",
     "fetchSiteIcon",
     "getEntry",
     "changePassphrase",
@@ -132,6 +133,7 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
 
   const calls = [
     ["getVersion", "app:get-version", []],
+    ["exportOpenFormat", "vault:export-open-format", ["pass", "json"]],
     ["getSettings", "settings:get", []],
     ["dismissBackupReminder", "settings:dismiss-backup-reminder", []],
     ["confirmRecoveryKeySaved", "recovery:confirm-saved", ["AB12"]],
