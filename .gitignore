@@ -13,6 +13,7 @@ npm-debug.log*
 *.vault
 # Test vaults with made-up data only.
 !test/fixtures/*.vault
+!test/fixtures/**/*.vault
 vault.json
 profiles.json
 vaults/
