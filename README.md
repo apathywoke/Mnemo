@@ -1,12 +1,26 @@
 # Mnemo
 
-A macOS-first Electron prototype for the local-first password manager Mnemo. It can
-create, unlock, and back up an encrypted vault, and manage login entries with
-search, edit, delete, and copy actions. It also includes an on-device password
-generator with a zxcvbn-style strength estimate (English, German, and Russian
-dictionaries; see `NOTICE.md`) and optional, user-requested site
-icons. Multiple named vault profiles can be created, selected, and restored
-independently. It has not had an independent security review.
+A macOS-first Electron prototype of Mnemo, a local-first password manager.
+Everything stays in encrypted vaults on your Mac; there is no account and no
+server. It has not had an independent security review.
+
+- **Items:** logins with one-time codes (TOTP), payment cards, secure notes,
+  identities, and SSH keys; folders, favorites, a trash kept for 30 days,
+  the last 20 versions of each item, and encrypted attachments.
+- **Vaults:** several named vaults, each with its own master passphrase and a
+  recovery key; Touch ID unlock through the Secure Enclave (macOS 13 or
+  later).
+- **Keeping data safe:** verified local snapshots, encrypted copies in a
+  folder outside this Mac (iCloud Drive or an external disk), restoring from
+  either, encrypted backups, and checks of the recovery key and passphrase
+  that change nothing (see below).
+- **Moving in and out:** import from Bitwarden, 1Password, and Mnemo
+  backups; export without encryption in Bitwarden's JSON or CSV format.
+- **Reports:** weak, reused, and breached passwords (the breach check sends
+  only the first 5 characters of a hash, and only when you ask).
+- An on-device password generator with a zxcvbn-style strength estimate
+  (English, German, and Russian dictionaries; see `NOTICE.md`), optional
+  site icons, and an interface in English, German, and Russian.
 
 ## Start
 
@@ -50,6 +64,33 @@ node e2e/capture-screens.js /tmp/after-1    # new code; repeat for -2 and -3
 node e2e/compare-screens.js /tmp/before-* -- /tmp/after-* --diff /tmp/diff
 ```
 
+## Keeping data safe
+
+Mnemo keeps several layers between a mistake or a broken disk and lost data
+(details in [SECURITY.md](./SECURITY.md)):
+
+- **Writes** go to a temporary file that is flushed to the disk
+  (`F_FULLFSYNC`) before it replaces the vault in one rename, so a power cut
+  leaves the old file or the new one.
+- **Snapshots on this Mac** (Settings → Backups): after changes, a copy of
+  the encrypted vault is kept and verified (read back and decrypted, with
+  every attachment). Kept: the last ten, one a day for 30 days, and one
+  before every import, restore, format upgrade, or change of keys, for 90
+  days.
+- **A copy outside this Mac:** choose a folder in iCloud Drive or on an
+  external disk; snapshots are copied there, still encrypted, and read back
+  after each copy. The vault screen reminds you after 14 days without a
+  checked copy.
+- **Restore** a snapshot from Settings → Backups, from the unlock screen when
+  the vault file is damaged, or, on another Mac, as a new vault from the
+  folder of copies. A snapshot opens with the master passphrase or recovery
+  key that was valid when it was taken.
+- **Check the recovery key and passphrase** in Settings → Security without
+  changing anything; the vault screen asks you to check the key every 90
+  days. If both are lost, nobody, including Mnemo, can open the vault.
+- **Leave at any time:** export without encryption in Bitwarden's format,
+  which most password managers import.
+
 ## Release builds
 
 `npm run dist:mac` produces signed, notarized `.dmg` and `.zip` builds with
@@ -64,7 +105,7 @@ runtime. Each of them first builds the Touch ID helper
 app icon is drawn in `build/icon.svg`; `npm run icon`
 regenerates `build/icon.png` and `build/icon.icns` from it.
 
-Pushing a version tag (`v0.2.0`) runs `.github/workflows/release.yml`, which
+Pushing a version tag (such as `v0.2.5`) runs `.github/workflows/release.yml`, which
 tests, builds ad-hoc-signed `.dmg` and `.zip` files with the hardened
 runtime, signs an update manifest with the project's Ed25519 key, and
 publishes a GitHub release. Installed
@@ -151,9 +192,10 @@ and the main process enforces for new master passphrases.
   30 seconds if its plain-text contents still match the copied value. If
   another app replaces that text, the app leaves the new clipboard contents
   alone.
-- Backup files contain the same encrypted vault envelope, not plaintext, plus
-  the encrypted attachment files when there are any. They require the same
-  master passphrase; forgetting it means the data cannot be recovered.
+- Backup files, snapshots, and copies outside this Mac contain the same
+  encrypted vault envelope, not plaintext, plus the encrypted attachment
+  files. Each opens with the master passphrase or recovery key that was valid
+  when it was made; without either, the data cannot be recovered.
 - Items can be sorted into folders and favorites. Deleted items wait in the
   trash for 30 days. Each item keeps its last 20 versions, including earlier
   passwords, which can be restored. Attachments are encrypted files stored
@@ -178,8 +220,11 @@ and the main process enforces for new master passphrases.
 See [SECURITY.md](./SECURITY.md) before using the prototype with real
 credentials or adding network access.
 
-## Not decided yet
+## Not there yet
 
-Other item types, authenticator, browser integration, and any future sync
-protocol still need design. The password strength display is an estimate of
-known attack strategies, not a security guarantee. Do not use this prototype for real passwords.
+Browser autofill, sync between Macs, passkeys, sharing, and apps for other
+systems do not exist yet; sync and anything that adds network access will
+get a design document first. Builds from GitHub are ad-hoc signed, not
+notarized. The password strength display is an estimate of known attack
+strategies, not a security guarantee. Do not use this prototype for real
+passwords.
