@@ -1,6 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { randomBytes } = require("node:crypto");
+const { removeStaleTemporaryFiles } = require("./durable-file");
 
 const SETTINGS_VERSION = 1;
 const MAX_SETTINGS_BYTES = 4096;
@@ -40,6 +41,7 @@ class SettingsStore {
   }
 
   async load() {
+    await removeStaleTemporaryFiles(this.filePath);
     try {
       const stats = await fs.stat(this.filePath);
       if (stats.size > MAX_SETTINGS_BYTES) return this.get();

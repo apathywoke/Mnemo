@@ -93,6 +93,13 @@ passwords until the design has received independent security review.
 - The encrypted file is versioned and written to a temporary file before being
   renamed into place with restrictive file permissions. The prototype supports
   one running app instance.
+- Each write is flushed to the disk before the rename (Node's `sync()` uses
+  `F_FULLFSYNC` on macOS), and the folder after it, so a power cut leaves the
+  old or the new file. A full disk leaves the old file in place and says so.
+  Temporary files left by a crash are removed later. A vault that does not
+  parse, or whose key opens and whose data does not, is reported as damaged
+  rather than as a wrong passphrase; a damaged key wrap cannot be told apart
+  from a wrong passphrase.
 - Exported `.vault` files contain the encrypted envelope as-is; no plaintext is
   written to the backup. A backup uses the same master passphrase as the local
   vault. Restore verifies the file and passphrase before replacing the local

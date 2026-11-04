@@ -59,7 +59,7 @@ test("a vault file in a newer format says so before any passphrase check", async
   // damaged file, as before.
   for (const changed of [{ ...envelope, format: "other-app", version: 3 }, { ...envelope, version: 2.5 }, { ...envelope, version: "3" }]) {
     await fs.writeFile(filePath, JSON.stringify(changed));
-    await assert.rejects(new VaultStore(filePath).unlock(PASSPHRASE), WRONG_PASSPHRASE);
+    await assert.rejects(new VaultStore(filePath).unlock(PASSPHRASE), /vault file is damaged/);
   }
 });
 
