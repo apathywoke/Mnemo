@@ -21,9 +21,16 @@ security updates current.
 ## Checks
 
 ```sh
-npm run check      # ESLint, TypeScript checks of the JSDoc types, unit tests
-npm run test:e2e   # drives the real app with Playwright (needs Electron's binary)
+npm run check            # ESLint, TypeScript checks of the JSDoc types, unit tests
+npm run test:e2e         # drives the real app with Playwright (needs Electron's binary)
+npm run test:durability  # kills vault operations at every file change (several minutes)
 ```
+
+`npm test` runs a sample of the durability test: a save and a copy outside
+this Mac, killed at every fourth step. The full run kills every operation
+that writes (saves, attachments, a passphrase change, import, restores,
+snapshot rotation, copies outside) at every step and checks that the vault,
+its snapshots, and the next launch are intact.
 
 The app has no runtime dependencies; ESLint, TypeScript, and
 `playwright-core` are development tools only and are not packaged. Types are

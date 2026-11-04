@@ -15,6 +15,8 @@ const DEFAULT_UPDATE_INTERVAL = "1d";
 // the file stays small.
 const MAX_UNCONFIRMED_RECOVERY_KEYS = 32;
 const PROFILE_ID_PATTERN = /^[0-9A-Za-z-]{1,64}$/;
+// Bounded like the list above; one entry per vault.
+const MAX_KEY_CHECKS = 128;
 
 function isFolderPath(value) {
   return typeof value === "string" &&
@@ -52,6 +54,10 @@ class SettingsStore {
     // its name, through the copy status.
     /** @type {string | null} */
     this.outsideFolder = null;
+    // When each vault next reminds the user to check its recovery key
+    // (recovery-keys.js), by profile ID. Times only.
+    /** @type {Record<string, number>} */
+    this.keyCheckDue = {};
     /** @type {Promise<unknown>} */
     this.writeQueue = Promise.resolve();
   }
@@ -75,6 +81,11 @@ class SettingsStore {
           backupReminder: parsed.backupReminder !== false,
         };
         if (isFolderPath(parsed.outsideFolder)) this.outsideFolder = parsed.outsideFolder;
+        if (parsed.keyCheckDue !== null && typeof parsed.keyCheckDue === "object" && !Array.isArray(parsed.keyCheckDue)) {
+          this.keyCheckDue = Object.fromEntries(Object.entries(parsed.keyCheckDue)
+            .filter(([id, time]) => PROFILE_ID_PATTERN.test(id) && Number.isSafeInteger(time) && time > 0)
+            .slice(-MAX_KEY_CHECKS));
+        }
         if (Array.isArray(parsed.unconfirmedRecoveryKeys)) {
           this.unconfirmedRecoveryKeys = parsed.unconfirmedRecoveryKeys
             .filter((id) => typeof id === "string" && PROFILE_ID_PATTERN.test(id))
@@ -137,6 +148,24 @@ class SettingsStore {
     return write;
   }
 
+  getKeyCheckDue(profileId) {
+    return Object.hasOwn(this.keyCheckDue, profileId) ? this.keyCheckDue[profileId] : null;
+  }
+
+  setKeyCheckDue(profileId, time) {
+    if (typeof profileId !== "string" || !PROFILE_ID_PATTERN.test(profileId) || !Number.isSafeInteger(time) || time <= 0) {
+      return Promise.reject(new Error("Could not save the settings."));
+    }
+    const write = this.writeQueue.then(async () => {
+      const others = Object.entries(this.keyCheckDue).filter(([id]) => id !== profileId);
+      const next = Object.fromEntries([...others, [profileId, time]].slice(-MAX_KEY_CHECKS));
+      await this.write(this.settings, { keyCheckDue: next });
+      this.keyCheckDue = next;
+    });
+    this.writeQueue = write.catch(() => {});
+    return write;
+  }
+
   getOutsideFolder() {
     return this.outsideFolder;
   }
@@ -168,14 +197,18 @@ class SettingsStore {
 
   // `changes`: the values kept outside get() that this write changes.
   async write(settings, changes = {}) {
-    const { unconfirmedRecoveryKeys = this.unconfirmedRecoveryKeys, outsideFolder = this.outsideFolder } = changes;
+    const {
+      unconfirmedRecoveryKeys = this.unconfirmedRecoveryKeys,
+      outsideFolder = this.outsideFolder,
+      keyCheckDue = this.keyCheckDue,
+    } = changes;
     const directory = path.dirname(this.filePath);
     const temporaryPath = `${this.filePath}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
     try {
       await fs.mkdir(directory, { recursive: true, mode: 0o700 });
       await fs.writeFile(
         temporaryPath,
-        JSON.stringify({ version: SETTINGS_VERSION, ...settings, unconfirmedRecoveryKeys, outsideFolder }),
+        JSON.stringify({ version: SETTINGS_VERSION, ...settings, unconfirmedRecoveryKeys, outsideFolder, keyCheckDue }),
         { mode: 0o600, flag: "wx" },
       );
       await fs.rename(temporaryPath, this.filePath);

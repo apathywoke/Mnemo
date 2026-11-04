@@ -12,10 +12,11 @@ item 2 done) and for Touch ID backed by the Secure Enclave (B8, "Touch ID
 helper", A1, A4, A8; section 7, item 7), with the Keychain-based Touch ID
 removed after unlock was confirmed on real hardware, and for confirming
 new recovery keys (data table). Updated 2026-11-04 for flushing writes and
-telling damage from a wrong passphrase (B2, A1), and for the export without
-encryption (data table, A3), and the same day for local snapshots (data
-table, A1, A4; section 7, items 12–13), copies outside this Mac (data
-table, A1; section 7, item 13), and restoring from snapshots (A1).
+telling damage from a wrong passphrase (B2, A1), for the export without
+encryption (data table, A3), for local snapshots (data table, A1, A4;
+section 7, items 12–13), copies outside this Mac (data table, A1; section
+7, item 13), restoring from snapshots (A1), and checking the recovery key
+with the durability and damage tests (section 7, item 13).
 
 ## 1. What Mnemo protects
 
@@ -402,8 +403,16 @@ must not be used with real vaults on a shared machine.
     or the item is deleted for good. A per-item "clear history" action would
     let users drop it sooner. Items deleted for good stay in local snapshots
     until those are rotated out: up to 30 days, 90 in a pinned one.
-13. **Local snapshots and copies outside this Mac.** **Partly done** (data
-    safety plan, steps 3 and 4a).
+13. **Local snapshots and copies outside this Mac.** **Done** (data safety
+    plan, steps 3–5). `test/durability.test.js` kills every writing
+    operation at each file change and checks the vault, its snapshots, and
+    the next launch; `test/corruption.test.js` damages every part of the
+    vault, attachments, snapshots, and copies outside; a fixed snapshot
+    fixture keeps today's format readable.
+    - **Accepted:** damage to the recovery wrap goes unnoticed while the
+      vault opens with the passphrase (the wrap is not used then). The
+      check in Settings and the reminder every 90 days find it; older
+      snapshots still hold an intact wrap.
     - Snapshots are kept and verified on this Mac, copied to a folder the
       user chooses outside it, and restored from the app (steps 3, 4a, 4b).
       A restore is a deliberate rollback: when revision tracking lands

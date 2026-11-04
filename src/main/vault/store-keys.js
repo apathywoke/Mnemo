@@ -14,7 +14,7 @@ const {
   MAX_ATTACHMENT_BYTES,
 } = require("./constants");
 const { decodeBase64 } = require("./records");
-const { decodeRecoveryKey } = require("./recovery-key");
+const { decodeRecoveryKey, deriveRecoveryWrappingKey } = require("./recovery-key");
 const {
   encryptGcm,
   decryptGcm,
@@ -129,6 +129,48 @@ class VaultStoreKeys {
       wrappingKey?.fill(0);
       unwrapped?.fill(0);
     }
+  }
+
+  // Checks that `recoveryKeyText` opens the open vault, and changes nothing:
+  // the key unwraps the vault key, which must equal the one in use. Throws
+  // for a mistyped key (its checksum) and for a key that does not open this
+  // vault; the key is not "typed in" in the sense of recovery, so it is not
+  // replaced.
+  /** @this {Store} */
+  async checkRecoveryKey(recoveryKeyText) {
+    return this.enqueueMutation(async () => {
+      this.requireUnlocked();
+      if (this.envelope.version !== FORMAT_VERSION) throw new Error("This vault has no recovery key.");
+      const recoveryKeyBytes = decodeRecoveryKey(recoveryKeyText);
+      const header = headerOf(this.envelope);
+      const salt = decodeBase64(this.envelope.recovery.salt, SALT_BYTES, SALT_BYTES);
+      let wrappingKey = null;
+      let unwrapped = null;
+      try {
+        wrappingKey = deriveRecoveryWrappingKey(recoveryKeyBytes, salt);
+        unwrapped = decryptGcm(this.envelope.recoveryWrap, wrappingKey, getAad("recovery-wrap", header), KEY_BYTES);
+        if (!timingSafeEqual(unwrapped, /** @type {Buffer} */ (this.dataKey))) throw new Error("mismatch");
+      } catch {
+        throw new Error("This recovery key does not open this vault.");
+      } finally {
+        recoveryKeyBytes.fill(0);
+        salt.fill(0);
+        wrappingKey?.fill(0);
+        unwrapped?.fill(0);
+      }
+      return { matches: true };
+    });
+  }
+
+  // Checks the master passphrase of the open vault, and changes nothing.
+  /** @this {Store} */
+  async checkPassphrase(passphrase) {
+    return this.enqueueMutation(async () => {
+      this.requireUnlocked();
+      validatePassphrase(passphrase);
+      await this.verifyPassphrase(passphrase);
+      return { matches: true };
+    });
   }
 
   // Opens the vault with its recovery key, sets a new master passphrase, and

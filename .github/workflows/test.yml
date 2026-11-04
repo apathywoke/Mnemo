@@ -7,6 +7,7 @@ name: Test
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -58,6 +59,29 @@ jobs:
       - run: npm run lint
 
       - run: npm run typecheck
+
+  # Kills every vault operation at each of its file changes
+  # (test/durability.test.js). It takes tens of minutes, so it runs for pull
+  # requests and on request; `npm test` runs a sample of it everywhere.
+  durability:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+
+      - run: npm run test:durability
 
   # Drives the real app, so this job downloads the Electron binary.
   e2e:

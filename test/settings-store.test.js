@@ -29,7 +29,7 @@ test("settings default to the system language and persist a chosen language", as
   await store.setUpdateInterval("1d");
 
   const filePath = path.join(directory, "settings.json");
-  assert.deepEqual(JSON.parse(await fs.readFile(filePath, "utf8")), { version: 1, language: "de", theme: "light", updateInterval: "1d", backupReminder: true, unconfirmedRecoveryKeys: [], outsideFolder: null });
+  assert.deepEqual(JSON.parse(await fs.readFile(filePath, "utf8")), { version: 1, language: "de", theme: "light", updateInterval: "1d", backupReminder: true, unconfirmedRecoveryKeys: [], outsideFolder: null, keyCheckDue: {} });
   if (process.platform !== "win32") {
     assert.equal((await fs.stat(filePath)).mode & 0o777, 0o600);
   }

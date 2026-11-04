@@ -42,6 +42,11 @@ const PASSPHRASE_ACTIONS = Object.freeze({
     confirm: "settings.exportOpenConfirm",
     error: "errors.exportOpen",
   },
+  checkPassphrase: {
+    prompt: "settings.checkPassphrasePrompt",
+    confirm: "settings.checkSubmit",
+    error: "errors.checkPassphrase",
+  },
   delete: {
     prompt: "settings.deletePrompt",
     confirm: "settings.deleteConfirm",
@@ -154,6 +159,11 @@ function bind(ctx) {
   const outsideStop = $("#settings-outside-stop");
   const outsideError = $("#settings-outside-error");
   const recoveryButton = $("#settings-recovery-button");
+  const checkKeyButton = $("#settings-check-key-button");
+  const checkKeyForm = $("#settings-check-key-form");
+  const checkKeyInput = $("#settings-check-key-input");
+  const checkKeyError = $("#settings-check-key-error");
+  const checkKeySubmit = $("#settings-check-key-submit");
   const confirmForm = $("#settings-confirm-form");
   const confirmPrompt = $("#settings-confirm-prompt");
   const confirmPassphrase = $("#settings-confirm-passphrase");
@@ -181,6 +191,7 @@ function bind(ctx) {
         ? "settings.recoveryMissing"
         : recoveryConfirmed ? "settings.recoveryEnabled" : "settings.recoveryUnconfirmed");
     recoveryButton.hidden = recoveryEnabled === null;
+    checkKeyButton.hidden = recoveryEnabled !== true;
     recoveryButton.textContent = i18n.t(
       recoveryEnabled ? "settings.recoveryReplace" : "settings.recoveryCreate",
     );
@@ -261,8 +272,43 @@ function bind(ctx) {
     void ctx.pages.access.openSnapshotsForVault();
   });
 
+  // Checking the recovery key: typed here, checked in main, nothing changes.
+  function closeKeyCheck() {
+    checkKeyForm.reset();
+    checkKeyForm.hidden = true;
+    checkKeyError.hidden = true;
+  }
+
+  function openKeyCheck() {
+    resetVaultActions();
+    checkKeyForm.hidden = false;
+    checkKeyInput.focus();
+  }
+
+  checkKeyButton.addEventListener("click", openKeyCheck);
+  $("#settings-check-key-cancel").addEventListener("click", closeKeyCheck);
+  checkKeyForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    checkKeyError.hidden = true;
+    checkKeySubmit.disabled = true;
+    try {
+      await ctx.api.checkRecoveryKey(checkKeyInput.value);
+      closeKeyCheck();
+      recoveryConfirmed = true;
+      renderVault();
+      showToast(i18n.t("toast.recoveryKeyChecked"));
+      void ctx.pages.vault?.refreshBackupReminder();
+    } catch (cause) {
+      ctx.setError(checkKeyError, i18n.errorText(cause, "errors.checkRecoveryKey"));
+      checkKeyInput.focus();
+    } finally {
+      checkKeySubmit.disabled = false;
+    }
+  });
+
   resetVaultActions = () => {
     pendingAction = null;
+    closeKeyCheck();
     confirmForm.reset();
     confirmForm.hidden = true;
     confirmError.hidden = true;
@@ -362,6 +408,10 @@ function bind(ctx) {
       const result = await ctx.api.exportOpenFormat(passphrase, action === "exportJson" ? "json" : "csv");
       resetVaultActions();
       if (!result.canceled) showToast(i18n.t("toast.exportedOpen"));
+    } else if (action === "checkPassphrase") {
+      await ctx.api.checkPassphrase(passphrase);
+      resetVaultActions();
+      showToast(i18n.t("toast.passphraseChecked"));
     } else if (action === "delete") {
       const result = await ctx.api.deleteActiveVault(passphrase);
       resetVaultActions();
@@ -422,18 +472,20 @@ function bind(ctx) {
   dialog.addEventListener("close", resetVaultActions);
   i18n.onChange(renderVault);
 
-  function open(tab = activeTab) {
+  // `checkKey`: open the recovery key check (from the reminder banner).
+  async function open(tab = activeTab, { checkKey = false } = {}) {
     error.hidden = true;
     themeError.hidden = true;
     showSavedTheme();
     selectTab(tab);
     dialog.showModal();
-    void refreshVault();
+    await refreshVault();
+    if (checkKey && recoveryEnabled) openKeyCheck();
   }
   // One button in the access screens' header, one in the vault's; the
   // reminder banners open a category directly.
   for (const button of [$("#settings-button"), $("#vault-settings-button")]) {
-    button.addEventListener("click", () => open());
+    button.addEventListener("click", () => void open());
   }
   ctx.openSettings = open;
   $("#close-settings-dialog").addEventListener("click", () => dialog.close());

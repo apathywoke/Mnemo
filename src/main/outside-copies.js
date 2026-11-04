@@ -17,7 +17,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
-const { isDiskFullError, writeFileDurably, removeStaleTemporaryFiles } = require("./durable-file");
+const { isDiskFullError, writeFileDurably, removeCrashedTemporaryFiles } = require("./durable-file");
 const {
   DAY_MS,
   KEEP_DAILY_MS,
@@ -285,7 +285,9 @@ class OutsideCopies {
       const problem = await this.folderProblem(folder);
       if (problem) throw fail(problem === "inside-data" ? "other" : "unavailable");
       const target = await this.targetDirectory(folder, vaultPath);
-      await removeStaleTemporaryFiles(path.join(target, "x"));
+      // What a run killed while copying left behind.
+      await removeCrashedTemporaryFiles(target);
+      await removeCrashedTemporaryFiles(path.join(target, "attachments"));
       // Nothing verified here yet: nothing to copy, and nothing failed.
       if (!(await this.copySnapshots(vaultPath, target, now))) return await this.writeStatus(vaultPath, { lastRunAt: now });
       return await this.writeStatus(vaultPath, { verifiedAt: now, failedAt: null, failure: null, lastRunAt: now });

@@ -264,7 +264,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   // The recovery key is returned once and can be copied until dismissed.
   assert.match(created.recoveryKey, /^([0-9A-Z]{4}-){13}[0-9A-Z]{4}$/);
   // Until the user types its last characters, it counts as unconfirmed.
-  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: false, pending: true });
+  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: false, pending: true, checkDue: false });
   await invoke("recovery:copy");
   assert.equal(clipboardText, created.recoveryKey);
   for (const typed of ["", "!!!!", created.recoveryKey.slice(-5, -1), created.recoveryKey]) {
@@ -277,7 +277,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
     await invoke("recovery:confirm-saved", ` ${created.recoveryKey.slice(-4).toLowerCase()} `),
     { confirmed: true },
   );
-  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: true, pending: true });
+  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: true, pending: true, checkDue: false });
   assert.equal((await invoke("settings:get")).backupReminder, true);
   await invoke("recovery:dismiss");
   await assert.rejects(invoke("recovery:copy"), /\[mnemo:errors\.copyValue\]/);
@@ -292,7 +292,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.deepEqual(await invoke("vault:create-recovery-key", "correct horse battery staple"), { canceled: true });
   assert.equal(messageBoxes.length, boxesBefore + 1);
   assert.equal(messageBoxes.at(-1).title, "Replace the recovery key?");
-  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: true, pending: false });
+  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: true, pending: false, checkDue: false });
   messageResponse = 1;
   const rotated = await invoke("vault:create-recovery-key", "correct horse battery staple");
   messageResponse = 0;
@@ -301,7 +301,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   // A key the user never confirmed stays flagged after the vault locks.
   assert.equal((await invoke("vault:lock")).unlocked, false);
   await invoke("vault:unlock", "correct horse battery staple");
-  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: false, pending: false });
+  assert.deepEqual(await invoke("vault:get-recovery-status"), { enabled: true, confirmed: false, pending: false, checkDue: false });
 
   // Touch ID: enabling needs the passphrase; unlocking releases the key.
   assert.deepEqual(await invoke("biometric:status"), { available: true, enabled: false });

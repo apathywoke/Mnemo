@@ -1,0 +1,10 @@
+{
+  "//": "Made-up test data for test/snapshot-format.test.js: a snapshot as Mnemo writes it since November 2026 (description version 1, attachment pool). Do not regenerate: later versions must keep reading it.",
+  "passphrase": "harbor velvet quartz 59 lantern",
+  "recoveryKey": "KA79-CAP5-MHSJ-Y60F-T288-Y5ZT-3MXK-ZY21-4PDV-KRR8-6WYK-YJX5-3W4G-8G6E",
+  "snapshot": "1793793600001-0feebb8a1f501235",
+  "entryId": "3629a4fe-48ff-444a-a68e-8c935ca1267d",
+  "entryName": "Snapshot fixture login",
+  "attachmentId": "d570475e-d261-44eb-9b6a-3c15919f037f",
+  "attachmentText": "made-up fixture attachment"
+}
