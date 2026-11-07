@@ -19,18 +19,18 @@
   border: 1px solid var(--c-555555);
   border-radius: 50%;
   color: var(--c-eeeeee);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .status-card strong {
   color: var(--c-e6e6e6);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .status-card p {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.5;
 }

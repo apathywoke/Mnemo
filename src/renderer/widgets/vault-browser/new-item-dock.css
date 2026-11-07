@@ -16,7 +16,7 @@
   justify-content: center;
   gap: 7px;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 13px;
   transition: background-color 140ms ease, transform 140ms ease;
 }
 
@@ -25,7 +25,7 @@
 }
 
 .new-item-dock .new-entry-button[aria-expanded="true"] {
-  background: var(--c-ffffff);
+  background: var(--accent-hover);
 }
 
 .new-item-dock .new-item-menu {

@@ -69,7 +69,7 @@ function maskFor(type, key, details) {
 function renderItemDetail(details, ui, { onCopy, onReveal, revealed = null, onRevealText }) {
   const { type } = details;
   const schema = itemTypes.ITEM_TYPES[type];
-  ui.kind.textContent = t(`item.type.${type}`).toLocaleUpperCase();
+  ui.kind.textContent = t(`item.type.${type}`);
   loginModel.setItemIcon(ui.icon, type);
   ui.name.textContent = details.name;
   ui.subtitle.textContent = details.subtitle ?? "";

@@ -1,0 +1,41 @@
+/* macOS window material. Loaded by styles.css, last.
+ *
+ * src/main/window.js gives the macOS window the sidebar material, and
+ * theme.js marks the page with data-platform="mac". While a vault is open the
+ * page is see-through where the material should show (the title bar and the
+ * sidebar); the list and the detail stay opaque. The access screens keep
+ * their own background. */
+
+:root[data-platform="mac"]:has(body.is-unlocked),
+:root[data-platform="mac"] body.is-unlocked,
+:root[data-platform="mac"] .is-unlocked .app-shell,
+:root[data-platform="mac"] .is-unlocked .workspace {
+  background: transparent;
+}
+
+:root[data-platform="mac"] .is-unlocked .workspace {
+  padding: 0;
+}
+
+:root[data-platform="mac"] .is-unlocked .dashboard-header {
+  min-height: 52px;
+  padding: 6px 18px 6px 88px;
+}
+
+:root[data-platform="mac"] .is-unlocked .backup-recovery-warning {
+  margin: 8px 14px 0;
+}
+
+:root[data-platform="mac"] .is-unlocked .vault-browser {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+:root[data-platform="mac"] .is-unlocked .vault-sidebar {
+  padding: 10px 8px 8px 10px;
+}
+
+:root[data-platform="mac"] .is-unlocked .entry-browser,
+:root[data-platform="mac"] .is-unlocked .entry-detail-area {
+  background: var(--surface);
+}

@@ -28,6 +28,10 @@ async function settle(page) {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     document.getElementById("toast-region")?.replaceChildren();
     for (const field of document.querySelectorAll("input, textarea")) field.style.caretColor = "transparent";
+    // A page screenshot leaves out the macOS window material that shows
+    // through the open vault (vibrancy.css); a flat gray stands in for it.
+    const root = document.documentElement;
+    root.style.backgroundColor = root.dataset.theme === "dark" ? "#2b2b2e" : "#e6e6e9";
     const finite = document.getAnimations()
       .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity);
     await Promise.all(finite.map((animation) => animation.finished.catch(() => {})));

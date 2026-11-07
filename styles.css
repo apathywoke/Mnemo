@@ -64,3 +64,4 @@
 @import "./src/renderer/features/history/history.css";
 @import "./src/renderer/features/organize/folders.css";
 @import "./src/renderer/shared/ui/passphrase-strength.css";
+@import "./src/renderer/app/styles/vibrancy.css";

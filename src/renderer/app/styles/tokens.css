@@ -257,4 +257,22 @@
   --soft: var(--c-c6c6c6);
   --white: var(--c-f4f4f4);
   --error: var(--c-f0b4b4);
+  /* The macOS system blue, for main actions, selection, links, and focus.
+     White text on --accent keeps a 4.5:1 contrast in both themes. */
+  --accent: #1f6fe0;
+  --accent-hover: #3580ea;
+  --accent-text: #5ea2ff;
+  --on-accent: #ffffff;
+  --focus-ring: rgb(31 111 224 / 45%);
+  --sidebar-hover: rgb(255 255 255 / 7%);
+  --sidebar-selected: rgb(255 255 255 / 13%);
+}
+
+:root[data-theme="light"] {
+  --accent: #0a63d1;
+  --accent-hover: #0857ba;
+  --accent-text: #0a5bc2;
+  --focus-ring: rgb(10 99 209 / 30%);
+  --sidebar-hover: rgb(0 0 0 / 5%);
+  --sidebar-selected: rgb(0 0 0 / 9%);
 }

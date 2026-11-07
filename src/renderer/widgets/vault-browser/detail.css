@@ -27,9 +27,8 @@
 
 .detail-kind {
   color: var(--c-777777);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 650;
-  letter-spacing: 0.15em;
 }
 
 .detail-toolbar > div {
@@ -71,7 +70,7 @@
   overflow-wrap: anywhere;
   margin: 7px 0 0;
   color: var(--c-888888);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .detail-fields {
@@ -84,9 +83,8 @@
   display: block;
   margin-bottom: 8px;
   color: var(--c-777777);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 650;
-  letter-spacing: 0.13em;
 }
 
 .detail-value-row {
@@ -101,7 +99,7 @@
   overflow: hidden;
   flex: 1;
   color: var(--c-dedede);
-  font-size: 11px;
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -113,7 +111,7 @@
 .copy-button {
   min-height: 27px;
   padding: 0 7px;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .copy-button.password-visibility-toggle,
@@ -126,7 +124,7 @@
   overflow-wrap: anywhere;
   margin: 0;
   color: var(--c-c4c4c4);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.7;
   white-space: pre-wrap;
 }
@@ -160,10 +158,10 @@
 .detail-empty p {
   margin: 16px 0 6px;
   color: var(--c-c7c7c7);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .detail-empty span {
   color: var(--c-777777);
-  font-size: 9px;
+  font-size: 11px;
 }

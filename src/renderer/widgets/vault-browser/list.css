@@ -40,7 +40,7 @@
   outline: 0;
   background: transparent;
   color: var(--c-eeeeee);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .search-box input::placeholder {
@@ -53,7 +53,7 @@
   border-radius: 4px;
   color: var(--c-727272);
   font-family: inherit;
-  font-size: 8px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -62,9 +62,8 @@
   justify-content: space-between;
   margin: 12px 2px 4px;
   color: var(--c-777777);
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 650;
-  letter-spacing: 0.13em;
 }
 
 .entry-list {
@@ -93,17 +92,21 @@
     transform 180ms ease;
 }
 
-.entry-row:hover,
-.entry-row[aria-selected="true"] {
+.entry-row:hover {
   background: var(--c-181818);
 }
 
-.entry-row:hover {
-  transform: translateX(2px);
+/* The macOS selection: the accent color with white text. */
+.entry-row[aria-selected="true"],
+.entry-row[aria-selected="true"]:hover {
+  border-radius: 7px;
+  border-bottom-color: transparent;
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
-.entry-row[aria-selected="true"] {
-  box-shadow: inset 2px 0 var(--c-ededed);
+.entry-row[aria-selected="true"] .entry-row-meta {
+  color: rgb(255 255 255 / 85%);
 }
 
 .entry-row-icon,
@@ -116,7 +119,7 @@
   border-radius: 8px;
   background: var(--c-151515);
   color: var(--c-dddddd);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -162,20 +165,20 @@
 
 .entry-row-name {
   color: var(--c-e4e4e4);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 550;
 }
 
 .entry-row-meta {
   color: var(--c-7e7e7e);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .empty-list,
 .no-results {
   padding: 20px 8px;
   color: var(--c-888888);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.6;
 }
 

@@ -50,7 +50,7 @@
 .import-source input {
   grid-row: span 2;
   margin: 0;
-  accent-color: var(--c-eeeeee);
+  accent-color: var(--accent);
 }
 
 .import-source-name {
@@ -60,7 +60,7 @@
 
 .import-source-hint {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .import-instructions {
@@ -79,7 +79,7 @@
 
 .import-mnemo-fields label {
   color: var(--c-bcbcbc);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -87,7 +87,7 @@
   margin: 8px 0 0;
   color: var(--muted);
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
+  font-size: 13px;
   word-break: break-all;
 }
 
@@ -102,7 +102,7 @@
   margin: 10px 0 0;
   padding-left: 18px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.7;
 }
 

@@ -4,6 +4,9 @@ A macOS-first Electron prototype of Mnemo, a local-first password manager.
 Everything stays in encrypted vaults on your Mac; there is no account and no
 server. It has not had an independent security review.
 
+> **Prototype: not for real passwords yet.** The app no longer says so on
+> every screen, so this page does.
+
 - **Items:** logins with one-time codes (TOTP), payment cards, secure notes,
   identities, and SSH keys; folders, favorites, a trash kept for 30 days,
   the last 20 versions of each item, and encrypted attachments.

@@ -12,4 +12,7 @@
 
   apply();
   query.addEventListener("change", apply);
+
+  // macOS windows have the sidebar material behind the page (vibrancy.css).
+  if (navigator.userAgent.includes("Macintosh")) document.documentElement.dataset.platform = "mac";
 })();

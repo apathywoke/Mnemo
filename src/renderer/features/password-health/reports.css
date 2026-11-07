@@ -28,7 +28,7 @@
   border-radius: 12px;
   background: var(--surface);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   text-decoration: none;
   transition: border-color 140ms ease;
 }
@@ -101,7 +101,7 @@
 
 .report-status {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .report-list {
@@ -122,7 +122,7 @@
   border-radius: 999px;
   background: var(--c-17140d);
   color: var(--c-d6c58f);
-  font-size: 11px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -139,13 +139,13 @@
 .report-group-title {
   margin: 6px 0 2px;
   color: var(--c-d6c58f);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .report-empty {
   margin: 4px 0 0;
   color: var(--c-70c58b);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .reports-view.is-empty .report-tiles,

@@ -9,9 +9,7 @@
    theme whatever the current one is. */
 .settings-field-label {
   color: var(--c-8b8b8b);
-  font-size: 9px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+  font-size: 11px;
 }
 
 .theme-options {
@@ -55,7 +53,7 @@
 
 .theme-option-name {
   color: var(--c-9a9a9a);
-  font-size: 12px;
+  font-size: 13px;
   text-align: center;
 }
 

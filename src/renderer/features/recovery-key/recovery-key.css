@@ -38,7 +38,7 @@
 .recovery-key-description {
   margin: 10px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   text-wrap: pretty;
 }
@@ -73,7 +73,7 @@
   margin: 18px 0 0;
   padding-left: 18px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.7;
 }
 
@@ -89,7 +89,7 @@
   display: block;
   margin-top: 18px;
   color: var(--c-d2d2d2);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -120,7 +120,7 @@
   border: 1px solid var(--c-554721);
   border-radius: 10px;
   color: var(--c-f0e3b8);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
 }
 

@@ -22,7 +22,7 @@
   background: var(--c-rgb-24-24-24-96);
   box-shadow: 0 12px 36px var(--c-rgb-0-0-0-40);
   color: var(--c-d5d5d5);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.5;
   opacity: 0;
   transform: translateY(9px);
@@ -78,7 +78,7 @@
   border: 1px solid currentColor;
   border-radius: 50%;
   color: var(--c-70c58b);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 650;
 }
 

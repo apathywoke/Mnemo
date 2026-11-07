@@ -96,7 +96,7 @@
 
 .update-status-text span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.45;
   text-wrap: pretty;
 }
@@ -124,7 +124,7 @@
 .update-status-actions .update-action-button,
 .update-status-actions .secondary-button {
   min-height: 34px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .update-status-actions .secondary-button:disabled {
@@ -163,7 +163,7 @@
   color: var(--c-dddddd);
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   text-decoration: underline;
   text-decoration-color: var(--c-555555);
   text-underline-offset: 3px;
@@ -171,7 +171,7 @@
 
 .update-notes-link::after {
   content: " ▾";
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .update-notes-link[aria-expanded="true"]::after {

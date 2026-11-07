@@ -18,18 +18,19 @@
   color: var(--c-cccccc);
   cursor: pointer;
   font: inherit;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .dialog-save-button {
-  border-color: var(--c-eeeeee);
-  background: var(--c-eeeeee);
-  color: var(--c-090909);
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
   font-weight: 650;
 }
 
 .dialog-save-button:hover {
-  background: var(--c-ffffff);
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .delete-confirm-button {
@@ -40,13 +41,13 @@
 .confirm-content > p:not(.eyebrow) {
   margin: 12px 0 0;
   color: var(--c-999999);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .confirm-content > label {
   margin-top: 20px;
   color: var(--c-bdbdbd);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.6;
 }
 
@@ -67,7 +68,7 @@
   background: var(--c-0c0c0c);
   color: var(--c-eeeeee);
   font: inherit;
-  font-size: 11px;
+  font-size: 13px;
   transition: border-color 140ms ease;
 }
 
@@ -84,7 +85,7 @@
   color: var(--c-f0dada);
   cursor: pointer;
   font: inherit;
-  font-size: 10px;
+  font-size: 12px;
   transition:
     border-color 140ms ease,
     background-color 140ms ease,
