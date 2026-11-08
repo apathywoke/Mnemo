@@ -1,0 +1,136 @@
+/* Settings like macOS System Settings. Loaded by styles.css, after the
+ * settings, category, and update rules it reshapes.
+ *
+ * Four categories in a sidebar, each with a small colored icon; the
+ * selected one in the accent. Each part of a category is a rounded group,
+ * as in the item detail. */
+
+#settings-dialog {
+  width: min(94vw, 760px);
+}
+
+.settings-layout {
+  grid-template-columns: 176px minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 18px;
+}
+
+/* The categories stay in view while a long pane scrolls. */
+.settings-tabs {
+  position: sticky;
+  top: 0;
+  align-self: start;
+}
+
+@media (max-width: 640px) {
+  .settings-tabs {
+    position: static;
+  }
+}
+
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  color: var(--c-e4e4e4);
+  font-size: 13px;
+}
+
+.settings-tab:hover {
+  background: var(--sidebar-hover);
+  color: var(--c-f2f2f2);
+}
+
+.settings-tab[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.settings-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.settings-tab-icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  place-items: center;
+  border-radius: 6px;
+  color: #fff;
+}
+
+.settings-tab-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.settings-tab-icon[data-icon="general"] {
+  background: #8e8e93;
+}
+
+.settings-tab-icon[data-icon="security"] {
+  background: #3b82f6;
+}
+
+.settings-tab-icon[data-icon="backups"] {
+  background: #2fa866;
+}
+
+.settings-tab-icon[data-icon="advanced"] {
+  background: #5e5e66;
+}
+
+/* The update dot sits at the end of General. */
+.settings-tab > .settings-tab-dot {
+  margin-left: auto;
+}
+
+/* A rounded group per part, with its title inside. */
+.settings-pane > .settings-section,
+.settings-pane-body > .settings-section {
+  margin-top: 14px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--c-2d2d2d);
+  border-radius: 10px;
+  background: var(--c-rgb-230-230-230-8);
+}
+
+.settings-pane > .settings-section:first-child,
+.settings-pane-body > .settings-section:first-child {
+  margin-top: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-2d2d2d);
+}
+
+.settings-section-title,
+.settings-section > .settings-field-label,
+.settings-section > label:first-child {
+  margin: 0;
+  color: var(--c-eeeeee);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-section .update-status-card {
+  border-color: var(--c-2d2d2d);
+}
+
+/* The update interval, below the status, inside the same group. */
+.settings-section > .settings-field {
+  margin-top: 6px;
+}
+
+.settings-section > .settings-field > label {
+  color: var(--c-aaaaaa);
+  font-size: 12px;
+}

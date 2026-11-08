@@ -197,7 +197,6 @@ const en = {
   "footer.version": "App version",
   "footer.noSync": "No sync or telemetry",
 
-  "settings.eyebrow": "Application",
   "settings.title": "Settings",
   "settings.close": "Close settings",
   "settings.language": "Language",
@@ -745,8 +744,7 @@ const en = {
   "settings.categories": "Settings categories",
   "settings.tabGeneral": "General",
   "settings.tabSecurity": "Security",
-  "settings.tabData": "Data",
-  "settings.tabVault": "Vault",
+  "settings.tabAdvanced": "Advanced",
 
   // One-time codes
   "detail.totp": "One-time code",
@@ -1070,7 +1068,6 @@ const de = {
   "footer.version": "App-Version",
   "footer.noSync": "Keine Synchronisierung oder Telemetrie",
 
-  "settings.eyebrow": "Anwendung",
   "settings.title": "Einstellungen",
   "settings.close": "Einstellungen schließen",
   "settings.language": "Sprache",
@@ -1615,8 +1612,7 @@ const de = {
   "settings.categories": "Einstellungskategorien",
   "settings.tabGeneral": "Allgemein",
   "settings.tabSecurity": "Sicherheit",
-  "settings.tabData": "Daten",
-  "settings.tabVault": "Tresor",
+  "settings.tabAdvanced": "Erweitert",
 
   // One-time codes
   "detail.totp": "Einmalcode",
@@ -1940,7 +1936,6 @@ const ru = {
   "footer.version": "Версия приложения",
   "footer.noSync": "Без синхронизации и телеметрии",
 
-  "settings.eyebrow": "Приложение",
   "settings.title": "Настройки",
   "settings.close": "Закрыть настройки",
   "settings.language": "Язык",
@@ -2485,8 +2480,7 @@ const ru = {
   "settings.categories": "Разделы настроек",
   "settings.tabGeneral": "Общие",
   "settings.tabSecurity": "Безопасность",
-  "settings.tabData": "Данные",
-  "settings.tabVault": "Хранилище",
+  "settings.tabAdvanced": "Дополнительно",
 
   // One-time codes
   "detail.totp": "Одноразовый код",

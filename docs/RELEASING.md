@@ -288,7 +288,7 @@ a commit that is already on `main` and to approve the job.
 ### What the app does
 
 About 20 seconds after launch and then on the schedule chosen in
-Settings → Updates (every 30 minutes, hour, 6 hours, or day; daily by
+Settings → General (every 30 minutes, hour, 6 hours, or day; daily by
 default; or never), and whenever the user clicks **Check for updates**,
 the app reads the latest release, verifies the manifest
 signature with the bundled keys, and shows a banner when a newer version
