@@ -275,7 +275,9 @@ test("a new recovery key is confirmed by its last characters", async (t) => {
     await page.fill("#create-passphrase", TEST_PASSPHRASE);
     await page.press("#create-passphrase", "Enter");
     await page.locator("#setup-step-2:not([hidden])").waitFor();
-    assert.equal(await page.textContent("#setup-step"), "Step 2 of 3");
+    // Confirming is still the passphrase step, shown in the title bar.
+    assert.equal(await page.textContent(".setup-stepper [aria-current='step']"), "1Passphrase");
+    assert.ok(await page.isVisible(".setup-stepper"));
     await page.click("#setup-step-back");
     await page.locator("#setup-step-1:not([hidden])").waitFor();
     await fillSetup(page);

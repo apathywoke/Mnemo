@@ -36,8 +36,8 @@ const en = {
   "profile.deleteAria": "Delete {name}",
   "profile.deleteTitle": "Delete vault",
 
-  "setup.step1": "Step 1 of 3",
-  "setup.step2": "Step 2 of 3",
+  "setup.stepPassphrase": "Passphrase",
+  "setup.stepsAria": "Steps to create a vault",
   "setup.continue": "Continue",
   "setup.descriptionConfirm": "Type the master passphrase again, so a typo cannot lock you out.",
   "setup.title": "Create a vault",
@@ -907,8 +907,8 @@ const de = {
   "profile.deleteAria": "{name} löschen",
   "profile.deleteTitle": "Tresor löschen",
 
-  "setup.step1": "Schritt 1 von 3",
-  "setup.step2": "Schritt 2 von 3",
+  "setup.stepPassphrase": "Passphrase",
+  "setup.stepsAria": "Schritte zum Erstellen eines Tresors",
   "setup.continue": "Weiter",
   "setup.descriptionConfirm": "Geben Sie die Master-Passphrase noch einmal ein, damit ein Tippfehler Sie nicht aussperrt.",
   "setup.title": "Tresor erstellen",
@@ -1775,8 +1775,8 @@ const ru = {
   "profile.deleteAria": "Удалить {name}",
   "profile.deleteTitle": "Удалить хранилище",
 
-  "setup.step1": "Шаг 1 из 3",
-  "setup.step2": "Шаг 2 из 3",
+  "setup.stepPassphrase": "Мастер-пароль",
+  "setup.stepsAria": "Шаги создания хранилища",
   "setup.continue": "Продолжить",
   "setup.descriptionConfirm": "Введите мастер-пароль ещё раз, чтобы опечатка не закрыла вам доступ.",
   "setup.title": "Создание хранилища",

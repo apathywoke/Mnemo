@@ -81,11 +81,65 @@
   display: none;
 }
 
-.setup-step-label {
+/* Creating a vault: the steps in the title bar, the current one in the
+   accent. Steps 2 and 3 are the recovery key and the copy outside this
+   Mac that follow creation. */
+.workspace-header {
+  position: relative;
+}
+
+.setup-stepper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: none;
+  gap: 22px;
   margin: 0;
-  color: var(--accent-text);
-  font-size: 12px;
+  padding: 0;
+  list-style: none;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
+body:has(#setup-panel:not([hidden])) .setup-stepper {
+  display: flex;
+}
+
+.setup-stepper li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--c-888888);
+  font-size: 13px;
+}
+
+.setup-stepper li[aria-current="step"] {
+  color: var(--c-eeeeee);
+  font-weight: 500;
+}
+
+.setup-stepper-number {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid var(--c-555555);
+  border-radius: 50%;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.setup-stepper li[aria-current="step"] .setup-stepper-number {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+@media (max-width: 760px) {
+  .setup-stepper li:not([aria-current="step"]) > span:last-child {
+    display: none;
+  }
 }
 
 .unlock-context {

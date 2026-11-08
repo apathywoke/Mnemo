@@ -19,6 +19,12 @@
       <section class="workspace">
         <header class="workspace-header">
           <span class="workspace-header-spacer"></span>
+          <!-- Creating a vault: shown in the title bar while the setup panel is. -->
+          <ol class="setup-stepper" aria-label="Steps to create a vault" data-i18n-aria-label="setup.stepsAria">
+            <li aria-current="step"><span class="setup-stepper-number" aria-hidden="true">1</span><span data-i18n="setup.stepPassphrase">Passphrase</span></li>
+            <li><span class="setup-stepper-number" aria-hidden="true">2</span><span data-i18n="settings.recoveryTitle">Recovery key</span></li>
+            <li><span class="setup-stepper-number" aria-hidden="true">3</span><span data-i18n="settings.outsideTitle">Copy outside this Mac</span></li>
+          </ol>
           <div class="workspace-header-controls">
             <button id="settings-button" type="button" class="quiet-button settings-button" aria-haspopup="dialog" aria-controls="settings-dialog">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -100,7 +106,6 @@
         </section>
 
         <section id="setup-panel" class="vault-panel" hidden>
-          <p id="setup-step" class="setup-step-label" data-i18n="setup.step1">Step 1 of 3</p>
           <h2 data-i18n="setup.title">Create a vault</h2>
           <p id="setup-description" class="description" data-i18n="setup.description">
             Choose a unique master passphrase of at least 12 characters, rated Strong; a phrase of several unrelated words works well. It encrypts your vault and is never stored by the app.
