@@ -1,148 +1,22 @@
-/* App shell: brand panel, workspace, header, and content area. Loaded by styles.css, in order. */
+/* App shell: workspace, header, and content area. Loaded by styles.css, in order. */
 
 .app-shell {
   display: grid;
   width: 100%;
   min-height: 540px;
   height: 100vh;
-  grid-template-columns: minmax(270px, 0.9fr) minmax(390px, 1.1fr);
-  gap: 12px;
-  padding: 12px;
+  grid-template-columns: minmax(0, 1fr);
   overflow: auto;
   background: var(--c-050505);
-  transition: grid-template-columns 720ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.brand-panel,
+/* The whole window; its header is the title bar on the access screens. */
 .workspace {
+  display: flex;
   min-width: 0;
-  border: 1px solid var(--c-191919);
-  border-radius: 19px;
-}
-
-/* Decorative, so it can drag the window; the window buttons sit over its
-   top left corner. */
-.brand-panel {
-  -webkit-app-region: drag;
-  app-region: drag;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  overflow: hidden;
-  padding: 30px 28px 20px;
-  background: var(--c-080808);
-  isolation: isolate;
-  transform-origin: right center;
-  transition:
-    opacity 280ms ease,
-    transform 620ms cubic-bezier(0.22, 1, 0.36, 1),
-    padding 620ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 360ms ease;
-}
-
-.brand-heading,
-.brand-footer {
-  position: relative;
-  z-index: 1;
-}
-
-.brand-heading {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 7px;
-}
-
-.wordmark {
-  color: var(--white);
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.045em;
-  text-decoration: none;
-}
-
-.wordmark > span:first-child {
-  font-weight: 400;
-}
-
-.wordmark-dot {
-  color: var(--c-888888);
-}
-
-.brand-caption,
-.brand-footer,
-.eyebrow,
-.workspace-footer {
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.brand-caption {
-  color: var(--c-7e7e7e);
-}
-
-.brand-art {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--c-f1f1f1);
-  pointer-events: none;
-}
-
-.brand-art svg {
-  width: clamp(118px, 17vw, 190px);
-  height: auto;
-  filter: drop-shadow(0 0 16px var(--c-rgb-255-255-255-10));
-}
-
-.guide {
-  position: absolute;
-  display: block;
-  background: var(--c-171717);
-}
-
-.guide-horizontal {
-  top: 50%;
-  right: 0;
-  left: 0;
-  height: 1px;
-}
-
-.guide-vertical {
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-}
-
-.brand-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  color: var(--c-777777);
-  font-size: 11px;
-}
-
-.brand-footer span:last-child {
-  white-space: nowrap;
-}
-
-.brand-footer i {
-  display: inline-block;
-  width: 3px;
-  height: 3px;
-  margin: 0 5px 2px;
-  border-radius: 50%;
-  background: var(--c-858585);
-}
-
-.workspace {
-  display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 24px 28px 16px;
+  padding: 0 28px 14px;
   background: var(--surface);
 }
 

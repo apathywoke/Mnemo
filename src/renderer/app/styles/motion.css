@@ -54,22 +54,6 @@
 }
 
 @media (max-width: 860px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .is-unlocked .app-shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .is-unlocked .workspace {
-    grid-column: 1;
-  }
-
-  .brand-panel {
-    display: none;
-  }
-
   .workspace {
     padding-right: clamp(20px, 6vw, 44px);
     padding-left: clamp(20px, 6vw, 44px);
@@ -79,10 +63,6 @@
 @media (max-height: 640px) {
   .app-shell {
     min-height: 500px;
-  }
-
-  .workspace {
-    padding-top: 16px;
   }
 
   .vault-panel {

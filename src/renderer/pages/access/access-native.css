@@ -1,0 +1,256 @@
+/* Access screens (choose a vault, create, unlock, recover, restore) like a
+ * macOS app. Loaded by styles.css, after the panel, form, and button rules
+ * it reshapes.
+ *
+ * One column in the middle of the window, under the app's mark: a short
+ * title, a line of explanation, rounded fields, and one main button, with
+ * the rarer choices as links below. The header row is the title bar: it
+ * drags the window (the window buttons sit at its left), except over its
+ * own buttons. */
+
+.workspace-header {
+  min-height: 52px;
+  padding-left: 64px;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.workspace-header button,
+.workspace-header .local-badge {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.workspace-header-spacer {
+  flex: 1;
+}
+
+.content {
+  flex-direction: column;
+  padding: 8px 0 36px;
+}
+
+.is-unlocked .content {
+  flex-direction: row;
+}
+
+/* The app's mark: the asterisk on an accent tile. */
+.access-brand {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  flex: none;
+  place-items: center;
+  margin-bottom: 14px;
+  border-radius: 15px;
+  background: linear-gradient(160deg, var(--accent-hover), var(--accent));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--on-accent);
+}
+
+.access-brand svg {
+  width: 38px;
+  height: 38px;
+}
+
+.vault-panel:not(.vault-dashboard) {
+  width: min(100%, 400px);
+  align-self: center;
+  padding: 4px 2px;
+  text-align: center;
+}
+
+.vault-panel:not(.vault-dashboard) h2 {
+  margin: 4px 0 6px;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.vault-panel:not(.vault-dashboard) .description {
+  max-width: 360px;
+  margin: 0 auto;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* What each screen is goes in its title; the old labels above it go. */
+.vault-panel:not(.vault-dashboard) > .eyebrow.section-label {
+  display: none;
+}
+
+.setup-step-label {
+  margin: 0;
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.unlock-context {
+  position: relative;
+  justify-content: center;
+  margin: 0;
+}
+
+.unlock-context .back-button {
+  position: absolute;
+  left: 0;
+}
+
+.unlock-context .section-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Fields: rounded boxes, the accent ring on focus. */
+.vault-panel:not(.vault-dashboard) .vault-form {
+  gap: 6px;
+  margin-top: 22px;
+}
+
+.vault-panel:not(.vault-dashboard) .vault-form label {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.vault-panel:not(.vault-dashboard) .vault-form input:not([type="checkbox"], [type="radio"], [type="file"]),
+.vault-panel:not(.vault-dashboard) .secret-input-row {
+  min-height: 36px;
+  border: 1px solid var(--c-3d3d3d);
+  border-radius: 8px;
+  background: var(--c-0b0b0b);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.vault-panel:not(.vault-dashboard) .vault-form input:not([type="checkbox"], [type="radio"], [type="file"]) {
+  padding: 7px 11px;
+}
+
+.vault-panel:not(.vault-dashboard) .secret-input-row {
+  gap: 4px;
+  padding: 0 3px 0 11px;
+}
+
+/* The input inside a row with a Show button: the row is the box. */
+.vault-panel:not(.vault-dashboard) .vault-form .secret-input-row > input:not([type="checkbox"], [type="radio"], [type="file"]),
+.vault-panel:not(.vault-dashboard) .vault-form .secret-input-row > input:not([type="checkbox"], [type="radio"], [type="file"]):focus {
+  min-height: 34px;
+  padding: 7px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.vault-panel:not(.vault-dashboard) .vault-form input:not([type="checkbox"], [type="radio"], [type="file"]):focus,
+.vault-panel:not(.vault-dashboard) .secret-input-row:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.vault-panel:not(.vault-dashboard) .secret-input-row .password-visibility-toggle {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  flex-basis: 28px;
+}
+
+.vault-panel:not(.vault-dashboard) .primary-button {
+  margin-top: 16px;
+}
+
+.vault-panel:not(.vault-dashboard) .passphrase-strength {
+  margin-top: 4px;
+}
+
+/* The rarer choices, centered under the form. */
+.vault-panel:not(.vault-dashboard) > .text-button {
+  align-self: center;
+  margin-top: 10px;
+  text-align: center;
+}
+
+.vault-panel:not(.vault-dashboard) > .text-button + .text-button {
+  margin-top: 0;
+}
+
+.unlock-secondary-actions {
+  justify-content: center;
+}
+
+.touchid-button {
+  align-self: center;
+}
+
+/* Creating a vault, one step at a time (vault-access/setup-steps.js). */
+.setup-step {
+  display: grid;
+  gap: 6px;
+}
+
+.setup-step[hidden] {
+  display: none;
+}
+
+.setup-step .recovery-warning {
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+.setup-step-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.vault-panel:not(.vault-dashboard) .setup-step-actions > button {
+  width: 100%;
+  min-height: 38px;
+  margin: 0;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+/* The version and the privacy line, quiet and centered at the bottom. */
+.version {
+  right: 0;
+  left: 0;
+  text-align: center;
+}
+
+.workspace-footer {
+  justify-content: center;
+  border-top: 0;
+}
+
+/* Choosing a vault: the list, then a new vault, then the restores. */
+.vault-panel:not(.vault-dashboard) .profile-list {
+  margin-top: 22px;
+  text-align: left;
+}
+
+.vault-panel:not(.vault-dashboard) .profile-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.vault-panel:not(.vault-dashboard) .profile-actions > .secondary-button {
+  width: 100%;
+  font-size: 13px;
+}
+
+.vault-panel:not(.vault-dashboard) .profile-actions > .text-button {
+  align-self: center;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.vault-panel:not(.vault-dashboard) .profile-actions > .text-button + .text-button {
+  margin-top: 0;
+}

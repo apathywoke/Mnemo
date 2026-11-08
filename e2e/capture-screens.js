@@ -78,8 +78,10 @@ async function captureTheme(theme, folder) {
     await page.fill("#profile-name", "Personal");
     await page.fill("#create-passphrase", TEST_PASSPHRASE);
     await shot("02-setup-strength");
-
+    await page.click("#setup-continue");
+    await page.locator("#setup-step-2:not([hidden])").waitFor();
     await page.fill("#confirm-passphrase", TEST_PASSPHRASE);
+    await shot("02-setup-confirm");
     await page.click("#create-form button[type='submit']");
     await page.locator("#recovery-key-dialog[open]").waitFor();
     await shot("03-recovery-key", ["#recovery-key-value"]);

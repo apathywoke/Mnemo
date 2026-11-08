@@ -2,15 +2,22 @@ import { $ } from "../../shared/lib/dom.js";
 import { t, errorText, errorKey } from "../../shared/lib/i18n.js";
 import { conceal } from "../../shared/ui/password-visibility.js";
 import { show as showToast } from "../../shared/ui/toast-notifications.js";
+import * as setupSteps from "./setup-steps.js";
 
 function bind(ctx, access) {
   const createForm = $("#create-form");
   const unlockForm = $("#unlock-form");
   const restoreForm = $("#restore-form");
   const recoverForm = $("#recover-form");
+  const steps = setupSteps.bind(ctx);
 
   createForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    // Enter on step 1 continues; only step 2 creates the vault.
+    if (steps.step() === 1) {
+      steps.next();
+      return;
+    }
     conceal(createForm);
     $("#create-error").hidden = true;
     if ($("#create-passphrase").value !== $("#confirm-passphrase").value) {
@@ -39,7 +46,8 @@ function bind(ctx, access) {
         showToast(t("toast.vaultCreatedLocked"));
         return;
       }
-      ctx.setError($("#create-error"), errorText(cause, "errors.createVault"));
+      // The passphrases were cleared: start again where they are typed.
+      steps.restart(errorText(cause, "errors.createVault"));
     } finally {
       button.disabled = false;
       button.textContent = t("setup.submit");

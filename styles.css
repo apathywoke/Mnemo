@@ -67,4 +67,5 @@
 @import "./src/renderer/widgets/vault-browser/detail-card.css";
 @import "./src/renderer/shared/ui/inline-editor.css";
 @import "./src/renderer/features/settings/settings-native.css";
+@import "./src/renderer/pages/access/access-native.css";
 @import "./src/renderer/app/styles/vibrancy.css";

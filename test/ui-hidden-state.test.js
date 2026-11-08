@@ -49,6 +49,6 @@ test("Mnemo is the application brand while Local Vault remains a legacy profile 
 
   assert.match(html, /<title>Mnemo<\/title>/);
   assert.match(html, /aria-label="Mnemo"/);
-  assert.match(html, /<span>MNEMO<\/span>/);
+  assert.match(html, /<div class="access-brand" aria-label="Mnemo"/);
   assert.match(window, /title: "Mnemo"/);
 });
