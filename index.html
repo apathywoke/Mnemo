@@ -515,22 +515,25 @@
               <section id="entry-detail" class="entry-detail" hidden>
                 <div class="detail-toolbar">
                   <span class="detail-kind" data-i18n="detail.kind">Login</span>
-                  <div>
-                    <button id="fetch-site-icon-button" type="button" class="detail-action" data-i18n="detail.loadIcon">
-                      Load site icon
-                    </button>
-                    <button id="edit-entry-button" type="button" class="detail-action" data-i18n="detail.edit">
-                      Edit
-                    </button>
-                    <button id="delete-entry-button" type="button" class="detail-action danger-action" data-i18n="common.delete">
-                      Delete
-                    </button>
+                  <div class="detail-toolbar-actions">
+                    <button id="edit-entry-button" type="button" class="detail-action detail-edit-button" data-i18n="detail.edit">Edit</button>
+                    <div class="detail-more">
+                      <button id="entry-more-button" type="button" class="detail-action detail-more-button" aria-haspopup="menu" aria-expanded="false" aria-controls="entry-more-menu" aria-label="More actions" data-i18n-aria-label="detail.moreActions" title="More actions" data-i18n-title="detail.moreActions">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/></svg>
+                      </button>
+                      <div id="entry-more-menu" class="detail-more-menu" role="menu" aria-labelledby="entry-more-button" hidden>
+                        <button id="fetch-site-icon-button" type="button" class="detail-menu-item" role="menuitem" data-i18n="detail.loadIcon">Load site icon</button>
+                        <button id="delete-entry-button" type="button" class="detail-menu-item danger-action" role="menuitem" data-i18n="common.delete">Delete</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div class="detail-title-block">
                   <div id="detail-icon" class="detail-icon" aria-hidden="true">A</div>
-                  <h3 id="detail-name"></h3>
-                  <p id="detail-url" class="detail-url"></p>
+                  <div class="detail-title-text">
+                    <h3 id="detail-name"></h3>
+                    <p id="detail-url" class="detail-url"></p>
+                  </div>
                 </div>
                 <div class="detail-fields">
                   <div class="detail-field">
@@ -577,15 +580,24 @@
               <section id="item-detail" class="entry-detail item-detail" hidden>
                 <div class="detail-toolbar">
                   <span id="item-detail-kind" class="detail-kind"></span>
-                  <div>
-                    <button id="edit-item-button" type="button" class="detail-action" data-i18n="detail.edit">Edit</button>
-                    <button id="delete-item-button" type="button" class="detail-action danger-action" data-i18n="common.delete">Delete</button>
+                  <div class="detail-toolbar-actions">
+                    <button id="edit-item-button" type="button" class="detail-action detail-edit-button" data-i18n="detail.edit">Edit</button>
+                    <div class="detail-more">
+                      <button id="item-more-button" type="button" class="detail-action detail-more-button" aria-haspopup="menu" aria-expanded="false" aria-controls="item-more-menu" aria-label="More actions" data-i18n-aria-label="detail.moreActions" title="More actions" data-i18n-title="detail.moreActions">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/></svg>
+                      </button>
+                      <div id="item-more-menu" class="detail-more-menu" role="menu" aria-labelledby="item-more-button" hidden>
+                        <button id="delete-item-button" type="button" class="detail-menu-item danger-action" role="menuitem" data-i18n="common.delete">Delete</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div class="detail-title-block">
                   <div id="item-detail-icon" class="detail-icon item-detail-icon" aria-hidden="true"></div>
-                  <h3 id="item-detail-name"></h3>
-                  <p id="item-detail-subtitle" class="detail-url"></p>
+                  <div class="detail-title-text">
+                    <h3 id="item-detail-name"></h3>
+                    <p id="item-detail-subtitle" class="detail-url"></p>
+                  </div>
                 </div>
                 <div id="item-detail-fields" class="detail-fields"></div>
               </section>

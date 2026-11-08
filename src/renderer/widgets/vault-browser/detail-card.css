@@ -1,0 +1,239 @@
+/* Vault browser: the detail as a macOS card. Loaded by styles.css, after
+ * the detail, field, organize, and attachment rules it reshapes.
+ *
+ * A compact title (icon beside the name), the fields in one rounded group
+ * with a row each (label on the left, value on the right, its Show and Copy
+ * buttons on hover or focus), Edit as a button, and the rarer actions in
+ * the "⋯" menu (shared/ui/menu.js). */
+
+.entry-detail {
+  max-width: 680px;
+  padding-top: 12px;
+}
+
+/* Toolbar: the kind on the left; Edit and "⋯" on the right. */
+.detail-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-edit-button {
+  min-height: 28px;
+  padding: 0 14px;
+  border-color: var(--c-3d3d3d);
+  color: var(--c-e4e4e4);
+  font-size: 13px;
+}
+
+.detail-edit-button:hover {
+  border-color: var(--c-555555);
+}
+
+.detail-more {
+  position: relative;
+}
+
+.detail-more-button {
+  display: grid;
+  width: 30px;
+  min-height: 28px;
+  place-items: center;
+  padding: 0;
+}
+
+.detail-more-button svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.detail-more-button[aria-expanded="true"] {
+  border-color: var(--c-3d3d3d);
+  color: var(--c-f2f2f2);
+}
+
+.detail-more-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  min-width: 190px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--c-141414);
+  box-shadow: 0 12px 32px var(--c-rgb-0-0-0-40);
+}
+
+.detail-more-menu[hidden] {
+  display: none;
+}
+
+.detail-menu-item {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--c-e4e4e4);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.detail-menu-item[hidden] {
+  display: none;
+}
+
+.detail-menu-item:disabled {
+  color: var(--c-777777);
+  cursor: default;
+}
+
+.detail-menu-item:hover:not(:disabled),
+.detail-menu-item:focus-visible {
+  outline: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.detail-menu-item.danger-action {
+  color: var(--c-e87878);
+}
+
+.detail-menu-item.danger-action:hover,
+.detail-menu-item.danger-action:focus-visible {
+  background: var(--c-c45c5c);
+  color: var(--on-accent);
+}
+
+/* Title: the icon beside the name and the site or subtitle. */
+.detail-title-block {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.detail-title-block .detail-icon {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  margin: 0;
+  border-radius: 12px;
+  font-size: 20px;
+}
+
+.detail-title-text {
+  min-width: 0;
+}
+
+.detail-title-block h3 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.detail-url {
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.detail-organize {
+  margin-top: 14px;
+}
+
+/* Fields: one rounded group, a row each. */
+.detail-fields {
+  display: block;
+  overflow: hidden;
+  margin-top: 20px;
+  border: 1px solid var(--c-2d2d2d);
+  border-radius: 10px;
+  background: var(--c-rgb-230-230-230-8);
+}
+
+.detail-fields:empty {
+  display: none;
+}
+
+.detail-field {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 8px 5px 14px;
+}
+
+.detail-field[hidden] {
+  display: none;
+}
+
+.detail-field + .detail-field {
+  border-top: 1px solid var(--c-2d2d2d);
+}
+
+.detail-field > label {
+  width: 118px;
+  flex: none;
+  margin: 0;
+  color: var(--c-888888);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.detail-value-row {
+  min-width: 0;
+  min-height: 32px;
+  flex: 1;
+  border-bottom: 0;
+}
+
+/* Notes and other long text: the label at the top of the row. */
+.detail-field:has(.detail-notes, .detail-multiline) {
+  align-items: flex-start;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.detail-field > .detail-notes {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-field > .detail-reveal-button,
+.detail-value-row > .detail-reveal-button {
+  min-height: 26px;
+  margin: -4px 0;
+}
+
+/* A value with a copy button copies on a click (vault-browser/index.js). */
+.detail-value-row:has(.password-copy-toggle:not(.password-visibility-toggle)) > .detail-value {
+  cursor: pointer;
+}
+
+.detail-field:has(.password-copy-toggle:not(.password-visibility-toggle)):hover {
+  background: var(--c-rgb-230-230-230-8);
+}
+
+/* Show and Copy appear with the pointer or the keyboard focus. */
+.detail-value-row > .copy-button {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.detail-field:hover .detail-value-row > .copy-button,
+.detail-value-row:focus-within > .copy-button {
+  opacity: 1;
+}
+
+/* Attachments: a row group like the fields. */
+.detail-attachments {
+  margin-top: 22px;
+}
