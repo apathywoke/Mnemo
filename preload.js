@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("vaultApp", {
   dismissBackupReminder: () => ipcRenderer.invoke("settings:dismiss-backup-reminder"),
   confirmRecoveryKeySaved: (typed) => ipcRenderer.invoke("recovery:confirm-saved", typed),
   setTheme: (theme) => ipcRenderer.invoke("settings:set-theme", theme),
+  setMenuBarIcon: (shown) => ipcRenderer.invoke("settings:set-menu-bar-icon", shown),
   setUpdateInterval: (interval) => ipcRenderer.invoke("settings:set-update-interval", interval),
   // Updates are checked, downloaded, verified, and installed by main.
   getUpdateState: () => ipcRenderer.invoke("updates:get-state"),

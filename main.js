@@ -35,6 +35,7 @@ const { createClipboard } = require("./src/main/clipboard");
 const { createLock } = require("./src/main/lock");
 const { createRecoveryKeys } = require("./src/main/recovery-keys");
 const { createAppMenu } = require("./src/main/app-menu");
+const { createMenuBar } = require("./src/main/menu-bar");
 const { createNotesReveal } = require("./src/main/notes-reveal");
 const { createWindowManager } = require("./src/main/window");
 const { registerAppScheme } = require("./src/main/app-protocol");
@@ -88,6 +89,7 @@ Object.assign(ctx, createNotesReveal(ctx));
 Object.assign(ctx, createWindowManager(ctx));
 Object.assign(ctx, createRegisterHandler(ctx));
 Object.assign(ctx, createUpdates(ctx));
+Object.assign(ctx, createMenuBar(ctx));
 const { lockVault, createWindow, registerAppProtocol, scheduleUpdateCheck, buildAppMenu } = ctx;
 
 if (launchedWithRemoteDebugging) {
@@ -183,6 +185,8 @@ if (launchedWithRemoteDebugging) {
     void state.settingsLoaded.then(() => scheduleUpdateCheck());
     // In the saved language; settings:set-language builds it again.
     void state.settingsLoaded.then(() => buildAppMenu());
+    // The menu bar icon, if the setting shows it (settings:set-menu-bar-icon).
+    void state.settingsLoaded.then(() => ctx.updateMenuBar());
     // Timers stand still while the Mac sleeps; re-plan from the clock.
     powerMonitor.on("resume", () => scheduleUpdateCheck());
 

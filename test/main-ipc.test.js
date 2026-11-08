@@ -221,14 +221,14 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   );
 
   assert.equal(await invoke("app:get-version"), "0.1.0-test");
-  assert.deepEqual(await invoke("settings:get"), { language: "en", theme: "system", updateInterval: "1d", backupReminder: true });
+  assert.deepEqual(await invoke("settings:get"), { language: "en", theme: "system", updateInterval: "1d", backupReminder: true, menuBarIcon: true });
   assert.equal(nativeThemeStub.themeSource, "system");
-  assert.deepEqual(await invoke("settings:set-theme", "light"), { language: "en", theme: "light", updateInterval: "1d", backupReminder: true });
+  assert.deepEqual(await invoke("settings:set-theme", "light"), { language: "en", theme: "light", updateInterval: "1d", backupReminder: true, menuBarIcon: true });
   assert.equal(nativeThemeStub.themeSource, "light");
   await assert.rejects(invoke("settings:set-theme", "sepia"), /\[mnemo:errors\.saveSettings\]/);
   await invoke("settings:set-theme", "system");
   await assert.rejects(invoke("settings:set-language", "fr"), /\[mnemo:errors\.saveSettings\]/);
-  assert.deepEqual(await invoke("settings:set-language", "de"), { language: "de", theme: "system", updateInterval: "1d", backupReminder: true });
+  assert.deepEqual(await invoke("settings:set-language", "de"), { language: "de", theme: "system", updateInterval: "1d", backupReminder: true, menuBarIcon: true });
   assert.equal((await invoke("settings:dismiss-backup-reminder")).backupReminder, false);
   await assert.rejects(
     invoke("profiles:create", "Primary", "short"),
@@ -243,7 +243,7 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal(updates.canInstall, false);
   assert.equal(updates.blocker, "notPackaged");
   assert.equal(updates.updateInterval, "1d");
-  assert.deepEqual(await invoke("settings:set-update-interval", "6h"), { language: "en", theme: "system", updateInterval: "6h", backupReminder: false });
+  assert.deepEqual(await invoke("settings:set-update-interval", "6h"), { language: "en", theme: "system", updateInterval: "6h", backupReminder: false, menuBarIcon: true });
   assert.equal((await invoke("updates:get-state")).updateInterval, "6h");
   await assert.rejects(invoke("settings:set-update-interval", "5m"), /\[mnemo:errors\.saveSettings\]/);
   await invoke("settings:set-update-interval", "off");

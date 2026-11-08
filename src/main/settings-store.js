@@ -44,6 +44,8 @@ class SettingsStore {
       theme: DEFAULT_THEME,
       updateInterval: DEFAULT_UPDATE_INTERVAL,
       backupReminder: true,
+      // The icon in the menu bar (menu-bar.js); on unless turned off.
+      menuBarIcon: true,
     };
     // Kept in the same file, but not part of get(): the page does not need
     // the list of profile IDs.
@@ -79,6 +81,7 @@ class SettingsStore {
             ? parsed.updateInterval
             : parsed.autoUpdate === false ? "off" : DEFAULT_UPDATE_INTERVAL,
           backupReminder: parsed.backupReminder !== false,
+          menuBarIcon: parsed.menuBarIcon !== false,
         };
         if (isFolderPath(parsed.outsideFolder)) this.outsideFolder = parsed.outsideFolder;
         if (parsed.keyCheckDue !== null && typeof parsed.keyCheckDue === "object" && !Array.isArray(parsed.keyCheckDue)) {
@@ -121,6 +124,13 @@ class SettingsStore {
       return Promise.reject(new Error("Could not save the settings."));
     }
     return this.update({ updateInterval: interval });
+  }
+
+  setMenuBarIcon(shown) {
+    if (typeof shown !== "boolean") {
+      return Promise.reject(new Error("Could not save the settings."));
+    }
+    return this.update({ menuBarIcon: shown });
   }
 
   setBackupReminder(shown) {

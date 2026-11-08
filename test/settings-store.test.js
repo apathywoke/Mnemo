@@ -13,27 +13,27 @@ const options = {
 test("settings default to the system language and persist a chosen language", async (t) => {
   const directory = await makeTempDirectory(t);
   const store = new SettingsStore(directory, options);
-  assert.deepEqual(await store.load(), { language: "ru", theme: "system", updateInterval: "1d", backupReminder: true });
+  assert.deepEqual(await store.load(), { language: "ru", theme: "system", updateInterval: "1d", backupReminder: true, menuBarIcon: true });
 
-  assert.deepEqual(await store.setLanguage("de"), { language: "de", theme: "system", updateInterval: "1d", backupReminder: true });
+  assert.deepEqual(await store.setLanguage("de"), { language: "de", theme: "system", updateInterval: "1d", backupReminder: true, menuBarIcon: true });
   await assert.rejects(store.setLanguage("fr"), /Could not save the settings/);
-  assert.deepEqual(store.get(), { language: "de", theme: "system", updateInterval: "1d", backupReminder: true });
+  assert.deepEqual(store.get(), { language: "de", theme: "system", updateInterval: "1d", backupReminder: true, menuBarIcon: true });
 
   // Quick successive changes build on each other.
   await Promise.all([store.setTheme("light"), store.setLanguage("en"), store.setLanguage("de")]);
-  assert.deepEqual(store.get(), { language: "de", theme: "light", updateInterval: "1d", backupReminder: true });
+  assert.deepEqual(store.get(), { language: "de", theme: "light", updateInterval: "1d", backupReminder: true, menuBarIcon: true });
   await assert.rejects(store.setTheme("sepia"), /Could not save the settings/);
-  assert.deepEqual(await store.setUpdateInterval("30m"), { language: "de", theme: "light", updateInterval: "30m", backupReminder: true });
+  assert.deepEqual(await store.setUpdateInterval("30m"), { language: "de", theme: "light", updateInterval: "30m", backupReminder: true, menuBarIcon: true });
   await assert.rejects(store.setUpdateInterval("5m"), /Could not save the settings/);
   await assert.rejects(store.setUpdateInterval(true), /Could not save the settings/);
   await store.setUpdateInterval("1d");
 
   const filePath = path.join(directory, "settings.json");
-  assert.deepEqual(JSON.parse(await fs.readFile(filePath, "utf8")), { version: 1, language: "de", theme: "light", updateInterval: "1d", backupReminder: true, unconfirmedRecoveryKeys: [], outsideFolder: null, keyCheckDue: {} });
+  assert.deepEqual(JSON.parse(await fs.readFile(filePath, "utf8")), { version: 1, language: "de", theme: "light", updateInterval: "1d", backupReminder: true, menuBarIcon: true, unconfirmedRecoveryKeys: [], outsideFolder: null, keyCheckDue: {} });
   if (process.platform !== "win32") {
     assert.equal((await fs.stat(filePath)).mode & 0o777, 0o600);
   }
-  assert.deepEqual(await new SettingsStore(directory, options).load(), { language: "de", theme: "light", updateInterval: "1d", backupReminder: true });
+  assert.deepEqual(await new SettingsStore(directory, options).load(), { language: "de", theme: "light", updateInterval: "1d", backupReminder: true, menuBarIcon: true });
 });
 
 test("corrupt or unsupported settings fall back to the default", async (t) => {
@@ -41,11 +41,11 @@ test("corrupt or unsupported settings fall back to the default", async (t) => {
   const filePath = path.join(directory, "settings.json");
   for (const contents of ["{not json", JSON.stringify({ version: 1, language: "fr" }), JSON.stringify({ version: 2, language: "de" })]) {
     await fs.writeFile(filePath, contents);
-    assert.deepEqual(await new SettingsStore(directory, options).load(), { language: "ru", theme: "system", updateInterval: "1d", backupReminder: true });
+    assert.deepEqual(await new SettingsStore(directory, options).load(), { language: "ru", theme: "system", updateInterval: "1d", backupReminder: true, menuBarIcon: true });
   }
   // A bad theme does not discard a good language, and vice versa.
   await fs.writeFile(filePath, JSON.stringify({ version: 1, language: "de", theme: "sepia" }));
-  assert.deepEqual(await new SettingsStore(directory, options).load(), { language: "de", theme: "system", updateInterval: "1d", backupReminder: true });
+  assert.deepEqual(await new SettingsStore(directory, options).load(), { language: "de", theme: "system", updateInterval: "1d", backupReminder: true, menuBarIcon: true });
 });
 
 test("the old on/off update setting carries over to an interval", async (t) => {
@@ -53,7 +53,7 @@ test("the old on/off update setting carries over to an interval", async (t) => {
   const filePath = path.join(directory, "settings.json");
   const load = () => new SettingsStore(directory, options).load();
   await fs.writeFile(filePath, JSON.stringify({ version: 1, language: "de", theme: "dark", autoUpdate: false }));
-  assert.deepEqual(await load(), { language: "de", theme: "dark", updateInterval: "off", backupReminder: true });
+  assert.deepEqual(await load(), { language: "de", theme: "dark", updateInterval: "off", backupReminder: true, menuBarIcon: true });
   await fs.writeFile(filePath, JSON.stringify({ version: 1, language: "de", theme: "dark", autoUpdate: true }));
   assert.equal((await load()).updateInterval, "1d");
   await fs.writeFile(filePath, JSON.stringify({ version: 1, language: "de", updateInterval: "6h" }));
@@ -107,4 +107,15 @@ test("vaults with an unconfirmed recovery key are remembered, and kept out of ge
   const fromFile = new SettingsStore(directory, options);
   await fromFile.load();
   assert.deepEqual(fromFile.unconfirmedRecoveryKeys, [vault]);
+});
+
+test("the menu bar icon is shown until turned off, and the choice is kept", async (t) => {
+  const directory = await makeTempDirectory(t);
+  const store = new SettingsStore(directory, options);
+  assert.equal((await store.load()).menuBarIcon, true);
+  assert.equal((await store.setMenuBarIcon(false)).menuBarIcon, false);
+  await assert.rejects(store.setMenuBarIcon("no"), /Could not save the settings/);
+  assert.equal((await new SettingsStore(directory, options).load()).menuBarIcon, false);
+  assert.equal((await store.setMenuBarIcon(true)).menuBarIcon, true);
+  assert.equal((await new SettingsStore(directory, options).load()).menuBarIcon, true);
 });

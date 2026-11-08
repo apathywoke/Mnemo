@@ -763,6 +763,9 @@ const en = {
   // Appearance
   "settings.theme": "Theme",
   "settings.themeHint": "Choose how Mnemo looks. System follows the macOS appearance.",
+  "settings.menuBarIcon": "Show in the menu bar",
+  "settings.menuBarIconHint": "An icon at the top of the screen opens Mnemo or locks the vault.",
+  "menuBar.open": "Open Mnemo",
   "settings.themeSystem": "System",
   "settings.themeDark": "Dark",
   "settings.themeLight": "Light",
@@ -1630,6 +1633,9 @@ const de = {
   // Appearance
   "settings.theme": "Design",
   "settings.themeHint": "Wählen Sie das Aussehen von Mnemo. „System“ folgt der macOS-Darstellung.",
+  "settings.menuBarIcon": "In der Menüleiste anzeigen",
+  "settings.menuBarIconHint": "Ein Symbol oben am Bildschirm öffnet Mnemo oder sperrt den Tresor.",
+  "menuBar.open": "Mnemo öffnen",
   "settings.themeSystem": "System",
   "settings.themeDark": "Dunkel",
   "settings.themeLight": "Hell",
@@ -2497,6 +2503,9 @@ const ru = {
   // Appearance
   "settings.theme": "Тема",
   "settings.themeHint": "Выберите оформление Mnemo. «Системная» следует настройке macOS.",
+  "settings.menuBarIcon": "Показывать в строке меню",
+  "settings.menuBarIconHint": "Значок вверху экрана открывает Mnemo или блокирует хранилище.",
+  "menuBar.open": "Открыть Mnemo",
   "settings.themeSystem": "Системная",
   "settings.themeDark": "Тёмная",
   "settings.themeLight": "Светлая",

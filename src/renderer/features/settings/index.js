@@ -6,6 +6,7 @@ import { show as showToast } from "../../shared/ui/toast-notifications.js";
 
 let resetVaultActions = () => {};
 let savedTheme = "system";
+let savedMenuBarIcon = true;
 let showVaultLocked = () => {};
 
 // Actions that need the master passphrase again. Each names its prompt,
@@ -105,6 +106,24 @@ function bind(ctx) {
       showSavedTheme();
     });
   }
+
+  // The menu bar icon: main shows or removes it (menu-bar.js).
+  const menuBarIcon = $("#settings-menu-bar-icon");
+  const menuBarError = $("#settings-menu-bar-error");
+  function showSavedMenuBarIcon() {
+    menuBarIcon.checked = savedMenuBarIcon;
+  }
+  menuBarIcon.addEventListener("change", async () => {
+    menuBarError.hidden = true;
+    menuBarIcon.disabled = true;
+    try {
+      savedMenuBarIcon = (await ctx.api.setMenuBarIcon(menuBarIcon.checked)).menuBarIcon;
+    } catch (cause) {
+      ctx.setError(menuBarError, i18n.errorText(cause, "errors.saveSettings"));
+    }
+    menuBarIcon.disabled = false;
+    showSavedMenuBarIcon();
+  });
 
   // Categories. General works any time; the others act on the open vault
   // and show a hint instead while it is locked.
@@ -494,7 +513,9 @@ function bind(ctx) {
   async function open(tab = activeTab, { checkKey = false } = {}) {
     error.hidden = true;
     themeError.hidden = true;
+    menuBarError.hidden = true;
     showSavedTheme();
+    showSavedMenuBarIcon();
     selectTab(tab);
     dialog.showModal();
     await refreshVault();
@@ -515,6 +536,7 @@ async function loadSettings(ctx) {
     const settings = await ctx.api.getSettings();
     i18n.setLanguage(settings.language);
     savedTheme = settings.theme ?? "system";
+    savedMenuBarIcon = settings.menuBarIcon !== false;
   } catch {
     i18n.setLanguage(i18n.language);
   }
