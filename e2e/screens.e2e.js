@@ -221,6 +221,12 @@ test("every main screen and dialog opens without page errors", async (t) => {
     await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
     await closeDialog(page, "settings-dialog", "close-settings-dialog");
 
+    // Switch vault: the vault list comes down over the vault, which is
+    // cleared.
+    await page.click("#switch-profile-button");
+    await page.locator("#profiles-panel:not([hidden])").waitFor();
+    assert.equal(await page.locator("#entry-list .entry-row").count(), 0);
+
     assert.deepEqual(errors, []);
   } finally {
     await app.close();

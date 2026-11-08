@@ -60,15 +60,21 @@ function create(ctx) {
       state.availableProfiles = await ctx.api.chooseProfile();
       state.selectedProfileId = null;
       state.selectedProfileName = null;
-      ctx.clearVaultView();
-      ctx.clearSensitiveFields();
-      renderProfiles();
-      if (state.availableProfiles.length === 0) {
-        $("#setup-back-button").hidden = true;
-        ctx.showPanel("setup");
-      } else {
-        ctx.showPanel("profiles");
-      }
+      const show = () => {
+        ctx.clearVaultView();
+        ctx.clearSensitiveFields();
+        renderProfiles();
+        if (state.availableProfiles.length === 0) {
+          $("#setup-back-button").hidden = true;
+          ctx.showPanel("setup");
+        } else {
+          ctx.showPanel("profiles");
+        }
+      };
+      // From an open vault (Switch vault), the vault list comes down over
+      // it, as the lock screen does.
+      if (document.body.classList.contains("is-unlocked")) await ctx.transition("lock", show);
+      else show();
     } catch (cause) {
       $("#fatal-message").textContent = errorText(cause, "errors.switchProfiles");
       ctx.showPanel("fatal");

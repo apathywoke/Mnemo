@@ -84,7 +84,7 @@ passwords until the design has received independent security review.
 - Keys and entry data are cleared from managed buffers and UI fields on lock
   where possible, but JavaScript strings and objects cannot be reliably
   zeroized. The page is cleared at once; for about half a second the lock
-  screen then slides down over a still picture of what the window showed
+  screen (or the vault list, after Switch vault) then slides down over a still picture of what the window showed
   (the browser's view transition), which holds nothing that was not on
   screen. With reduced motion, or a hidden window, there is no picture.
 - Copying a username or password writes it to the system clipboard and clears
