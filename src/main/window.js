@@ -37,8 +37,16 @@ function createWindowManager(ctx) {
       title: "Mnemo",
       // The window buttons sit over the page: the vault header (or the brand
       // panel) is the title bar and drags the window (styles: app-region).
+      // On macOS the window has the sidebar material; the open vault leaves
+      // the title bar and the sidebar see-through over it (vibrancy.css).
       ...(process.platform === "darwin"
-        ? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 18, y: 18 } }
+        ? {
+          titleBarStyle: "hiddenInset",
+          trafficLightPosition: { x: 18, y: 18 },
+          vibrancy: "sidebar",
+          visualEffectState: "followWindow",
+          backgroundColor: "#00000000",
+        }
         : {}),
       webPreferences: {
         preload: path.join(APP_ROOT, "preload.js"),

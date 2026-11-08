@@ -23,7 +23,7 @@
 .item-fields > label {
   margin-top: 12px;
   color: var(--c-aaaaaa);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .item-fields > input,
@@ -38,7 +38,7 @@
   background: transparent;
   color: var(--c-eeeeee);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .item-fields > textarea {
@@ -52,11 +52,5 @@
 
 .item-fields .mono-input {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 11px;
-}
-
-/* Item field labels come from sentence-case strings shared with the editor;
-   show them like the login detail labels. */
-.item-detail .detail-field label {
-  text-transform: uppercase;
+  font-size: 13px;
 }

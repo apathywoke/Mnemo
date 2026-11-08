@@ -18,7 +18,7 @@
   background: var(--c-0b0b0b);
   color: var(--white);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .folder-create input:focus-visible,
@@ -60,7 +60,7 @@
 .folder-row-name {
   overflow: hidden;
   color: var(--c-dedede);
-  font-size: 13px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -68,7 +68,7 @@
 .folder-row-count {
   min-width: 18px;
   color: var(--c-777777);
-  font-size: 11px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }

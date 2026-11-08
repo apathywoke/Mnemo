@@ -3,7 +3,7 @@
 .entry-form > label {
   margin-top: 12px;
   color: var(--c-aaaaaa);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .entry-form > input:not([type="hidden"]),
@@ -18,7 +18,7 @@
   background: transparent;
   color: var(--c-eeeeee);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .password-input-row {
@@ -45,7 +45,7 @@
   background: transparent;
   color: var(--c-eeeeee);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .entry-form textarea {

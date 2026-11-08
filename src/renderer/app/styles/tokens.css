@@ -257,4 +257,24 @@
   --soft: var(--c-c6c6c6);
   --white: var(--c-f4f4f4);
   --error: var(--c-f0b4b4);
+  /* A soft blue for main actions, the selection, and focus. White text on
+     --accent is about 3.7:1, so it is used for buttons and the selected row
+     (semibold or larger text), not for body text. Links and icons on the
+     page background use --accent-text, which keeps 4.5:1. */
+  --accent: #4c8df6;
+  --accent-hover: #6199f8;
+  --accent-text: #7aa9ff;
+  --on-accent: #ffffff;
+  --focus-ring: rgb(76 141 246 / 45%);
+  --sidebar-hover: rgb(255 255 255 / 7%);
+  --sidebar-selected: rgb(255 255 255 / 13%);
+}
+
+:root[data-theme="light"] {
+  --accent: #3b82f6;
+  --accent-hover: #2f74e6;
+  --accent-text: #2563eb;
+  --focus-ring: rgb(59 130 246 / 35%);
+  --sidebar-hover: rgb(0 0 0 / 5%);
+  --sidebar-selected: rgb(0 0 0 / 9%);
 }

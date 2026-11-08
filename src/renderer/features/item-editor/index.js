@@ -62,7 +62,7 @@ function init(ctx, { refreshEntries }) {
     current = { type, id: details?.id ?? "" };
     form.reset();
     error.hidden = true;
-    $("#item-dialog-eyebrow").textContent = t(`item.type.${type}`).toLocaleUpperCase();
+    $("#item-dialog-eyebrow").textContent = t(`item.type.${type}`);
     $("#item-dialog-title").textContent = t(details ? "editor.editItem" : "editor.newItem", {
       type: t(`item.type.${type}`),
     });

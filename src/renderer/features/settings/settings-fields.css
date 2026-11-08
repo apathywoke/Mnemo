@@ -19,9 +19,7 @@
 /* Same treatment as the dialog's eyebrow above it. */
 .settings-field label {
   color: var(--c-8b8b8b);
-  font-size: 9px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+  font-size: 11px;
 }
 
 .settings-select {
@@ -51,7 +49,7 @@
 .settings-hint {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.45;
   text-wrap: pretty;
 }

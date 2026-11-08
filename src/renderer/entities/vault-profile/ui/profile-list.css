@@ -55,14 +55,14 @@
 
 .profile-choice-name {
   color: var(--c-ededed);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 550;
 }
 
 .profile-choice-meta {
   margin-top: 5px;
   color: var(--c-777777);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .profile-choice-arrow {

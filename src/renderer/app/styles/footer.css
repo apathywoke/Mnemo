@@ -6,7 +6,7 @@
   left: clamp(10px, 3.5vw, 42px);
   margin: 0;
   color: var(--c-686868);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .version #app-version {
@@ -22,6 +22,5 @@
   padding-top: 10px;
   border-top: 1px solid var(--c-252525);
   color: var(--c-707070);
-  font-size: 8px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
 }

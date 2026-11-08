@@ -66,7 +66,7 @@ function create(ctx) {
     const typeTitle = t(
       state.typeFilter === "all" ? "vault.allItems" : `vault.filter${state.typeFilter[0].toUpperCase()}${state.typeFilter.slice(1)}`,
     );
-    $("#entry-list-title").textContent = (organize?.scopeTitle() ?? typeTitle).toLocaleUpperCase();
+    $("#entry-list-title").textContent = organize?.scopeTitle() ?? typeTitle;
     organize?.updateDock();
     organize?.renderSidebar();
   }
