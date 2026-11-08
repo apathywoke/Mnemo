@@ -1,0 +1,139 @@
+/* Item editors in the detail area (inline-editor.js). Loaded by styles.css,
+ * after the dialog, form, and generator rules it reshapes.
+ *
+ * The editor takes the detail's place and its look: no frame or backdrop,
+ * the title like the detail's, and a row per field with the label on the
+ * left, as in the detail card. */
+
+.inline-editor {
+  position: static;
+  width: auto;
+  max-width: 680px;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+}
+
+.inline-editor[open] {
+  animation: detail-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* While an editor is open it is the only thing in the detail area. */
+.is-editing .entry-detail-area > :not(.inline-editor) {
+  display: none;
+}
+
+/* The parts of the vault that are inert while editing look it. */
+.is-editing #vault-sidebar,
+.is-editing .entry-browser,
+.is-editing #vault-notices,
+.is-editing #reports-button,
+.is-editing #switch-profile-button,
+.is-editing #vault-settings-button {
+  opacity: 0.45;
+}
+
+.inline-editor .entry-form {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 12px;
+  padding: 12px clamp(18px, 3vw, 34px) 30px;
+}
+
+.inline-editor .entry-form > *,
+.inline-editor .item-fields > * {
+  grid-column: 1 / -1;
+}
+
+/* A label on the left, its field on the right. */
+.inline-editor .entry-form > label,
+.inline-editor .item-fields > label {
+  grid-column: 1;
+  margin: 0;
+  color: var(--c-888888);
+  font-size: 13px;
+}
+
+.inline-editor .entry-form > input:not([type="hidden"]),
+.inline-editor .entry-form > textarea,
+.inline-editor .entry-form > .password-input-row,
+.inline-editor .item-fields > input,
+.inline-editor .item-fields > textarea,
+.inline-editor .item-fields > .password-input-row,
+.inline-editor .item-fields > .card-number-row,
+.inline-editor .item-fields > .field-message,
+.inline-editor .entry-form > .password-strength,
+.inline-editor .entry-form > .password-strength-note,
+.inline-editor .entry-form > .password-tools,
+.inline-editor .entry-form > .field-hint,
+.inline-editor .entry-form > .entry-remove-totp {
+  grid-column: 2;
+}
+
+/* Labels above a tall field sit at its top. */
+.inline-editor .entry-form > label:has(+ textarea),
+.inline-editor .item-fields > label:has(+ textarea) {
+  align-self: start;
+  padding-top: 8px;
+}
+
+.inline-editor .entry-form > .password-strength,
+.inline-editor .entry-form > .password-strength-note,
+.inline-editor .entry-form > .field-hint {
+  margin-top: -4px;
+}
+
+/* Title: like the detail's. */
+.inline-editor .dialog-heading {
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.inline-editor .dialog-heading h3 {
+  margin-top: 2px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.inline-editor .dialog-actions {
+  margin-top: 12px;
+}
+
+/* Generate sits beside the password; its options stay folded. */
+.password-input-row > .generate-password-button {
+  flex: none;
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.password-tools {
+  margin-top: 0;
+}
+
+.password-tools > summary {
+  width: fit-content;
+  color: var(--accent-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Folded, only its title shows, as a link-like line. */
+.password-tools:not([open]) {
+  padding: 2px 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.password-tools[open] > summary {
+  margin-bottom: 10px;
+}

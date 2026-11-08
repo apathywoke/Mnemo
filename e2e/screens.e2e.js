@@ -3,7 +3,7 @@
 // is noticed even where no other test clicks.
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { createDataFolder, createVault, launchApp, removeDataFolder } = require("./app");
+const { createDataFolder, createVault, launchApp, removeDataFolder, TEST_PASSPHRASE, unlock } = require("./app");
 
 function collectErrors(page) {
   const errors = [];
@@ -42,9 +42,21 @@ test("every main screen and dialog opens without page errors", async (t) => {
     // History appears once there is an earlier version, so edit the login.
     await page.click("#edit-entry-button");
     await page.locator("#entry-dialog[open]").waitFor();
+    // The editor opens in place of the detail. The rest of the vault waits
+    // until it closes, except Lock.
+    const editingState = () => page.evaluate(() => ({
+      detail: !document.querySelector("#entry-detail").checkVisibility(),
+      sidebar: document.querySelector("#vault-sidebar").inert,
+      list: document.querySelector(".entry-browser").inert,
+      lock: document.querySelector("#lock-button").closest("[inert]") === null,
+      modal: document.querySelector("#entry-dialog").matches(":modal"),
+    }));
+    assert.deepEqual(await editingState(), { detail: true, sidebar: true, list: true, lock: true, modal: false });
     await page.fill("#entry-name", "Generated, renamed");
     await page.click("#entry-form button[type='submit']");
     await page.locator("#entry-dialog[open]").waitFor({ state: "detached" });
+    // The "close" event comes a moment after the dialog closes.
+    await page.waitForFunction(() => !document.querySelector("#vault-sidebar").inert, null, { timeout: 3000 });
     await page.click("#history-button");
     await page.locator("#history-dialog[open]").waitFor();
     await closeDialog(page, "history-dialog", "close-history-dialog");
@@ -81,6 +93,27 @@ test("every main screen and dialog opens without page errors", async (t) => {
     await page.click("#detail-password");
     await page.locator(".toast-notification", { hasText: "Copied" }).first().waitFor();
     assert.ok((await app.evaluate(({ clipboard }) => clipboard.readText())).length >= 8);
+
+    // Escape closes the editor and gives the vault back.
+    await page.click("#edit-entry-button");
+    await page.locator("#entry-dialog[open]").waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator("#entry-dialog[open]").waitFor({ state: "detached" });
+    await page.waitForFunction(() => !document.querySelector("#vault-sidebar").inert, null, { timeout: 3000 });
+    await page.locator("#entry-detail").waitFor();
+
+    // Locking while editing closes the editor; after unlocking nothing is
+    // left inert.
+    await page.click("#edit-entry-button");
+    await page.locator("#entry-dialog[open]").waitFor();
+    await page.click("#lock-button");
+    await page.locator("#unlock-panel:not([hidden])").waitFor();
+    assert.equal(await page.locator("#entry-dialog[open]").count(), 0);
+    await unlock(page, TEST_PASSPHRASE);
+    await page.locator("#open-panel:not([hidden])").waitFor();
+    assert.equal(await page.evaluate(() => document.querySelectorAll("[inert]").length), 0);
+    await page.click("#entry-list .entry-row");
+    await page.locator("#entry-detail:not([hidden])").waitFor();
 
     // Every other item type opens its editor.
     for (const type of ["card", "note", "identity", "ssh"]) {

@@ -4,6 +4,7 @@ import { t, errorText } from "../../shared/lib/i18n.js";
 import * as passwordVisibility from "../../shared/ui/password-visibility.js";
 import { show as showToast } from "../../shared/ui/toast-notifications.js";
 import * as itemTypes from "../../../shared/item-types.js";
+import * as inlineEditor from "../../shared/ui/inline-editor.js";
 
 const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>';
 
@@ -73,7 +74,7 @@ function init(ctx, { refreshEntries }) {
     passwordVisibility.bindAll(fieldsContainer);
     passwordVisibility.conceal(fieldsContainer);
     typeHelper = type === "card" ? cardInputFeature.attach(fieldsContainer) : null;
-    dialog.showModal();
+    inlineEditor.open(dialog);
     $("#item-name").focus();
   }
 
@@ -120,6 +121,7 @@ function init(ctx, { refreshEntries }) {
   $("#cancel-item-button").addEventListener("click", () => dialog.close());
   $("#close-item-dialog").addEventListener("click", () => dialog.close());
   dialog.addEventListener("close", clear);
+  inlineEditor.bind(dialog);
 
   return { open, close: () => dialog.open && dialog.close() };
 }

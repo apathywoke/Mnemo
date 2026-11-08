@@ -1,6 +1,7 @@
 import { $ } from "../../shared/lib/dom.js";
 import { t, errorText } from "../../shared/lib/i18n.js";
 import { conceal } from "../../shared/ui/password-visibility.js";
+import * as inlineEditor from "../../shared/ui/inline-editor.js";
 import { show as showToast } from "../../shared/ui/toast-notifications.js";
 
 function init(ctx, { getEntry, refreshEntries, passwordGenerator }) {
@@ -46,7 +47,7 @@ function init(ctx, { getEntry, refreshEntries, passwordGenerator }) {
   function openNew() {
     clearForm();
     setTitle("editor.titleNew");
-    dialog.showModal();
+    inlineEditor.open(dialog);
     $("#entry-name").focus();
   }
 
@@ -92,7 +93,7 @@ function init(ctx, { getEntry, refreshEntries, passwordGenerator }) {
     }
     conceal(form);
     passwordGenerator.updatePasswordStrength();
-    dialog.showModal();
+    inlineEditor.open(dialog);
     $("#entry-name").focus();
   }
 
@@ -134,6 +135,7 @@ function init(ctx, { getEntry, refreshEntries, passwordGenerator }) {
   $("#cancel-entry-button").addEventListener("click", () => dialog.close());
   $("#close-entry-dialog").addEventListener("click", () => dialog.close());
   dialog.addEventListener("close", clearForm);
+  inlineEditor.bind(dialog);
 
   return { clearForm, openNew, openEdit };
 }

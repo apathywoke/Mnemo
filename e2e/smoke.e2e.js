@@ -6,14 +6,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const test = require("node:test");
-const {
-  TEST_PASSPHRASE,
-  createDataFolder,
-  createVault,
-  launchApp,
-  removeDataFolder,
-  visiblePanel,
-} = require("./app");
+const { TEST_PASSPHRASE, createDataFolder, createVault, launchApp, removeDataFolder, visiblePanel, unlock } = require("./app");
 
 const LOGIN = { name: "Example mail", username: "someone@example.com", password: "Made-up test 12 password" };
 
@@ -26,12 +19,6 @@ async function addLogin(page, login) {
   await page.fill("#entry-password", login.password);
   await page.click("#entry-form button[type='submit']");
   await page.locator("#entry-dialog[open]").waitFor({ state: "detached" });
-}
-
-async function unlock(page, passphrase) {
-  await page.locator("#unlock-panel:not([hidden])").waitFor();
-  await page.fill("#unlock-passphrase", passphrase);
-  await page.click("#unlock-form button[type='submit']");
 }
 
 test("a vault is created, keeps a login across lock and relaunch, and never gives the page a password", async (t) => {

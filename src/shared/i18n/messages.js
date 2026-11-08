@@ -167,7 +167,6 @@ const en = {
 
   "generator.aria": "Password tools",
   "generator.title": "Password generator",
-  "generator.description": "Generate a unique password on this device.",
   "generator.generate": "Generate",
   "generator.length": "Length",
   "generator.optionsAria": "Password character options",
@@ -1041,7 +1040,6 @@ const de = {
 
   "generator.aria": "Passwort-Werkzeuge",
   "generator.title": "Passwortgenerator",
-  "generator.description": "Erzeugen Sie ein einzigartiges Passwort auf diesem Gerät.",
   "generator.generate": "Erzeugen",
   "generator.length": "Länge",
   "generator.optionsAria": "Zeichenoptionen für das Passwort",
@@ -1912,7 +1910,6 @@ const ru = {
 
   "generator.aria": "Инструменты для паролей",
   "generator.title": "Генератор паролей",
-  "generator.description": "Создайте уникальный пароль прямо на этом устройстве.",
   "generator.generate": "Создать",
   "generator.length": "Длина",
   "generator.optionsAria": "Наборы символов пароля",
