@@ -11,7 +11,6 @@ const MIN_PASSPHRASE_LENGTH = 12;
 
 function bind(ctx) {
   const form = $("#create-form");
-  const label = $("#setup-step");
   const description = $("#setup-description");
   const steps = [$("#setup-step-1"), $("#setup-step-2")];
   const stepError = $("#setup-step-error");
@@ -28,7 +27,6 @@ function bind(ctx) {
   function show(step) {
     current = step;
     steps.forEach((element, index) => { element.hidden = index + 1 !== step; });
-    setKey(label, step === 1 ? "setup.step1" : "setup.step2");
     setKey(description, step === 1 ? "setup.description" : "setup.descriptionConfirm");
     conceal(form);
   }
