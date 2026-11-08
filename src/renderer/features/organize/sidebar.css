@@ -116,3 +116,16 @@
   opacity: 0.4;
   cursor: default;
 }
+
+/* Security, with the number of notices shown (features/backup). */
+.sidebar-item-security[data-notices] .sidebar-item-count {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--c-e0c05b);
+  color: var(--c-090909);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 18px;
+  text-align: center;
+}

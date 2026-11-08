@@ -9,6 +9,7 @@ const ICONS = Object.freeze({
   star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z"/></svg>',
   folder: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2h9A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5Z"/></svg>',
   manage: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  security: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19 6v5.5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V6Z"/></svg>',
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5"/></svg>',
 });
 
@@ -126,11 +127,34 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
     return item;
   }
 
+  function withClass(element, className) {
+    element.classList.add(className);
+    return element;
+  }
+
   function sidebarHeading(text) {
     const heading = document.createElement("p");
     heading.className = "sidebar-heading";
     heading.textContent = text;
     return heading;
+  }
+
+  // Security: the vault's notices (features/backup) and the password
+  // reports. The count is the notices that are shown.
+  function securityItem() {
+    const notices = ctx.notices?.count() ?? 0;
+    const item = sidebarItem({
+      label: t("sidebar.security"),
+      count: notices || null,
+      icon: ICONS.security,
+      onSelect: () => ctx.openSecurity?.(),
+    });
+    withClass(item, "sidebar-item-security");
+    if (notices) {
+      item.dataset.notices = String(notices);
+      item.setAttribute("aria-label", t("sidebar.securityNotices", { count: notices }));
+    }
+    return item;
   }
 
   function renderSidebar() {
@@ -172,21 +196,20 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
           onSelect: () => setScope(folderScope),
         });
       }),
-      sidebarItem({
+      withClass(sidebarItem({
         label: t(state.folders.length ? "folders.manage" : "folders.newFolder"),
         icon: ICONS.manage,
         onSelect: openFoldersDialog,
-      }),
-      sidebarItem({
+      }), "sidebar-item-folders"),
+      securityItem(),
+      withClass(sidebarItem({
         label: t("trash.title"),
         count: countIn({ kind: "trash" }),
         icon: ICONS.trash,
         selected: scope.kind === "trash",
         onSelect: () => setScope({ kind: "trash" }),
-      }),
+      }), "sidebar-item-trash"),
     ];
-    items.at(-1).classList.add("sidebar-item-trash");
-    items.at(-2).classList.add("sidebar-item-folders");
     sidebar.replaceChildren(...items);
   }
 

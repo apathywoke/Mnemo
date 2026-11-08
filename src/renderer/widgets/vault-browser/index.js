@@ -311,6 +311,13 @@ function create(ctx) {
     },
   });
 
+  // Security in the sidebar: the password reports, with every notice
+  // unfolded above them.
+  ctx.openSecurity = () => {
+    if (!reports.isOpen()) reports.open();
+    ctx.notices?.expand();
+  };
+
   // "+ New item" opens a menu of item types.
   const newItemButton = $("#create-entry-button");
   const newItemMenu = $("#new-item-menu");

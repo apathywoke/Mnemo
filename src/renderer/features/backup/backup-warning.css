@@ -1,9 +1,94 @@
-/* Backup reminder banner. Loaded by styles.css, in order. */
+/* Vault notices and the backup reminder. Loaded by styles.css, in order. */
+
+/* One strip for every notice (features/backup). */
+.vault-notices {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  margin: 8px 10px 0;
+  border: 1px solid var(--c-554721);
+  border-radius: 8px;
+  background: var(--c-17140d);
+}
+
+.vault-notices[hidden] {
+  display: none;
+}
 
 .backup-recovery-warning {
-  margin: 8px 10px 0;
+  grid-column: 1;
+  margin: 0;
   padding: 8px 10px;
   gap: 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.vault-notices.is-expanded .backup-recovery-warning:not([hidden]) ~ .backup-recovery-warning {
+  border-top: 1px solid var(--c-554721);
+}
+
+/* "N more" / "Show less", beside the first notice. */
+.vault-notices-toggle {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  margin: 0 12px 0 4px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--c-e3d5a9);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.vault-notices-toggle:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.vault-notices-toggle[hidden] {
+  display: none;
+}
+
+/* Folded: only the first notice shown, on one line; the text is cut short
+   and unfolds with the rest. */
+.vault-notices:not(.is-expanded) .backup-recovery-warning:not([hidden]) ~ .backup-recovery-warning {
+  display: none;
+}
+
+.vault-notices:not(.is-expanded) .backup-recovery-warning {
+  align-items: center;
+}
+
+.vault-notices:not(.is-expanded) .backup-recovery-warning > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.vault-notices:not(.is-expanded) .backup-recovery-warning strong {
+  flex: none;
+  white-space: nowrap;
+}
+
+.vault-notices:not(.is-expanded) .backup-recovery-warning p {
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-notices:not(.is-expanded) .outside-copy-actions {
+  flex: none;
+  flex-wrap: nowrap;
+  margin: 0;
 }
 
 .backup-recovery-warning[hidden] {
