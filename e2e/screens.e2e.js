@@ -49,6 +49,39 @@ test("every main screen and dialog opens without page errors", async (t) => {
     await page.locator("#history-dialog[open]").waitFor();
     await closeDialog(page, "history-dialog", "close-history-dialog");
 
+    // The detail's "⋯" menu: the keyboard opens it on its first item it can
+    // use (this login has no website, so Load site icon is off), the arrows
+    // stay on the items, Escape closes it and returns to the button.
+    await page.focus("#entry-more-button");
+    await page.keyboard.press("Enter");
+    await page.locator("#entry-more-menu").waitFor();
+    assert.equal(await page.getAttribute("#entry-more-button", "aria-expanded"), "true");
+    assert.equal(await page.isDisabled("#fetch-site-icon-button"), true);
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "delete-entry-button");
+    await page.keyboard.press("ArrowDown");
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "delete-entry-button");
+    await page.keyboard.press("Escape");
+    await page.locator("#entry-more-menu").waitFor({ state: "hidden" });
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "entry-more-button");
+    // Opened with the pointer, Escape closes only the menu, not the detail.
+    await page.click("#entry-more-button");
+    await page.locator("#entry-more-menu").waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator("#entry-more-menu").waitFor({ state: "hidden" });
+    assert.equal(await page.isVisible("#entry-detail"), true);
+    // A press outside closes it too.
+    await page.click("#entry-more-button");
+    await page.locator("#entry-more-menu").waitFor();
+    await page.click("#detail-name");
+    await page.locator("#entry-more-menu").waitFor({ state: "hidden" });
+
+    // A click on a value copies it, as its copy button does: main copies,
+    // and the page only sees the toast.
+    await app.evaluate(({ clipboard }) => clipboard.clear());
+    await page.click("#detail-password");
+    await page.locator(".toast-notification", { hasText: "Copied" }).first().waitFor();
+    assert.ok((await app.evaluate(({ clipboard }) => clipboard.readText())).length >= 8);
+
     // Every other item type opens its editor.
     for (const type of ["card", "note", "identity", "ssh"]) {
       await page.click("#create-entry-button");

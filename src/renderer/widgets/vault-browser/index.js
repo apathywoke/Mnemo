@@ -13,6 +13,7 @@ import * as passwordHealthFeature from "../../features/password-health/index.js"
 import * as totpCodeFeature from "../../features/totp-code/index.js";
 import { $ } from "../../shared/lib/dom.js";
 import { t, errorText, onChange } from "../../shared/lib/i18n.js";
+import { bindMenu } from "../../shared/ui/menu.js";
 import { show as showToast } from "../../shared/ui/toast-notifications.js";
 
 function create(ctx) {
@@ -317,6 +318,22 @@ function create(ctx) {
     if (!reports.isOpen()) reports.open();
     ctx.notices?.expand();
   };
+
+  // The detail's rarer actions sit in its "⋯" menu.
+  bindMenu($("#entry-more-button"), $("#entry-more-menu"));
+  bindMenu($("#item-more-button"), $("#item-more-menu"));
+
+  // A click on a field's value copies it, like its copy button (main does
+  // the copying; the page never has the secret). Not while text in it is
+  // being selected.
+  for (const section of [$("#entry-detail"), $("#item-detail")]) {
+    section.addEventListener("click", (event) => {
+      const value = /** @type {Element} */ (event.target).closest(".detail-value");
+      if (!value || window.getSelection()?.toString()) return;
+      /** @type {HTMLButtonElement | null} */ (value.closest(".detail-value-row")
+        ?.querySelector(".password-copy-toggle:not(.password-visibility-toggle)"))?.click();
+    });
+  }
 
   // "+ New item" opens a menu of item types.
   const newItemButton = $("#create-entry-button");
