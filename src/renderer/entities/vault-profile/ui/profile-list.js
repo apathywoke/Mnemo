@@ -1,5 +1,6 @@
 import { formatLastOpened } from "../model/profile.js";
 import { t } from "../../../shared/lib/i18n.js";
+import { showContextMenu } from "../../../shared/ui/context-menu.js";
 
 function renderProfileList(container, profiles, { onSelect, onDelete }) {
   container.replaceChildren();
@@ -22,17 +23,16 @@ function renderProfileList(container, profiles, { onSelect, onDelete }) {
     arrow.textContent = "↗";
     button.append(name, meta, arrow);
     button.addEventListener("click", () => onSelect(profile, button));
+    // Deleting is rare and needs no passphrase (a forgotten one is a reason
+    // to delete), so it is in the row's menu: a right click, or the menu
+    // key. It asks for the vault's name first (profile-management).
+    button.addEventListener("contextmenu", (event) => {
+      showContextMenu(event, [
+        { label: t("profile.deleteMenu"), danger: true, onSelect: () => onDelete(profile) },
+      ]);
+    });
 
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "profile-delete-button";
-    deleteButton.setAttribute("aria-label", t("profile.deleteAria", { name: profile.name }));
-    deleteButton.title = t("profile.deleteTitle");
-    deleteButton.innerHTML =
-      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6m4-6v6"/><path d="M5 7l1 13h12l1-13"/><path d="M9 7V4h6v3"/></svg>';
-    deleteButton.addEventListener("click", () => onDelete(profile));
-
-    card.append(button, deleteButton);
+    card.append(button);
     container.append(card);
   }
 }

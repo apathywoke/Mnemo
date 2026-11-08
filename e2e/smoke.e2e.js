@@ -99,6 +99,19 @@ test("a vault is created, keeps a login across lock and relaunch, and never give
   ({ app, page } = await launchApp(userDataDir));
   try {
     await page.locator("#profiles-panel:not([hidden])").waitFor();
+    // No delete button on the rows: deleting is in a row's right-click
+    // menu, and it asks for the name first. Escape closes the menu.
+    assert.equal(await page.locator("#profile-list button:not(.profile-choice)").count(), 0);
+    await page.click("#profile-list .profile-choice", { button: "right" });
+    await page.locator(".context-menu [role='menuitem']", { hasText: "Delete vault…" }).waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator(".context-menu").waitFor({ state: "detached" });
+    assert.equal(await visiblePanel(page), "profiles-panel");
+    await page.click("#profile-list .profile-choice", { button: "right" });
+    await page.click(".context-menu [role='menuitem']");
+    await page.locator("#delete-profile-dialog[open]").waitFor();
+    await page.click("#cancel-profile-delete-button");
+    await page.locator("#delete-profile-dialog[open]").waitFor({ state: "detached" });
     await page.click("#profile-list .profile-choice");
     await unlock(page, TEST_PASSPHRASE);
     await page.locator("#open-panel:not([hidden])").waitFor();
