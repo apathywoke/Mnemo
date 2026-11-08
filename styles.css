@@ -65,6 +65,7 @@
 @import "./src/renderer/features/organize/folders.css";
 @import "./src/renderer/shared/ui/passphrase-strength.css";
 @import "./src/renderer/widgets/vault-browser/detail-card.css";
+@import "./src/renderer/shared/ui/context-menu.css";
 @import "./src/renderer/shared/ui/inline-editor.css";
 @import "./src/renderer/features/settings/settings-native.css";
 @import "./src/renderer/pages/access/access-native.css";

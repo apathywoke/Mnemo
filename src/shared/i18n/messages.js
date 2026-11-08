@@ -33,8 +33,7 @@ const en = {
   "profile.encryptedVault": "Encrypted vault",
   "profile.lastOpened": "Last opened · {date}",
   "profile.lastOpenedUnknown": "Last opened · Not recorded",
-  "profile.deleteAria": "Delete {name}",
-  "profile.deleteTitle": "Delete vault",
+  "profile.deleteMenu": "Delete vault…",
 
   "setup.stepPassphrase": "Passphrase",
   "setup.stepsAria": "Steps to create a vault",
@@ -904,8 +903,7 @@ const de = {
   "profile.encryptedVault": "Verschlüsselter Tresor",
   "profile.lastOpened": "Zuletzt geöffnet · {date}",
   "profile.lastOpenedUnknown": "Zuletzt geöffnet · Nicht erfasst",
-  "profile.deleteAria": "{name} löschen",
-  "profile.deleteTitle": "Tresor löschen",
+  "profile.deleteMenu": "Tresor löschen…",
 
   "setup.stepPassphrase": "Passphrase",
   "setup.stepsAria": "Schritte zum Erstellen eines Tresors",
@@ -1772,8 +1770,7 @@ const ru = {
   "profile.encryptedVault": "Зашифрованное хранилище",
   "profile.lastOpened": "Открыто · {date}",
   "profile.lastOpenedUnknown": "Открыто · нет данных",
-  "profile.deleteAria": "Удалить {name}",
-  "profile.deleteTitle": "Удалить хранилище",
+  "profile.deleteMenu": "Удалить хранилище…",
 
   "setup.stepPassphrase": "Мастер-пароль",
   "setup.stepsAria": "Шаги создания хранилища",

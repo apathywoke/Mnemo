@@ -14,7 +14,7 @@
 
 .profile-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 7px;
 }
@@ -78,38 +78,8 @@
   transform: translate(2px, -2px);
 }
 
-.profile-delete-button {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--c-777777);
-  cursor: pointer;
-  transition:
-    color 160ms ease,
-    background-color 160ms ease,
-    border-color 160ms ease;
-}
 
-.profile-delete-button svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
 
-.profile-delete-button:hover {
-  border-color: var(--c-4b2929);
-  background: var(--c-211515);
-  color: var(--c-e1a4a4);
-}
 
 .profile-actions {
   display: flex;
