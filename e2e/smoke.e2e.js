@@ -317,6 +317,9 @@ test("a snapshot is restored from Settings through the restore form", async (t) 
     await page.click("#vault-settings-button");
     await page.click("#settings-tab-backups");
     await page.locator("#settings-snapshot-status", { hasText: "Newest checked snapshot" }).waitFor();
+    // A snapshot from just now reads green; no copy outside this Mac, red.
+    assert.equal(await page.getAttribute("#settings-snapshot-status", "data-tone"), "good");
+    assert.equal(await page.getAttribute("#settings-outside-status", "data-tone"), "bad");
     await page.click("#settings-restore-snapshot");
     await page.locator("#snapshots-panel:not([hidden])").waitFor();
     const rows = page.locator("#snapshot-list .profile-choice");

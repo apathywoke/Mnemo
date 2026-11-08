@@ -209,7 +209,7 @@ test("every main screen and dialog opens without page errors", async (t) => {
     // Settings: every tab, the language, and the theme.
     await page.click("#vault-settings-button");
     await page.locator("#settings-dialog[open]").waitFor();
-    for (const tab of ["updates", "security", "data", "backups", "vault", "general"]) {
+    for (const tab of ["security", "backups", "advanced", "general"]) {
       await page.click(`#settings-tab-${tab}`);
       await page.locator(`#settings-pane-${tab}:not([hidden])`).waitFor();
     }

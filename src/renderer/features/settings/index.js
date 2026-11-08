@@ -207,7 +207,9 @@ function bind(ctx) {
         : snapshots.lastVerifiedAt === null
           ? i18n.t("settings.snapshotNone")
           : i18n.t("settings.snapshotLast", { date: formatDateTime(snapshots.lastVerifiedAt) });
-    snapshotStatus.classList.toggle("settings-hint-warning", (snapshots?.failedAt ?? null) !== null);
+    setTone(snapshotStatus, snapshots === null
+      ? null
+      : snapshots.failedAt !== null ? "bad" : ageTone(snapshots.lastVerifiedAt));
     renderOutside();
     touchIdEnable.hidden = !touchId?.available || touchId.enabled;
     touchIdDisable.hidden = !touchId?.available || !touchId.enabled;
@@ -215,6 +217,19 @@ function bind(ctx) {
       confirmPrompt.textContent = i18n.t(PASSPHRASE_ACTIONS[pendingAction].prompt);
       confirmSubmit.textContent = i18n.t(PASSPHRASE_ACTIONS[pendingAction].confirm);
     }
+  }
+
+  // How a backup status reads at a glance: none (or failing) is red, one
+  // older than a week yellow, a recent one green (settings-native.css).
+  const FRESH_MS = 7 * 24 * 60 * 60 * 1000;
+  function ageTone(timestamp) {
+    if (timestamp === null || timestamp === undefined) return "bad";
+    return Date.now() - timestamp <= FRESH_MS ? "good" : "stale";
+  }
+  function setTone(element, tone) {
+    element.classList.toggle("settings-status", tone !== null);
+    if (tone === null) delete element.dataset.tone;
+    else element.dataset.tone = tone;
   }
 
   // The copy outside this Mac: where to, when it was last checked, and what
@@ -230,6 +245,9 @@ function bind(ctx) {
           : i18n.t("settings.outsideNever", { folder });
     const failed = folder !== null && outside.failedAt !== null &&
       (outside.verifiedAt === null || outside.failedAt > outside.verifiedAt);
+    setTone(outsideStatus, outside === null
+      ? null
+      : folder === null || failed ? "bad" : ageTone(outside.verifiedAt));
     outsideProblem.hidden = !failed;
     outsideProblem.textContent = failed
       ? i18n.t("settings.outsideFailed", {

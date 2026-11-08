@@ -175,7 +175,7 @@ and the main process enforces for new master passphrases.
   breach check in Reports (only when you click it; it sends the first 5
   characters of each password's SHA-1 hash to Have I Been Pwned), and the
   update check against this project's GitHub releases (on demand and on a
-  schedule chosen in Settings → Updates: every 30 minutes, hour, 6 hours, or
+  schedule chosen in Settings → General: every 30 minutes, hour, 6 hours, or
   day, or never; daily by default).
 - Each profile has its own vault under Electron's per-user application data
   directory. The existing `vault.json` is retained as the “Local Vault” profile.

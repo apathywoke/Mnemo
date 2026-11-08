@@ -151,7 +151,7 @@ async function captureTheme(theme, folder) {
 
     await page.click("#vault-settings-button");
     await page.locator("#settings-dialog[open]").waitFor();
-    for (const [index, tab] of ["general", "updates", "security", "data", "backups", "vault"].entries()) {
+    for (const [index, tab] of ["general", "security", "backups", "advanced"].entries()) {
       await page.click(`#settings-tab-${tab}`);
       await page.locator(`#settings-pane-${tab}:not([hidden])`).waitFor();
       await shot(`${13 + index}-settings-${tab}`);
