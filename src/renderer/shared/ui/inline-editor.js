@@ -4,7 +4,7 @@
 // open dialog (Escape, menu commands, locking) treats them as before.
 //
 // While one is open the rest of the vault cannot be used: the sidebar, the
-// list, the notices, and the title bar's buttons are inert, so an unsaved
+// list, the notices, Switch vault, and Settings are inert, so an unsaved
 // edit is not left behind by picking another item. Lock stays usable: the
 // vault can always be locked, and locking closes the editor. Save, Cancel,
 // and Escape close it too and give the rest back.
@@ -13,7 +13,6 @@ const OUTSIDE = [
   "#vault-sidebar",
   ".entry-browser",
   "#vault-notices",
-  "#reports-button",
   "#switch-profile-button",
   "#vault-settings-button",
 ];

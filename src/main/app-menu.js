@@ -4,9 +4,9 @@
 //
 // Lock is done here, like a screen lock. The other commands are sent to the
 // page as "menu:command" with a fixed name; the page acts on them only where
-// they make sense (an open vault for New item and Find).
+// they make sense (an open vault for New item, Find, and Copy Password).
 
-const MENU_COMMANDS = Object.freeze(["settings", "new-item", "find"]);
+const MENU_COMMANDS = Object.freeze(["settings", "new-item", "find", "copy-password"]);
 
 function createAppMenu(ctx) {
   const { state, tr, lockVault } = ctx;
@@ -63,6 +63,10 @@ function createAppMenu(ctx) {
           { role: "copy", label: tr("menu.copy") },
           { role: "paste", label: tr("menu.paste") },
           { role: "selectAll", label: tr("menu.selectAll") },
+          separator,
+          // The selected login's password; main copies it, as the detail's
+          // copy button does.
+          { label: tr("menu.copyPassword"), accelerator: "CommandOrControl+Shift+C", click: () => send("copy-password") },
         ],
       },
       {

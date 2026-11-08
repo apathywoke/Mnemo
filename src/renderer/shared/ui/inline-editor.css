@@ -40,7 +40,6 @@
 .is-editing #vault-sidebar,
 .is-editing .entry-browser,
 .is-editing #vault-notices,
-.is-editing #reports-button,
 .is-editing #switch-profile-button,
 .is-editing #vault-settings-button {
   opacity: 0.45;

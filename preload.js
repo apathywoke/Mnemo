@@ -128,7 +128,7 @@ contextBridge.exposeInMainWorld("vaultApp", {
   // Menu bar commands (src/main/app-menu.js); only these names reach the page.
   onMenuCommand: (callback) => {
     ipcRenderer.on("menu:command", (_event, command) => {
-      if (["settings", "new-item", "find"].includes(command)) callback(command);
+      if (["settings", "new-item", "find", "copy-password"].includes(command)) callback(command);
     });
   },
   onAutoLocked: (callback) => {

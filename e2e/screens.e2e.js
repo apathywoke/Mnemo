@@ -5,6 +5,14 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { createDataFolder, createVault, launchApp, removeDataFolder, TEST_PASSPHRASE, unlock } = require("./app");
 
+async function waitForClipboard(app) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (await app.evaluate(({ clipboard }) => clipboard.readText())) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("Nothing was copied.");
+}
+
 function collectErrors(page) {
   const errors = [];
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
@@ -120,6 +128,33 @@ test("every main screen and dialog opens without page errors", async (t) => {
     await page.click("#detail-password");
     await page.locator(".toast-notification", { hasText: "Copied" }).first().waitFor();
     assert.ok((await app.evaluate(({ clipboard }) => clipboard.readText())).length >= 8);
+    // Edit > Copy Password (⌘⇧C) copies the shown login's password the same way.
+    await app.evaluate(({ clipboard }) => clipboard.clear());
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send("menu:command", "copy-password"));
+    await waitForClipboard(app);
+
+    // ↑ and ↓ move through the list, from a row or from the search field.
+    await page.click("#create-entry-button");
+    await page.click("[data-new-item='login']");
+    await page.locator("#entry-dialog[open]").waitFor();
+    await page.fill("#entry-name", "Second");
+    await page.fill("#entry-password", "Made-up test 12 password");
+    await page.click("#entry-form button[type='submit']");
+    await page.locator("#entry-dialog[open]").waitFor({ state: "detached" });
+    await page.waitForFunction(() => !document.querySelector("#vault-sidebar").inert, null, { timeout: 3000 });
+    const selectedName = () => page.textContent("#entry-list .entry-row[aria-selected='true'] .entry-row-name");
+    // The newest is first.
+    await page.click("#entry-list .entry-row >> nth=0");
+    assert.equal(await selectedName(), "Second");
+    await page.keyboard.press("ArrowDown");
+    assert.equal(await selectedName(), "Generated, renamed");
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-selected")), "true");
+    await page.keyboard.press("ArrowUp");
+    assert.equal(await selectedName(), "Second");
+    await page.focus("#entry-search");
+    await page.keyboard.press("ArrowDown");
+    assert.equal(await selectedName(), "Generated, renamed");
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "entry-search");
 
     // Escape closes the editor and gives the vault back.
     await page.click("#edit-entry-button");
@@ -150,15 +185,23 @@ test("every main screen and dialog opens without page errors", async (t) => {
       await closeDialog(page, "item-dialog", "close-item-dialog");
     }
 
-    // The sidebar and the folder dialog.
-    await page.click("#vault-sidebar .sidebar-item:has([data-type='card'])");
-    await page.locator("#vault-sidebar [aria-current='true']:has([data-type='card'])").waitFor();
+    // The sidebar lists only the types the vault has; then the folder dialog.
+    assert.equal(await page.locator("#vault-sidebar [data-type='card']").count(), 0);
+    await page.click("#vault-sidebar .sidebar-item:has([data-type='login'])");
+    await page.locator("#vault-sidebar [aria-current='true']:has([data-type='login'])").waitFor();
     await page.click("#vault-sidebar .sidebar-item-folders");
     await page.locator("#folders-dialog[open]").waitFor();
     await closeDialog(page, "folders-dialog", "close-folders-dialog");
 
-    // Reports.
-    await page.click("#reports-button");
+    // Security opens the reports and is the selected item; picking another
+    // item in the sidebar closes them.
+    await page.click(".sidebar-item-security");
+    await page.locator("#reports-view:not([hidden])").waitFor();
+    await page.locator(".sidebar-item-security[aria-current='true']").waitFor();
+    assert.equal(await page.locator("#vault-sidebar [aria-current='true']").count(), 1);
+    await page.click("#vault-sidebar .sidebar-item >> nth=0");
+    await page.locator("#reports-view").waitFor({ state: "hidden" });
+    await page.click(".sidebar-item-security");
     await page.locator("#reports-view:not([hidden])").waitFor();
     await page.click("#reports-close");
     await page.locator("#reports-view").waitFor({ state: "hidden" });

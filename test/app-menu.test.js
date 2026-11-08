@@ -48,6 +48,8 @@ test("the menu bar has no reload, locks in main, and sends only named commands",
   byLabel("[menu.settings]").click();
   byLabel("[menu.newItem]").click();
   byLabel("[menu.find]").click();
+  assert.equal(byLabel("[menu.copyPassword]").accelerator, "CommandOrControl+Shift+C");
+  byLabel("[menu.copyPassword]").click();
   assert.deepEqual(sent, MENU_COMMANDS.map((command) => ["menu:command", command]));
 });
 

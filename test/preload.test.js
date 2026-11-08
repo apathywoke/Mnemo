@@ -242,8 +242,8 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
   assert.equal(autoLocked, true);
   const commands = [];
   exposedApi.onMenuCommand((command) => commands.push(command));
-  for (const command of ["settings", "new-item", "find", "lock", { toString: () => "find" }]) {
+  for (const command of ["settings", "new-item", "find", "copy-password", "lock", { toString: () => "find" }]) {
     listeners.get("menu:command")({}, command);
   }
-  assert.deepEqual(commands, ["settings", "new-item", "find"]);
+  assert.deepEqual(commands, ["settings", "new-item", "find", "copy-password"]);
 });

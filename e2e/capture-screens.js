@@ -132,9 +132,9 @@ async function captureTheme(theme, folder) {
     await page.click("#close-history-dialog");
     await page.locator("#history-dialog[open]").waitFor({ state: "detached" });
 
-    await page.click("#vault-sidebar .sidebar-item:has([data-type='card'])");
-    await page.locator("#vault-sidebar [aria-current='true']:has([data-type='card'])").waitFor();
-    await shot("10-sidebar-cards");
+    await page.click("#vault-sidebar .sidebar-item:has([data-type='login'])");
+    await page.locator("#vault-sidebar [aria-current='true']:has([data-type='login'])").waitFor();
+    await shot("10-sidebar-logins");
     // Back to all items.
     await page.click("#vault-sidebar .sidebar-item >> nth=0");
     await page.click("#vault-sidebar .sidebar-item-folders");
@@ -143,7 +143,7 @@ async function captureTheme(theme, folder) {
     await page.click("#close-folders-dialog");
     await page.locator("#folders-dialog[open]").waitFor({ state: "detached" });
 
-    await page.click("#reports-button");
+    await page.click(".sidebar-item-security");
     await page.locator("#reports-view:not([hidden])").waitFor();
     await shot("12-reports", ["#reports-summary"]);
     await page.click("#reports-close");
