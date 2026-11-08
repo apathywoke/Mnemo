@@ -25,23 +25,9 @@
   display: none;
 }
 
-.is-unlocked .app-shell {
-  grid-template-columns: minmax(0, 0fr) minmax(0, 1fr);
-}
-
-/* The panel shrinks to nothing, but its art (a 180px SVG) still sits over
-   the sidebar, and app-region is inherited: macOS would take clicks there
-   to drag the window (a click from the page itself, as in the e2e tests,
-   is not affected). */
-.is-unlocked .brand-panel {
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
-  padding-right: 0;
-  padding-left: 0;
-  border-color: transparent;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-20px) scale(0.985);
+/* The mark above the access screens. */
+.is-unlocked .access-brand {
+  display: none;
 }
 
 .is-unlocked .version {

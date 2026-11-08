@@ -15,36 +15,12 @@
   </head>
   <body>
     <main class="app-shell">
-      <aside class="brand-panel" aria-label="Mnemo">
-        <div class="brand-heading">
-          <div class="wordmark" aria-label="Mnemo">
-            <span>MNE</span>MO<span class="wordmark-dot">.</span>
-          </div>
-          <span class="brand-caption" data-i18n="brand.caption">Private by design</span>
-        </div>
-
-        <div class="brand-art" aria-hidden="true">
-          <span class="guide guide-horizontal"></span>
-          <span class="guide guide-vertical"></span>
-          <svg viewBox="0 0 180 180" fill="none">
-            <g stroke="currentColor" stroke-width="2.5" stroke-linecap="square">
-              <path d="M90 18v46M90 116v46M18 90h46M116 90h46" />
-              <path d="m39 39 33 33m36 36 33 33M141 39l-33 33m-36 36-33 33" />
-            </g>
-          </svg>
-        </div>
-
-        <footer class="brand-footer">
-          <span>MNEMO</span>
-          <span>01 <i></i> <span data-i18n="brand.footerPrivate">Private</span></span>
-        </footer>
-      </aside>
 
       <section class="workspace">
         <header class="workspace-header">
-          <span class="eyebrow" data-i18n="header.eyebrow">Secure access</span>
+          <span class="workspace-header-spacer"></span>
           <div class="workspace-header-controls">
-            <button id="settings-button" type="button" class="quiet-button settings-button" aria-label="Settings" data-i18n-aria-label="header.settings" aria-haspopup="dialog" aria-controls="settings-dialog" title="Settings" data-i18n-title="header.settings">
+            <button id="settings-button" type="button" class="quiet-button settings-button" aria-haspopup="dialog" aria-controls="settings-dialog">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <g fill="currentColor" stroke="none">
                   <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2"/>
@@ -59,6 +35,7 @@
                 <circle cx="12" cy="12" r="6.2" class="settings-gear-hole" stroke="currentColor" stroke-width="1.8"/>
                 <circle cx="12" cy="12" r="2.4" class="settings-gear-hole" stroke="currentColor" stroke-width="1.8"/>
               </svg>
+              <span data-i18n="header.settings">Settings</span>
             </button>
             <div class="local-badge"><span></span> <span data-i18n="header.localBadge">Stored on this Mac</span></div>
           </div>
@@ -81,6 +58,15 @@
         </div>
 
         <section class="content" aria-live="polite">
+        <!-- The app's mark above the access screens (hidden while a vault is open). -->
+        <div class="access-brand" aria-label="Mnemo" role="img">
+          <svg viewBox="0 0 180 180" fill="none" aria-hidden="true">
+            <g stroke="currentColor" stroke-width="9" stroke-linecap="round">
+              <path d="M90 26v36M90 118v36M26 90h36M118 90h36" />
+              <path d="m45 45 25 25m40 40 25 25M135 45l-25 25m-40 40-25 25" />
+            </g>
+          </svg>
+        </div>
         <section id="profiles-panel" class="vault-panel profiles-panel" hidden>
           <p class="eyebrow section-label" data-i18n="profiles.eyebrow">Local profiles</p>
           <h2 data-i18n="profiles.title">Choose a vault</h2>
@@ -114,69 +100,80 @@
         </section>
 
         <section id="setup-panel" class="vault-panel" hidden>
-          <p class="eyebrow section-label" data-i18n="setup.eyebrow">New profile</p>
+          <p id="setup-step" class="setup-step-label" data-i18n="setup.step1">Step 1 of 3</p>
           <h2 data-i18n="setup.title">Create a vault</h2>
-          <p class="description" data-i18n="setup.description">
+          <p id="setup-description" class="description" data-i18n="setup.description">
             Choose a unique master passphrase of at least 12 characters, rated Strong; a phrase of several unrelated words works well. It encrypts your vault and is never stored by the app.
           </p>
-          <div class="recovery-warning" role="note">
-            <span class="recovery-warning-mark" aria-hidden="true">!</span>
-            <div>
-              <strong data-i18n="setup.recoveryTitle">Mnemo cannot recover your master passphrase</strong>
-              <p data-i18n="setup.recoveryBody">Next you’ll get a recovery key. It is the only way back in if you forget the passphrase, so keep both somewhere safe.</p>
-            </div>
-          </div>
+          <!-- Step 1: name and passphrase. Step 2: the warning and the
+               passphrase again. Step 3 is the recovery key (recovery-key). -->
           <form id="create-form" class="vault-form">
-            <label for="profile-name" data-i18n="setup.vaultName">Vault name</label>
-            <input
-              id="profile-name"
-              type="text"
-              maxlength="64"
-              autocomplete="off"
-              required
-            />
-            <label for="create-passphrase" data-i18n="common.masterPassphrase">Master passphrase</label>
-            <div class="secret-input-row">
+            <div id="setup-step-1" class="setup-step">
+              <label for="profile-name" data-i18n="setup.vaultName">Vault name</label>
               <input
-                id="create-passphrase"
-                type="password"
-                autocomplete="new-password"
-                minlength="12"
-                maxlength="1024"
+                id="profile-name"
+                type="text"
+                maxlength="64"
+                autocomplete="off"
                 required
               />
-              <button type="button" class="password-visibility-toggle" data-password-visibility-for="create-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="create-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
-              </button>
-            </div>
-            <div class="password-strength passphrase-strength" data-strength-for="create-passphrase" data-strength-inputs="profile-name" data-strength="empty">
-              <div class="password-strength-heading">
-                <span data-i18n="strength.passphraseTitle">Passphrase strength</span>
-                <span class="password-strength-label" aria-live="polite" data-i18n="strength.empty">Enter a password</span>
+              <label for="create-passphrase" data-i18n="common.masterPassphrase">Master passphrase</label>
+              <div class="secret-input-row">
+                <input
+                  id="create-passphrase"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="12"
+                  maxlength="1024"
+                  required
+                />
+                <button type="button" class="password-visibility-toggle" data-password-visibility-for="create-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="create-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                </button>
               </div>
-              <div class="password-strength-track" role="meter" aria-label="Master passphrase strength" data-i18n-aria-label="strength.passphraseMeterAria" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0"><span></span></div>
-              <p class="password-strength-note" data-i18n="strength.passphraseHint">At least 12 characters and rated Strong. A phrase of several unrelated words is long and easy to remember.</p>
+              <div class="password-strength passphrase-strength" data-strength-for="create-passphrase" data-strength-inputs="profile-name" data-strength="empty">
+                <div class="password-strength-heading">
+                  <span data-i18n="strength.passphraseTitle">Passphrase strength</span>
+                  <span class="password-strength-label" aria-live="polite" data-i18n="strength.empty">Enter a password</span>
+                </div>
+                <div class="password-strength-track" role="meter" aria-label="Master passphrase strength" data-i18n-aria-label="strength.passphraseMeterAria" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0"><span></span></div>
+                <p class="password-strength-note" data-i18n="strength.passphraseHint">At least 12 characters and rated Strong. A phrase of several unrelated words is long and easy to remember.</p>
+              </div>
+              <p id="setup-step-error" class="form-error" role="alert" hidden></p>
+              <button id="setup-continue" type="button" class="primary-button" data-i18n="setup.continue">Continue</button>
             </div>
-            <label for="confirm-passphrase" data-i18n="setup.confirmPassphrase">Confirm master passphrase</label>
-            <div class="secret-input-row">
-              <input
-                id="confirm-passphrase"
-                type="password"
-                autocomplete="new-password"
-                minlength="12"
-                maxlength="1024"
-                required
-              />
-              <button type="button" class="password-visibility-toggle" data-password-visibility-for="confirm-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="confirm-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
-              </button>
+            <div id="setup-step-2" class="setup-step" hidden>
+              <div class="recovery-warning" role="note">
+                <span class="recovery-warning-mark" aria-hidden="true">!</span>
+                <div>
+                  <strong data-i18n="setup.recoveryTitle">Mnemo cannot recover your master passphrase</strong>
+                  <p data-i18n="setup.recoveryBody">Next you’ll get a recovery key. It is the only way back in if you forget the passphrase, so keep both somewhere safe.</p>
+                </div>
+              </div>
+              <label for="confirm-passphrase" data-i18n="setup.confirmPassphrase">Confirm master passphrase</label>
+              <div class="secret-input-row">
+                <input
+                  id="confirm-passphrase"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="12"
+                  maxlength="1024"
+                  required
+                />
+                <button type="button" class="password-visibility-toggle" data-password-visibility-for="confirm-passphrase" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="confirm-passphrase" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                </button>
+              </div>
+              <p id="create-error" class="form-error" role="alert" hidden></p>
+              <div class="setup-step-actions">
+                <button id="setup-step-back" type="button" class="secondary-button" data-i18n="common.back">Back</button>
+                <button
+                  type="submit"
+                  class="primary-button"
+                  aria-label="Create encrypted vault" data-i18n-aria-label="setup.submitAria"
+                 data-i18n="setup.submit">Create</button>
+              </div>
             </div>
-            <p id="create-error" class="form-error" role="alert" hidden></p>
-            <button
-              type="submit"
-              class="primary-button"
-              aria-label="Create encrypted vault" data-i18n-aria-label="setup.submitAria"
-             data-i18n="setup.submit">Create</button>
           </form>
           <button id="setup-restore-button" type="button" class="text-button" data-i18n="common.restoreFromBackup">
             Restore from backup
@@ -398,7 +395,7 @@
           <header class="dashboard-header">
             <h2 id="active-profile-name" class="dashboard-title"></h2>
             <div class="dashboard-actions">
-              <button id="vault-settings-button" type="button" class="quiet-button settings-button" aria-label="Settings" data-i18n-aria-label="header.settings" aria-haspopup="dialog" aria-controls="settings-dialog" title="Settings" data-i18n-title="header.settings">
+              <button id="vault-settings-button" type="button" class="quiet-button settings-button" aria-haspopup="dialog" aria-controls="settings-dialog">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <g fill="currentColor" stroke="none">
                     <rect x="10.4" y="1.2" width="3.2" height="6.2" rx="1.2"/>
@@ -413,6 +410,7 @@
                   <circle cx="12" cy="12" r="6.2" class="settings-gear-hole" stroke="currentColor" stroke-width="1.8"/>
                   <circle cx="12" cy="12" r="2.4" class="settings-gear-hole" stroke="currentColor" stroke-width="1.8"/>
                 </svg>
+              <span data-i18n="header.settings">Settings</span>
               </button>
             </div>
           </header>

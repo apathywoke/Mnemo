@@ -11,9 +11,6 @@ const SUPPORTED_LANGUAGES = Object.freeze([
 ]);
 
 const en = {
-  "brand.caption": "Private by design",
-  "brand.footerPrivate": "Private",
-  "header.eyebrow": "Secure access",
   "header.localBadge": "Stored on this Mac",
   "header.settings": "Settings",
 
@@ -39,7 +36,10 @@ const en = {
   "profile.deleteAria": "Delete {name}",
   "profile.deleteTitle": "Delete vault",
 
-  "setup.eyebrow": "New profile",
+  "setup.step1": "Step 1 of 3",
+  "setup.step2": "Step 2 of 3",
+  "setup.continue": "Continue",
+  "setup.descriptionConfirm": "Type the master passphrase again, so a typo cannot lock you out.",
   "setup.title": "Create a vault",
   "setup.description": "Choose a unique master passphrase of at least 12 characters, rated Strong; a phrase of several unrelated words works well. It encrypts your vault and is never stored by the app.",
   "setup.recoveryTitle": "Mnemo cannot recover your master passphrase",
@@ -882,9 +882,6 @@ const en = {
 };
 
 const de = {
-  "brand.caption": "Privat aus Prinzip",
-  "brand.footerPrivate": "Privat",
-  "header.eyebrow": "Sicherer Zugang",
   "header.localBadge": "Auf diesem Mac gespeichert",
   "header.settings": "Einstellungen",
 
@@ -910,7 +907,10 @@ const de = {
   "profile.deleteAria": "{name} löschen",
   "profile.deleteTitle": "Tresor löschen",
 
-  "setup.eyebrow": "Neues Profil",
+  "setup.step1": "Schritt 1 von 3",
+  "setup.step2": "Schritt 2 von 3",
+  "setup.continue": "Weiter",
+  "setup.descriptionConfirm": "Geben Sie die Master-Passphrase noch einmal ein, damit ein Tippfehler Sie nicht aussperrt.",
   "setup.title": "Tresor erstellen",
   "setup.description": "Wählen Sie eine einzigartige Master-Passphrase mit mindestens 12 Zeichen und der Bewertung „Stark“; ein Satz aus mehreren unzusammenhängenden Wörtern eignet sich gut. Sie verschlüsselt Ihren Tresor und wird von der App nie gespeichert.",
   "setup.recoveryTitle": "Mnemo kann Ihre Master-Passphrase nicht wiederherstellen",
@@ -1750,9 +1750,6 @@ const de = {
 };
 
 const ru = {
-  "brand.caption": "Приватность по умолчанию",
-  "brand.footerPrivate": "Приватно",
-  "header.eyebrow": "Защищённый доступ",
   "header.localBadge": "Хранится на этом Mac",
   "header.settings": "Настройки",
 
@@ -1778,7 +1775,10 @@ const ru = {
   "profile.deleteAria": "Удалить {name}",
   "profile.deleteTitle": "Удалить хранилище",
 
-  "setup.eyebrow": "Новый профиль",
+  "setup.step1": "Шаг 1 из 3",
+  "setup.step2": "Шаг 2 из 3",
+  "setup.continue": "Продолжить",
+  "setup.descriptionConfirm": "Введите мастер-пароль ещё раз, чтобы опечатка не закрыла вам доступ.",
   "setup.title": "Создание хранилища",
   "setup.description": "Придумайте уникальный мастер-пароль не короче 12 символов с оценкой «Надёжный»: хорошо подходит фраза из нескольких не связанных слов. Он шифрует хранилище, и приложение нигде его не сохраняет.",
   "setup.recoveryTitle": "Mnemo не может восстановить мастер-пароль",

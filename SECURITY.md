@@ -83,7 +83,10 @@ passwords until the design has received independent security review.
   made before the update.
 - Keys and entry data are cleared from managed buffers and UI fields on lock
   where possible, but JavaScript strings and objects cannot be reliably
-  zeroized.
+  zeroized. The page is cleared at once; for about half a second the lock
+  screen then slides down over a still picture of what the window showed
+  (the browser's view transition), which holds nothing that was not on
+  screen. With reduced motion, or a hidden window, there is no picture.
 - Copying a username or password writes it to the system clipboard and clears
   it after 30 seconds if its plain-text contents still match the copied value.
   If another app replaces that text, the app leaves the new clipboard contents

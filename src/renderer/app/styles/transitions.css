@@ -1,0 +1,66 @@
+/* Unlocking and locking (ctx.transition in app/model/context.js), with
+ * the View Transitions API: the browser keeps a picture of the window as
+ * it was and animates it against the new one.
+ *
+ * Unlock: the access screen lifts off the top of the window, and the
+ * vault is already behind it. Lock: the lock screen comes down from the
+ * top over the vault. The moving screen is drawn above the other one. */
+
+::view-transition-group(root) {
+  animation-duration: 0s;
+}
+
+:root[data-transition="unlock"]::view-transition-old(root) {
+  z-index: 1;
+  animation: access-lift 560ms cubic-bezier(0.7, 0, 0.3, 1) both;
+  box-shadow: 0 18px 48px rgb(0 0 0 / 35%);
+}
+
+:root[data-transition="unlock"]::view-transition-new(root) {
+  animation: vault-settle 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+:root[data-transition="lock"]::view-transition-new(root) {
+  z-index: 1;
+  animation: access-drop 520ms cubic-bezier(0.7, 0, 0.3, 1) both;
+  box-shadow: 0 18px 48px rgb(0 0 0 / 35%);
+}
+
+:root[data-transition="lock"]::view-transition-old(root) {
+  animation: vault-recede 520ms ease-in both;
+}
+
+@keyframes access-lift {
+  to {
+    transform: translateY(-100%);
+  }
+}
+
+@keyframes access-drop {
+  from {
+    transform: translateY(-100%);
+  }
+}
+
+/* The vault comes forward a little as the screen leaves, and steps back
+   as it covers it. */
+@keyframes vault-settle {
+  from {
+    opacity: 0.6;
+    transform: scale(0.985);
+  }
+}
+
+@keyframes vault-recede {
+  to {
+    opacity: 0.6;
+    transform: scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}

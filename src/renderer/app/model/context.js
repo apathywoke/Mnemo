@@ -44,6 +44,29 @@ function createContext() {
     setError(element, message) {
       setElementError(element, message);
     },
+    /**
+     * Unlocking and locking as one motion (app/styles/transitions.css): on
+     * "unlock" the access screen lifts away and the vault is behind it; on
+     * "lock" it comes down over the vault. `update` makes the change; the
+     * browser shows the old picture until it is done. Without motion (the
+     * system setting, a hidden window), only `update` runs.
+     * @param {"unlock" | "lock"} kind
+     * @param {() => void | Promise<void>} update
+     */
+    async transition(kind, update) {
+      const root = document.documentElement;
+      const still = matchMedia("(prefers-reduced-motion: reduce)").matches || document.hidden;
+      if (still || typeof document.startViewTransition !== "function") {
+        await update();
+        return;
+      }
+      root.dataset.transition = kind;
+      const transition = document.startViewTransition(update);
+      transition.finished.catch(() => {}).finally(() => {
+        if (root.dataset.transition === kind) delete root.dataset.transition;
+      });
+      await transition.updateCallbackDone;
+    },
     showPanel(activePanel) {
       conceal();
       const panels = {

@@ -6,7 +6,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const test = require("node:test");
-const { TEST_PASSPHRASE, createDataFolder, createVault, launchApp, removeDataFolder, visiblePanel, unlock } = require("./app");
+const { TEST_PASSPHRASE, createDataFolder, createVault, fillSetup, launchApp, removeDataFolder, visiblePanel, unlock } = require("./app");
 
 const LOGIN = { name: "Example mail", username: "someone@example.com", password: "Made-up test 12 password" };
 
@@ -41,6 +41,8 @@ test("a vault is created, keeps a login across lock and relaunch, and never give
     assert.ok(!JSON.stringify(details).includes(LOGIN.password));
 
     await page.click("#lock-button");
+    // The lock screen comes down over the vault (transitions.css).
+    await page.locator("#unlock-panel:not([hidden])").waitFor();
     assert.equal(await visiblePanel(page), "unlock-panel");
     assert.equal(await page.locator("#entry-list .entry-row").count(), 0);
 
@@ -54,10 +56,7 @@ test("a vault is created, keeps a login across lock and relaunch, and never give
     await row.waitFor();
 
     // Nothing that drags the window lies over the vault: macOS takes real
-    // clicks there before the page sees them. Checked once the access
-    // screen's panel has finished shrinking.
-    await page.waitForFunction(() => document.querySelector(".brand-panel").getBoundingClientRect().width < 4);
-    await page.waitForTimeout(800);
+    // clicks there before the page sees them.
     const dragOverVault = await page.evaluate(() => {
       const boxes = ["#vault-sidebar", ".entry-browser", ".entry-detail-area", "#vault-notices"]
         .map((selector) => document.querySelector(selector)?.getBoundingClientRect())
@@ -265,11 +264,21 @@ test("a new recovery key is confirmed by its last characters", async (t) => {
 
   const { app, page } = await launchApp(userDataDir);
   try {
+    // Setup goes step by step: a passphrase main would refuse stays on the
+    // first step, and Back returns to it from the second.
     await page.locator("#setup-panel:not([hidden])").waitFor();
     await page.fill("#profile-name", "Test vault");
+    await page.fill("#create-passphrase", "short");
+    await page.click("#setup-continue");
+    await page.locator("#setup-step-error:not([hidden])").waitFor();
+    assert.equal(await page.isVisible("#setup-step-2"), false);
     await page.fill("#create-passphrase", TEST_PASSPHRASE);
-    await page.fill("#confirm-passphrase", TEST_PASSPHRASE);
-    await page.click("#create-form button[type='submit']");
+    await page.press("#create-passphrase", "Enter");
+    await page.locator("#setup-step-2:not([hidden])").waitFor();
+    assert.equal(await page.textContent("#setup-step"), "Step 2 of 3");
+    await page.click("#setup-step-back");
+    await page.locator("#setup-step-1:not([hidden])").waitFor();
+    await fillSetup(page);
     await page.locator("#recovery-key-dialog[open]").waitFor();
     assert.equal(await page.locator("#recovery-key-replaced").isHidden(), true);
     const key = (await page.textContent("#recovery-key-value")).trim();

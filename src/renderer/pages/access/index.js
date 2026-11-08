@@ -78,14 +78,32 @@ function create(ctx) {
   async function refreshState() {
     try {
       const status = await ctx.api.getVaultStatus();
+      const wasOpen = document.body.classList.contains("is-unlocked");
       if (status.unlocked) {
         $("#active-profile-name").textContent = state.selectedProfileName ?? "";
-        ctx.showPanel("open");
-        void ctx.pages.vault.refreshBackupReminder();
-        await ctx.pages.vault.refreshEntries();
+        // The vault behind the lifting screen already shows its items.
+        const open = async () => {
+          ctx.showPanel("open");
+          void ctx.pages.vault.refreshBackupReminder();
+          await ctx.pages.vault.refreshEntries();
+        };
+        if (wasOpen) await open();
+        else await ctx.transition("unlock", open);
       } else {
-        ctx.clearVaultView();
-        ctx.clearSensitiveFields();
+        if (status.vaultExists && wasOpen) {
+          // The lock screen comes down over the vault: the old picture is
+          // shown for the moment it takes, and the page is cleared at once.
+          await ctx.transition("lock", () => {
+            ctx.clearVaultView();
+            ctx.clearSensitiveFields();
+            $("#unlock-profile-name").textContent = state.selectedProfileName ?? "";
+            $("#unlock-snapshot-button").hidden = true;
+            ctx.showPanel("unlock");
+          });
+        } else {
+          ctx.clearVaultView();
+          ctx.clearSensitiveFields();
+        }
         if (status.vaultExists) {
           $("#unlock-profile-name").textContent = state.selectedProfileName ?? "";
           $("#unlock-snapshot-button").hidden = true;

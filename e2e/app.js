@@ -60,12 +60,20 @@ async function confirmRecoveryKey(page) {
   await page.locator("#recovery-key-dialog").waitFor({ state: "hidden" });
 }
 
-async function createVault(page, { name = "Test vault", passphrase = TEST_PASSPHRASE } = {}) {
+// The two steps of the setup form: name and passphrase, then the
+// passphrase again; submitting shows the recovery key.
+async function fillSetup(page, { name = "Test vault", passphrase = TEST_PASSPHRASE } = {}) {
   await page.locator("#setup-panel:not([hidden])").waitFor();
   await page.fill("#profile-name", name);
   await page.fill("#create-passphrase", passphrase);
+  await page.click("#setup-continue");
+  await page.locator("#setup-step-2:not([hidden])").waitFor();
   await page.fill("#confirm-passphrase", passphrase);
   await page.click("#create-form button[type='submit']");
+}
+
+async function createVault(page, { name = "Test vault", passphrase = TEST_PASSPHRASE } = {}) {
+  await fillSetup(page, { name, passphrase });
   await confirmRecoveryKey(page);
   await page.locator("#open-panel:not([hidden])").waitFor();
 }
@@ -83,6 +91,7 @@ module.exports = {
   TEST_PASSPHRASE,
   createDataFolder,
   createVault,
+  fillSetup,
   launchApp,
   removeDataFolder,
   unlock,
