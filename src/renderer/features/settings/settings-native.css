@@ -134,3 +134,49 @@
   color: var(--c-aaaaaa);
   font-size: 12px;
 }
+
+/* A backup status (index.js): red when there is none or it fails, yellow
+ * when it is older than a week, green when it is recent. */
+.settings-hint.settings-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--tone) 35%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  color: var(--c-eeeeee);
+  font-weight: 500;
+}
+
+.settings-status::before {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  place-items: center;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--tone);
+  color: var(--c-090909);
+  content: "!";
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.settings-status[data-tone="good"] {
+  --tone: var(--c-70c58b);
+}
+
+.settings-status[data-tone="good"]::before {
+  content: "✓";
+}
+
+.settings-status[data-tone="stale"] {
+  --tone: var(--c-e0c05b);
+}
+
+.settings-status[data-tone="bad"] {
+  --tone: var(--c-e87878);
+}
