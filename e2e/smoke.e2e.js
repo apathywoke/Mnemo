@@ -369,3 +369,37 @@ test("a snapshot is restored from Settings through the restore form", async (t) 
     await app.close();
   }
 });
+
+test("unlocking and locking finish when the window draws no picture for the motion", async (t) => {
+  const userDataDir = await createDataFolder();
+  t.after(() => removeDataFolder(userDataDir));
+
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    await createVault(page);
+    // A window covered by the Touch ID prompt may draw nothing, so the
+    // browser never takes the old picture and never runs the change on its
+    // own. Here it never does: only skipTransition() runs the change.
+    await page.evaluate(() => {
+      document.hasFocus = () => true;
+      document.startViewTransition = (update) => {
+        let done;
+        const updateCallbackDone = new Promise((resolve) => { done = resolve; });
+        return {
+          updateCallbackDone,
+          ready: new Promise(() => {}),
+          finished: updateCallbackDone,
+          skipTransition() {
+            Promise.resolve(update()).then(done);
+          },
+        };
+      };
+    });
+    await page.click("#lock-button");
+    await page.locator("#unlock-panel:not([hidden])").waitFor({ timeout: 3000 });
+    await unlock(page, TEST_PASSPHRASE);
+    await page.locator("#open-panel:not([hidden])").waitFor({ timeout: 3000 });
+  } finally {
+    await app.close();
+  }
+});
