@@ -34,25 +34,27 @@
   gap: 7px;
 }
 
-/* Doubled class so .quiet-button's padding, declared later, cannot push the
-   icon off center. */
+/* The gear and the word "Settings". Doubled class so .quiet-button's
+   padding, declared later, does not change it. */
 .settings-button.quiet-button {
   box-sizing: border-box;
-  display: inline-grid;
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
-  min-height: 34px;
-  place-items: center;
-  padding: 0;
-  line-height: 0;
+  display: inline-flex;
+  height: 30px;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px 0 9px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .settings-button svg {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   flex: none;
   fill: none;
   stroke: currentColor;

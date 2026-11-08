@@ -139,11 +139,15 @@ function bind(ctx) {
   });
 
   ctx.api.onAutoLocked(() => {
-    ctx.clearVaultView();
-    ctx.clearSensitiveFields();
-    $("#unlock-error").textContent = i18n.t("unlock.autoLocked");
-    $("#unlock-error").hidden = false;
-    ctx.showPanel("unlock");
+    const lock = () => {
+      ctx.clearVaultView();
+      ctx.clearSensitiveFields();
+      $("#unlock-error").textContent = i18n.t("unlock.autoLocked");
+      $("#unlock-error").hidden = false;
+      ctx.showPanel("unlock");
+    };
+    if (document.body.classList.contains("is-unlocked")) void ctx.transition("lock", lock);
+    else lock();
   });
 
   return { goBack };

@@ -41,6 +41,8 @@ test("a vault is created, keeps a login across lock and relaunch, and never give
     assert.ok(!JSON.stringify(details).includes(LOGIN.password));
 
     await page.click("#lock-button");
+    // The lock screen comes down over the vault (transitions.css).
+    await page.locator("#unlock-panel:not([hidden])").waitFor();
     assert.equal(await visiblePanel(page), "unlock-panel");
     assert.equal(await page.locator("#entry-list .entry-row").count(), 0);
 
