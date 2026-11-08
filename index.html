@@ -709,7 +709,13 @@
                       <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.25" y="2.25" width="11.5" height="11.5" rx="3"/><circle cx="5.6" cy="5.6" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="10.4" cy="10.4" r="1"/></svg>
                     </button>
                     <!-- The generator opens beside the password (password-generator/index.js). -->
-                    <div id="password-generator" class="password-generator" role="dialog" aria-label="Password generator" data-i18n-aria-label="generator.title" hidden>
+                    <div id="password-generator" class="password-generator" role="dialog" aria-labelledby="password-generator-title" tabindex="-1" hidden>
+                      <div class="password-generator-heading">
+                        <h4 id="password-generator-title" data-i18n="generator.title">Password generator</h4>
+                        <button id="close-password-generator" type="button" class="password-generator-close" aria-label="Close generator" data-i18n-aria-label="generator.close" title="Close generator" data-i18n-title="generator.close">
+                          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
+                        </button>
+                      </div>
                       <p id="generated-password" class="generated-password"></p>
                       <div id="generated-password-strength" class="password-strength" data-strength="empty">
                         <div

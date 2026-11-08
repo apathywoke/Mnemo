@@ -37,6 +37,19 @@ test("every main screen and dialog opens without page errors", async (t) => {
     await page.click("#password-generator-button");
     await page.locator("#password-generator:not([hidden])").waitFor();
     assert.equal((await page.textContent("#generated-password")).length, 20);
+    // The editor fits the detail area: nothing scrolls sideways.
+    assert.ok(await page.evaluate(() => {
+      const area = document.querySelector(".entry-detail-area");
+      return area.scrollWidth <= area.clientWidth;
+    }));
+    // A press on its background keeps it open; its close button closes it.
+    const generatorBox = await page.locator("#password-generator").boundingBox();
+    await page.mouse.click(generatorBox.x + 6, generatorBox.y + generatorBox.height / 2);
+    assert.ok(await page.locator("#password-generator").isVisible());
+    await page.click("#close-password-generator");
+    await page.locator("#password-generator").waitFor({ state: "hidden" });
+    await page.click("#password-generator-button");
+    await page.locator("#password-generator:not([hidden])").waitFor();
     await page.keyboard.press("Escape");
     await page.locator("#password-generator").waitFor({ state: "hidden" });
     assert.ok(await page.locator("#entry-dialog[open]").isVisible());

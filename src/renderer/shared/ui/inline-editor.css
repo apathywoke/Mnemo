@@ -20,6 +20,13 @@
   color: inherit;
 }
 
+/* The editor fills the detail area's width (dialogs.css gives #entry-dialog
+ * a fixed width as a window), so it never scrolls sideways. */
+#entry-dialog.inline-editor,
+#item-dialog.inline-editor {
+  width: auto;
+}
+
 .inline-editor[open] {
   animation: detail-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

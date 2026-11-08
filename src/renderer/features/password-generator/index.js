@@ -4,7 +4,8 @@
 // it shows a password made with the chosen length and character sets, its
 // expected strength, and the options. "Use password" puts it in the field;
 // the password is kept nowhere else, and closing the popover (Escape, a
-// press outside, leaving it with Tab, or closing the editor) clears it.
+// press outside, its close button, leaving it with Tab, or closing the
+// editor) clears it.
 //
 // password-tools.js stays language-neutral; map its levels to UI text here.
 import { $ } from "../../shared/lib/dom.js";
@@ -121,6 +122,7 @@ function init(ctx) {
     else open();
   });
 
+  $("#close-password-generator").addEventListener("click", () => close({ focusToggle: true }));
   $("#regenerate-password-button").addEventListener("click", regenerate);
   $("#generate-password-button").addEventListener("click", () => {
     if (!generated) return;
@@ -154,6 +156,8 @@ function init(ctx) {
     const target = /** @type {Node} */ (event.target);
     if (isOpen() && !popover.contains(target) && !toggle.contains(target)) close();
   });
+  // Leaving it with Tab closes it. A press on its background keeps the
+  // focus in it (tabindex="-1"), so it stays open.
   popover.addEventListener("focusout", (event) => {
     const next = /** @type {Node | null} */ (event.relatedTarget);
     if (next && !popover.contains(next) && next !== toggle) close();
