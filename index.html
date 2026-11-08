@@ -682,127 +682,133 @@
                 <p data-i18n="detail.emptyTitle">Select a login to view its details</p>
                 <span data-i18n="detail.emptyBody">Your vault is encrypted and stays on this Mac.</span>
               </section>
+              <!-- The editors open here, in place of the detail (shared/ui/inline-editor.js). -->
+              <dialog id="entry-dialog" class="app-dialog inline-editor" aria-labelledby="entry-dialog-title">
+                <form id="entry-form" class="entry-form">
+                  <div class="dialog-heading">
+                    <div>
+                      <p class="eyebrow section-label" data-i18n="editor.eyebrow">Login details</p>
+                      <h3 id="entry-dialog-title" data-i18n="editor.titleNew">New login</h3>
+                    </div>
+                    <button id="close-entry-dialog" type="button" class="dialog-close" aria-label="Close dialog" data-i18n-aria-label="common.closeDialog">×</button>
+                  </div>
+                  <input id="entry-id" type="hidden" />
+                  <label for="entry-name" data-i18n="editor.name">Name</label>
+                  <input id="entry-name" type="text" maxlength="200" autocomplete="off" required />
+                  <label for="entry-url" data-i18n="editor.website">Website</label>
+                  <input id="entry-url" type="text" maxlength="2048" inputmode="url" placeholder="https://example.com" autocomplete="url" />
+                  <label for="entry-username" data-i18n="editor.username">Username</label>
+                  <input id="entry-username" type="text" maxlength="1024" autocomplete="username" />
+                  <label for="entry-password" data-i18n="editor.password">Password</label>
+                  <div class="password-input-row">
+                    <input id="entry-password" type="password" maxlength="4096" autocomplete="new-password" required />
+                    <button type="button" class="password-visibility-toggle" data-password-visibility-for="entry-password" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="entry-password" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
+                    </button>
+                    <button id="password-generator-button" type="button" class="password-generator-button" aria-haspopup="dialog" aria-expanded="false" aria-controls="password-generator" aria-label="Password generator" data-i18n-aria-label="generator.title" title="Password generator" data-i18n-title="generator.title">
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.25" y="2.25" width="11.5" height="11.5" rx="3"/><circle cx="5.6" cy="5.6" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="10.4" cy="10.4" r="1"/></svg>
+                    </button>
+                    <!-- The generator opens beside the password (password-generator/index.js). -->
+                    <div id="password-generator" class="password-generator" role="dialog" aria-labelledby="password-generator-title" tabindex="-1" hidden>
+                      <div class="password-generator-heading">
+                        <h4 id="password-generator-title" data-i18n="generator.title">Password generator</h4>
+                        <button id="close-password-generator" type="button" class="password-generator-close" aria-label="Close generator" data-i18n-aria-label="generator.close" title="Close generator" data-i18n-title="generator.close">
+                          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
+                        </button>
+                      </div>
+                      <p id="generated-password" class="generated-password"></p>
+                      <div id="generated-password-strength" class="password-strength" data-strength="empty">
+                        <div
+                          id="generated-password-strength-meter"
+                          class="password-strength-track"
+                          role="meter"
+                          aria-label="Estimated generated password strength" data-i18n-aria-label="generator.meterAria"
+                          aria-valuemin="0"
+                          aria-valuemax="3"
+                          aria-valuenow="0"
+                        >
+                          <span></span>
+                        </div>
+                        <div class="password-strength-heading">
+                          <span id="generated-password-strength-label" data-i18n="generator.calculating">Calculating…</span>
+                        </div>
+                      </div>
+                      <div class="password-length">
+                        <div class="password-length-heading">
+                          <label for="password-length" data-i18n="generator.length">Length</label>
+                          <output id="password-length-value" for="password-length">20</output>
+                        </div>
+                        <input id="password-length" class="password-length-slider" type="range" min="8" max="64" value="20" />
+                        <div class="password-length-ticks" aria-hidden="true"><span>8</span><span>20</span><span>32</span><span>64</span></div>
+                      </div>
+                      <div class="password-generator-options" role="group" aria-label="Password character options" data-i18n-aria-label="generator.optionsAria">
+                        <label><span data-i18n="generator.uppercase">Uppercase</span><span class="password-option-sample" aria-hidden="true">A–Z</span><input id="password-uppercase" type="checkbox" checked /></label>
+                        <label><span data-i18n="generator.numbers">Numbers</span><span class="password-option-sample" aria-hidden="true">0–9</span><input id="password-numbers" type="checkbox" checked /></label>
+                        <label><span data-i18n="generator.symbols">Symbols</span><span class="password-option-sample" aria-hidden="true">!#$%</span><input id="password-symbols" type="checkbox" checked /></label>
+                      </div>
+                      <div class="password-generator-actions">
+                        <button id="regenerate-password-button" type="button" class="password-generator-new" data-i18n="generator.regenerate">New</button>
+                        <button id="generate-password-button" type="button" class="generate-password-button" data-i18n="generator.use">Use password</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div id="password-strength" class="password-strength" data-strength="empty">
+                    <div class="password-strength-heading">
+                      <span data-i18n="strength.title">Password strength</span>
+                      <span id="password-strength-label" aria-live="polite" data-i18n="strength.empty">Enter a password</span>
+                    </div>
+                    <div
+                      id="password-strength-meter"
+                      class="password-strength-track"
+                      role="meter"
+                      aria-label="Entered password strength" data-i18n-aria-label="strength.meterAria"
+                      aria-valuemin="0"
+                      aria-valuemax="3"
+                      aria-valuenow="0"
+                    >
+                      <span></span>
+                    </div>
+                  </div>
+                  <p class="password-strength-note" data-i18n="strength.note">This is a rough estimate, not a guarantee that a password is safe.</p>
+                  <label for="entry-totp" data-i18n="editor.totp">One-time codes (TOTP)</label>
+                  <input id="entry-totp" class="totp-input" type="text" maxlength="2048" autocomplete="off" spellcheck="false" placeholder="otpauth://… or secret key" data-i18n-placeholder="editor.totpPlaceholder" aria-describedby="entry-totp-hint" />
+                  <p id="entry-totp-hint" class="field-hint" data-i18n="editor.totpHint">Paste the setup key or otpauth:// link a site shows when you turn on two-factor authentication.</p>
+                  <label id="entry-remove-totp-field" class="entry-remove-totp" hidden>
+                    <input id="entry-remove-totp" type="checkbox" />
+                    <span data-i18n="editor.removeTotp">Remove one-time codes from this login</span>
+                  </label>
+                  <label for="entry-notes" data-i18n="editor.notes">Notes</label>
+                  <textarea id="entry-notes" maxlength="16384" rows="3"></textarea>
+                  <p id="entry-form-error" class="form-error" role="alert" hidden></p>
+                  <div class="dialog-actions">
+                    <button id="cancel-entry-button" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
+                    <button type="submit" class="dialog-save-button" data-i18n="editor.save">Save login</button>
+                  </div>
+                </form>
+              </dialog>
+              <dialog id="item-dialog" class="app-dialog inline-editor" aria-labelledby="item-dialog-title">
+                <form id="item-form" class="entry-form">
+                  <div class="dialog-heading">
+                    <div>
+                      <p id="item-dialog-eyebrow" class="eyebrow section-label"></p>
+                      <h3 id="item-dialog-title"></h3>
+                    </div>
+                    <button id="close-item-dialog" type="button" class="dialog-close" aria-label="Close dialog" data-i18n-aria-label="common.closeDialog">×</button>
+                  </div>
+                  <label for="item-name" data-i18n="editor.name">Name</label>
+                  <input id="item-name" type="text" maxlength="200" autocomplete="off" required />
+                  <div id="item-fields" class="item-fields"></div>
+                  <label for="item-notes" data-i18n="editor.notes">Notes</label>
+                  <textarea id="item-notes" maxlength="16384" rows="3"></textarea>
+                  <p id="item-form-error" class="form-error" role="alert" hidden></p>
+                  <div class="dialog-actions">
+                    <button id="cancel-item-button" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
+                    <button id="save-item-button" type="submit" class="dialog-save-button" data-i18n="editor.saveItem">Save</button>
+                  </div>
+                </form>
+              </dialog>
             </div>
           </div>
-
-          <dialog id="entry-dialog" class="app-dialog">
-            <form id="entry-form" class="entry-form">
-              <div class="dialog-heading">
-                <div>
-                  <p class="eyebrow section-label" data-i18n="editor.eyebrow">Login details</p>
-                  <h3 id="entry-dialog-title" data-i18n="editor.titleNew">New login</h3>
-                </div>
-                <button id="close-entry-dialog" type="button" class="dialog-close" aria-label="Close dialog" data-i18n-aria-label="common.closeDialog">×</button>
-              </div>
-              <input id="entry-id" type="hidden" />
-              <label for="entry-name" data-i18n="editor.name">Name</label>
-              <input id="entry-name" type="text" maxlength="200" autocomplete="off" required />
-              <label for="entry-url" data-i18n="editor.website">Website</label>
-              <input id="entry-url" type="text" maxlength="2048" inputmode="url" placeholder="https://example.com" autocomplete="url" />
-              <label for="entry-username" data-i18n="editor.username">Username</label>
-              <input id="entry-username" type="text" maxlength="1024" autocomplete="username" />
-              <label for="entry-password" data-i18n="editor.password">Password</label>
-              <div class="password-input-row">
-                <input id="entry-password" type="password" maxlength="4096" autocomplete="new-password" required />
-                <button type="button" class="password-visibility-toggle" data-password-visibility-for="entry-password" aria-label="Show password" data-i18n-aria-label="common.showPassword" aria-controls="entry-password" aria-pressed="false" title="Show password" data-i18n-title="common.showPassword">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m3 3 18 18"/></svg>
-                </button>
-              </div>
-              <div id="password-strength" class="password-strength" data-strength="empty">
-                <div class="password-strength-heading">
-                  <span data-i18n="strength.title">Password strength</span>
-                  <span id="password-strength-label" aria-live="polite" data-i18n="strength.empty">Enter a password</span>
-                </div>
-                <div
-                  id="password-strength-meter"
-                  class="password-strength-track"
-                  role="meter"
-                  aria-label="Entered password strength" data-i18n-aria-label="strength.meterAria"
-                  aria-valuemin="0"
-                  aria-valuemax="3"
-                  aria-valuenow="0"
-                >
-                  <span></span>
-                </div>
-              </div>
-              <p class="password-strength-note" data-i18n="strength.note">This is a rough estimate, not a guarantee that a password is safe.</p>
-              <section class="password-tools" aria-label="Password tools" data-i18n-aria-label="generator.aria">
-                <div class="password-tools-heading">
-                  <div>
-                    <h4 data-i18n="generator.title">Password generator</h4>
-                    <p data-i18n="generator.description">Generate a unique password on this device.</p>
-                  </div>
-                  <button id="generate-password-button" type="button" class="generate-password-button" data-i18n="generator.generate">
-                    Generate
-                  </button>
-                </div>
-                <div class="password-length-heading">
-                  <label for="password-length" data-i18n="generator.length">Length</label>
-                  <output id="password-length-value" for="password-length">20</output>
-                </div>
-                <input id="password-length" class="password-length-slider" type="range" min="8" max="64" value="20" />
-                <div class="password-generator-options" role="group" aria-label="Password character options" data-i18n-aria-label="generator.optionsAria">
-                  <label><input id="password-uppercase" type="checkbox" checked /> <span data-i18n="generator.uppercase">Uppercase</span></label>
-                  <label><input id="password-numbers" type="checkbox" checked /> <span data-i18n="generator.numbers">Numbers</span></label>
-                  <label><input id="password-symbols" type="checkbox" checked /> <span data-i18n="generator.symbols">Symbols</span></label>
-                </div>
-                <div id="generated-password-strength" class="password-strength" data-strength="empty">
-                  <div class="password-strength-heading">
-                    <span data-i18n="generator.estimatedTitle">Estimated generated strength</span>
-                    <span id="generated-password-strength-label" aria-live="polite" data-i18n="generator.calculating">Calculating…</span>
-                  </div>
-                  <div
-                    id="generated-password-strength-meter"
-                    class="password-strength-track"
-                    role="meter"
-                    aria-label="Estimated generated password strength" data-i18n-aria-label="generator.meterAria"
-                    aria-valuemin="0"
-                    aria-valuemax="3"
-                    aria-valuenow="0"
-                  >
-                    <span></span>
-                  </div>
-                </div>
-                <p class="password-tools-note" data-i18n="generator.note">Estimate uses the selected length and character types. Nothing is sent anywhere.</p>
-              </section>
-              <label for="entry-totp" data-i18n="editor.totp">One-time codes (TOTP)</label>
-              <input id="entry-totp" class="totp-input" type="text" maxlength="2048" autocomplete="off" spellcheck="false" placeholder="otpauth://… or secret key" data-i18n-placeholder="editor.totpPlaceholder" aria-describedby="entry-totp-hint" />
-              <p id="entry-totp-hint" class="field-hint" data-i18n="editor.totpHint">Paste the setup key or otpauth:// link a site shows when you turn on two-factor authentication.</p>
-              <label id="entry-remove-totp-field" class="entry-remove-totp" hidden>
-                <input id="entry-remove-totp" type="checkbox" />
-                <span data-i18n="editor.removeTotp">Remove one-time codes from this login</span>
-              </label>
-              <label for="entry-notes" data-i18n="editor.notes">Notes</label>
-              <textarea id="entry-notes" maxlength="16384" rows="3"></textarea>
-              <p id="entry-form-error" class="form-error" role="alert" hidden></p>
-              <div class="dialog-actions">
-                <button id="cancel-entry-button" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
-                <button type="submit" class="dialog-save-button" data-i18n="editor.save">Save login</button>
-              </div>
-            </form>
-          </dialog>
-
-          <dialog id="item-dialog" class="app-dialog">
-            <form id="item-form" class="entry-form">
-              <div class="dialog-heading">
-                <div>
-                  <p id="item-dialog-eyebrow" class="eyebrow section-label"></p>
-                  <h3 id="item-dialog-title"></h3>
-                </div>
-                <button id="close-item-dialog" type="button" class="dialog-close" aria-label="Close dialog" data-i18n-aria-label="common.closeDialog">×</button>
-              </div>
-              <label for="item-name" data-i18n="editor.name">Name</label>
-              <input id="item-name" type="text" maxlength="200" autocomplete="off" required />
-              <div id="item-fields" class="item-fields"></div>
-              <label for="item-notes" data-i18n="editor.notes">Notes</label>
-              <textarea id="item-notes" maxlength="16384" rows="3"></textarea>
-              <p id="item-form-error" class="form-error" role="alert" hidden></p>
-              <div class="dialog-actions">
-                <button id="cancel-item-button" type="button" class="quiet-button" data-i18n="common.cancel">Cancel</button>
-                <button id="save-item-button" type="submit" class="dialog-save-button" data-i18n="editor.saveItem">Save</button>
-              </div>
-            </form>
-          </dialog>
 
           <dialog id="history-dialog" class="app-dialog history-dialog" aria-labelledby="history-title">
             <div class="settings-dialog-content">

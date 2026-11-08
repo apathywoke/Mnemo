@@ -70,6 +70,13 @@ async function createVault(page, { name = "Test vault", passphrase = TEST_PASSPH
   await page.locator("#open-panel:not([hidden])").waitFor();
 }
 
+// Types the passphrase on the unlock screen and submits it.
+async function unlock(page, passphrase) {
+  await page.locator("#unlock-panel:not([hidden])").waitFor();
+  await page.fill("#unlock-passphrase", passphrase);
+  await page.click("#unlock-form button[type='submit']");
+}
+
 module.exports = {
   confirmRecoveryKey,
   ROOT,
@@ -78,5 +85,6 @@ module.exports = {
   createVault,
   launchApp,
   removeDataFolder,
+  unlock,
   visiblePanel,
 };
