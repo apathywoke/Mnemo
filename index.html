@@ -426,47 +426,52 @@
             </div>
           </header>
 
-          <div id="recovery-unconfirmed-warning" class="recovery-warning backup-recovery-warning" role="alert" hidden>
-            <span class="recovery-warning-mark" aria-hidden="true">!</span>
-            <div>
-              <strong data-i18n="vault.recoveryUnconfirmedTitle">Your new recovery key was not confirmed</strong>
-              <p data-i18n="vault.recoveryUnconfirmedBody">The vault locked before you confirmed that the new recovery key is saved. Create a new one in Settings → Security, and save it.</p>
-            </div>
-          </div>
-          <div id="backup-recovery-warning" class="recovery-warning backup-recovery-warning" role="note">
-            <span class="recovery-warning-mark" aria-hidden="true">!</span>
-            <div>
-              <strong data-i18n="vault.backupWarningTitle">Keep your master passphrase safe</strong>
-              <p data-i18n="vault.backupWarningBody">Every backup opens with the master passphrase or the recovery key that was valid when it was made. Keep both somewhere safe.</p>
-            </div>
-            <button id="dismiss-backup-warning" class="backup-warning-dismiss" type="button" aria-label="Dismiss this warning" data-i18n-aria-label="vault.dismissWarning" title="Dismiss this warning" data-i18n-title="vault.dismissWarning">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
-            </button>
-          </div>
-          <div id="key-check-banner" class="recovery-warning backup-recovery-warning" role="note" hidden>
-            <span class="recovery-warning-mark" aria-hidden="true">!</span>
-            <div>
-              <strong data-i18n="vault.keyCheckTitle">Check your recovery key</strong>
-              <p data-i18n="vault.keyCheckBody">If you forget the master passphrase, the recovery key is the only way back in. Make sure you still have it; checking changes nothing.</p>
-              <div class="outside-copy-actions">
-                <button id="key-check-banner-now" type="button" class="text-button" data-i18n="vault.keyCheckNow">Check now</button>
-                <button id="key-check-banner-later" type="button" class="text-button" data-i18n="vault.keyCheckLater">Later</button>
+          <!-- Notices, most important first. Folded, only the first shown one is
+               visible, on one line; the toggle shows them all (features/backup). -->
+          <div id="vault-notices" class="vault-notices" hidden>
+            <div id="recovery-unconfirmed-warning" class="recovery-warning backup-recovery-warning" role="alert" hidden>
+              <span class="recovery-warning-mark" aria-hidden="true">!</span>
+              <div>
+                <strong data-i18n="vault.recoveryUnconfirmedTitle">Your new recovery key was not confirmed</strong>
+                <p data-i18n="vault.recoveryUnconfirmedBody">The vault locked before you confirmed that the new recovery key is saved. Create a new one in Settings → Security, and save it.</p>
               </div>
             </div>
-          </div>
-          <div id="outside-copy-banner" class="recovery-warning backup-recovery-warning" role="note" hidden>
-            <span class="recovery-warning-mark" aria-hidden="true">!</span>
-            <div>
-              <strong id="outside-copy-banner-title"></strong>
-              <p id="outside-copy-banner-body"></p>
-              <div class="outside-copy-actions">
-                <button id="outside-copy-banner-action" type="button" class="text-button"></button>
-                <button id="outside-copy-banner-later" type="button" class="text-button" data-i18n="vault.outsideLater" hidden>Later</button>
+            <div id="outside-copy-banner" class="recovery-warning backup-recovery-warning" role="note" hidden>
+              <span class="recovery-warning-mark" aria-hidden="true">!</span>
+              <div>
+                <strong id="outside-copy-banner-title"></strong>
+                <p id="outside-copy-banner-body"></p>
+                <div class="outside-copy-actions">
+                  <button id="outside-copy-banner-action" type="button" class="text-button"></button>
+                  <button id="outside-copy-banner-later" type="button" class="text-button" data-i18n="vault.outsideLater" hidden>Later</button>
+                </div>
+              </div>
+              <button id="dismiss-outside-copy-banner" class="backup-warning-dismiss" type="button" aria-label="Dismiss this warning" data-i18n-aria-label="vault.dismissWarning" title="Dismiss this warning" data-i18n-title="vault.dismissWarning">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+              </button>
+            </div>
+            <div id="key-check-banner" class="recovery-warning backup-recovery-warning" role="note" hidden>
+              <span class="recovery-warning-mark" aria-hidden="true">!</span>
+              <div>
+                <strong data-i18n="vault.keyCheckTitle">Check your recovery key</strong>
+                <p data-i18n="vault.keyCheckBody">If you forget the master passphrase, the recovery key is the only way back in. Make sure you still have it; checking changes nothing.</p>
+                <div class="outside-copy-actions">
+                  <button id="key-check-banner-now" type="button" class="text-button" data-i18n="vault.keyCheckNow">Check now</button>
+                  <button id="key-check-banner-later" type="button" class="text-button" data-i18n="vault.keyCheckLater">Later</button>
+                </div>
               </div>
             </div>
-            <button id="dismiss-outside-copy-banner" class="backup-warning-dismiss" type="button" aria-label="Dismiss this warning" data-i18n-aria-label="vault.dismissWarning" title="Dismiss this warning" data-i18n-title="vault.dismissWarning">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
-            </button>
+            <div id="backup-recovery-warning" class="recovery-warning backup-recovery-warning" role="note">
+              <span class="recovery-warning-mark" aria-hidden="true">!</span>
+              <div>
+                <strong data-i18n="vault.backupWarningTitle">Keep your master passphrase safe</strong>
+                <p data-i18n="vault.backupWarningBody">Every backup opens with the master passphrase or the recovery key that was valid when it was made. Keep both somewhere safe.</p>
+              </div>
+              <button id="dismiss-backup-warning" class="backup-warning-dismiss" type="button" aria-label="Dismiss this warning" data-i18n-aria-label="vault.dismissWarning" title="Dismiss this warning" data-i18n-title="vault.dismissWarning">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+              </button>
+            </div>
+            <button id="vault-notices-toggle" type="button" class="vault-notices-toggle" aria-expanded="false" aria-controls="vault-notices" hidden></button>
           </div>
           <div class="vault-browser">
             <nav id="vault-sidebar" class="vault-sidebar" aria-label="Show items" data-i18n-aria-label="sidebar.label"></nav>

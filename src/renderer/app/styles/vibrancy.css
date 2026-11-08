@@ -22,7 +22,7 @@
   padding: 6px 18px 6px 88px;
 }
 
-:root[data-platform="mac"] .is-unlocked .backup-recovery-warning {
+:root[data-platform="mac"] .is-unlocked .vault-notices {
   margin: 8px 14px 0;
 }
 

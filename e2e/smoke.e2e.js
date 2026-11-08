@@ -66,10 +66,44 @@ test("a vault is created, keeps a login across lock and relaunch, and never give
     await page.locator("#open-panel:not([hidden])").waitFor();
     await row.waitFor();
 
+    // Nothing that drags the window lies over the vault: macOS takes real
+    // clicks there before the page sees them. Checked once the access
+    // screen's panel has finished shrinking.
+    await page.waitForFunction(() => document.querySelector(".brand-panel").getBoundingClientRect().width < 4);
+    await page.waitForTimeout(800);
+    const dragOverVault = await page.evaluate(() => {
+      const boxes = ["#vault-sidebar", ".entry-browser", ".entry-detail-area", "#vault-notices"]
+        .map((selector) => document.querySelector(selector)?.getBoundingClientRect())
+        .filter((box) => box && box.width > 0 && box.height > 0);
+      const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      return Array.from(document.querySelectorAll("*"))
+        .filter((element) => getComputedStyle(element).getPropertyValue("app-region") === "drag")
+        .filter((element) => {
+          const box = element.getBoundingClientRect();
+          return box.width > 0 && box.height > 0 && boxes.some((vault) => overlaps(box, vault));
+        })
+        .map((element) => element.tagName + "." + element.getAttribute("class"));
+    });
+    assert.deepEqual(dragOverVault, []);
+
+    // The notices share one strip: the offer of a copy outside this Mac
+    // comes first, the backup reminder is folded behind it ("1 more").
+    await page.locator("#outside-copy-banner").waitFor();
+    assert.equal(await page.locator("#backup-recovery-warning").isVisible(), false);
+    assert.equal(await page.textContent("#vault-notices-toggle"), "1 more");
+    // Security in the sidebar unfolds them, with the reports.
+    assert.equal(await page.textContent(".sidebar-item-security .sidebar-item-count"), "2");
+    await page.click(".sidebar-item-security");
+    await page.locator("#vault-notices.is-expanded").waitFor();
+    await page.locator("#reports-view:not([hidden])").waitFor();
+
     // The backup reminder shows until it is closed.
-    await page.locator("#backup-recovery-warning:not([hidden])").waitFor();
+    await page.locator("#backup-recovery-warning").waitFor();
     await page.click("#dismiss-backup-warning");
     await page.locator("#backup-recovery-warning").waitFor({ state: "hidden" });
+    // One notice left: no toggle, and the strip folds again.
+    await page.locator("#vault-notices-toggle").waitFor({ state: "hidden" });
+    assert.equal(await page.textContent(".sidebar-item-security .sidebar-item-count"), "1");
   } finally {
     await app.close();
   }
@@ -83,8 +117,8 @@ test("a vault is created, keeps a login across lock and relaunch, and never give
     await unlock(page, TEST_PASSPHRASE);
     await page.locator("#open-panel:not([hidden])").waitFor();
     await page.locator("#entry-list .entry-row-name", { hasText: LOGIN.name }).waitFor();
-    // Closed in the previous launch, it stays closed.
-    assert.equal(await page.locator("#backup-recovery-warning").isHidden(), true);
+    // Closed in the previous launch, it stays closed (not only folded).
+    assert.equal(await page.getAttribute("#backup-recovery-warning", "hidden"), "");
   } finally {
     await app.close();
   }
@@ -271,7 +305,7 @@ test("a new recovery key is confirmed by its last characters", async (t) => {
     await page.click("#unlock-form button[type='submit']");
     await page.locator("#open-panel:not([hidden])").waitFor();
     await page.locator("#recovery-unconfirmed-warning:not([hidden])").waitFor();
-    assert.equal(await page.locator("#backup-recovery-warning").isHidden(), true);
+    assert.equal(await page.getAttribute("#backup-recovery-warning", "hidden"), "");
   } finally {
     await app.close();
   }

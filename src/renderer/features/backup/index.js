@@ -14,7 +14,13 @@ import * as i18n from "../../shared/lib/i18n.js";
 // - The copy outside this Mac: offered once for a new vault ("Later" is
 //   remembered), and a reminder after 14 days without a checked copy, which
 //   closes only until the next unlock.
+//
+// The notices share one strip, most important first (index.html). Folded,
+// only the first one shown is visible, on one line; "N more" unfolds them
+// all, as does Security in the sidebar (ctx.notices.expand).
 function bind(ctx) {
+  const notices = $("#vault-notices");
+  const toggle = $("#vault-notices-toggle");
   const warning = $("#backup-recovery-warning");
   const unconfirmed = $("#recovery-unconfirmed-warning");
   const dismissWarningButton = $("#dismiss-backup-warning");
@@ -25,11 +31,35 @@ function bind(ctx) {
   const outsideLater = $("#outside-copy-banner-later");
   const outsideDismiss = $("#dismiss-outside-copy-banner");
   const keyCheck = $("#key-check-banner");
+  const banners = [unconfirmed, outsideBanner, keyCheck, warning];
   let outside = null;
+  let expanded = false;
+
+  const shownCount = () => banners.filter((banner) => !banner.hidden).length;
+
+  // Call after any banner is shown or hidden.
+  function renderNotices() {
+    const count = shownCount();
+    if (count < 2) expanded = false;
+    notices.hidden = count === 0;
+    notices.classList.toggle("is-expanded", expanded);
+    toggle.hidden = count < 2;
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.textContent = expanded
+      ? i18n.t("vault.noticesFewer")
+      : i18n.t("vault.noticesMore", { count: count - 1 });
+    ctx.organize?.renderSidebar();
+  }
+
+  function setExpanded(value) {
+    expanded = value;
+    renderNotices();
+  }
 
   function renderOutside() {
     const show = outside !== null && (outside.reminderDue || outside.offer);
     outsideBanner.hidden = !show;
+    renderNotices();
     if (!show) return;
     const offer = !outside.reminderDue;
     outsideBanner.setAttribute("role", offer ? "note" : "alert");
@@ -59,11 +89,13 @@ function bind(ctx) {
     warning.hidden = !unconfirmed.hidden || settings?.backupReminder === false;
     keyCheck.hidden = !unconfirmed.hidden || recovery?.pending === true || recovery?.checkDue !== true;
     outside = outsideStatus;
+    expanded = false;
     renderOutside();
   }
 
   dismissWarningButton.addEventListener("click", () => {
     warning.hidden = true;
+    renderNotices();
     // If saving fails, the reminder only comes back on the next launch.
     ctx.api.dismissBackupReminder().catch(() => {});
   });
@@ -87,6 +119,7 @@ function bind(ctx) {
 
   outsideLater.addEventListener("click", () => {
     outsideBanner.hidden = true;
+    renderNotices();
     ctx.api.dismissOutsideCopyOffer().catch(() => {});
   });
 
@@ -94,19 +127,25 @@ function bind(ctx) {
   // checked copy.
   outsideDismiss.addEventListener("click", () => {
     outsideBanner.hidden = true;
+    renderNotices();
   });
 
   $("#key-check-banner-now").addEventListener("click", () => ctx.openSettings("security", { checkKey: true }));
   $("#key-check-banner-later").addEventListener("click", () => {
     keyCheck.hidden = true;
+    renderNotices();
     ctx.api.snoozeKeyCheck().catch(() => {});
   });
+
+  toggle.addEventListener("click", () => setExpanded(!expanded));
 
   i18n.onChange(renderOutside);
   warning.hidden = true;
   unconfirmed.hidden = true;
   outsideBanner.hidden = true;
   keyCheck.hidden = true;
+  renderNotices();
+  ctx.notices = { count: shownCount, expand: () => setExpanded(true) };
   return { refresh };
 }
 
