@@ -98,6 +98,10 @@ async function captureTheme(theme, folder) {
     await page.fill("#entry-username", "someone@example.com");
     await page.fill("#entry-password", "Made-up test 12 password");
     await shot("06-login-editor");
+    await page.click("#password-generator-button");
+    await page.locator("#password-generator:not([hidden])").waitFor();
+    await shot("06-password-generator", ["#generated-password"]);
+    await page.keyboard.press("Escape");
     await page.click("#entry-form button[type='submit']");
     await page.locator("#entry-dialog[open]").waitFor({ state: "detached" });
     await addLogin(page, { name: "Bank", username: "someone", url: "https://bank.example", password: "password1" });

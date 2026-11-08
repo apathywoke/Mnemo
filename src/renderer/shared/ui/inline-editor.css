@@ -71,7 +71,6 @@
 .inline-editor .item-fields > .field-message,
 .inline-editor .entry-form > .password-strength,
 .inline-editor .entry-form > .password-strength-note,
-.inline-editor .entry-form > .password-tools,
 .inline-editor .entry-form > .field-hint,
 .inline-editor .entry-form > .entry-remove-totp {
   grid-column: 2;
@@ -105,35 +104,4 @@
 
 .inline-editor .dialog-actions {
   margin-top: 12px;
-}
-
-/* Generate sits beside the password; its options stay folded. */
-.password-input-row > .generate-password-button {
-  flex: none;
-  min-height: 26px;
-  padding: 0 10px;
-  font-size: 12px;
-}
-
-.password-tools {
-  margin-top: 0;
-}
-
-.password-tools > summary {
-  width: fit-content;
-  color: var(--accent-text);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-/* Folded, only its title shows, as a link-like line. */
-.password-tools:not([open]) {
-  padding: 2px 0;
-  border-color: transparent;
-  background: transparent;
-}
-
-.password-tools[open] > summary {
-  margin-bottom: 10px;
 }

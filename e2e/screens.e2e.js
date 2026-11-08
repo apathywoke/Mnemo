@@ -33,8 +33,22 @@ test("every main screen and dialog opens without page errors", async (t) => {
     await page.click("[data-new-item='login']");
     await page.locator("#entry-dialog[open]").waitFor();
     await page.fill("#entry-name", "Generated");
+    // The generator opens beside the password. Escape closes only it.
+    await page.click("#password-generator-button");
+    await page.locator("#password-generator:not([hidden])").waitFor();
+    assert.equal((await page.textContent("#generated-password")).length, 20);
+    await page.keyboard.press("Escape");
+    await page.locator("#password-generator").waitFor({ state: "hidden" });
+    assert.ok(await page.locator("#entry-dialog[open]").isVisible());
+    assert.equal(await page.textContent("#generated-password"), "");
+    // "Use password" puts the shown password in the field.
+    await page.click("#password-generator-button");
+    await page.fill("#password-length", "32");
+    const generated = await page.textContent("#generated-password");
+    assert.equal(generated.length, 32);
     await page.click("#generate-password-button");
-    assert.ok((await page.inputValue("#entry-password")).length >= 8);
+    await page.locator("#password-generator").waitFor({ state: "hidden" });
+    assert.equal(await page.inputValue("#entry-password"), generated);
     await page.click("#entry-form button[type='submit']");
     await page.locator("#entry-dialog[open]").waitFor({ state: "detached" });
     await page.click("#entry-list .entry-row");

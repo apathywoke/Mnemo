@@ -39,9 +39,7 @@ function init(ctx, { getEntry, refreshEntries, passwordGenerator }) {
     totpInput.disabled = false;
     conceal(form);
     error.hidden = true;
-    $("#password-length-value").value = $("#password-length").value;
-    passwordGenerator.updatePasswordStrength();
-    passwordGenerator.updateGeneratedPasswordStrength();
+    passwordGenerator.reset();
   }
 
   function openNew() {
