@@ -13,7 +13,7 @@
   min-height: 36px;
   padding: 0 15px;
   border: 1px solid var(--c-444444);
-  border-radius: 999px;
+  border-radius: 8px;
   background: transparent;
   color: var(--c-cccccc);
   cursor: pointer;
@@ -80,7 +80,7 @@
   min-height: 36px;
   padding: 0 15px;
   border: 1px solid var(--c-693939);
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--c-351c1c);
   color: var(--c-f0dada);
   cursor: pointer;

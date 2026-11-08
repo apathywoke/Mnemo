@@ -105,8 +105,21 @@
   color: var(--on-accent);
 }
 
-.entry-row[aria-selected="true"] .entry-row-meta {
-  color: rgb(255 255 255 / 85%);
+/* The second line too: a dimmed white would be too faint on the soft blue. */
+.entry-row[aria-selected="true"] .entry-row-name,
+.entry-row[aria-selected="true"] .entry-row-meta,
+.entry-row[aria-selected="true"] .entry-row-star {
+  color: var(--on-accent);
+}
+
+/* Inside the row, so the list's scrolling does not clip it; white on the
+   selected row, where the accent would not show. */
+.entry-row:focus-visible {
+  outline-offset: -2px;
+}
+
+.entry-row[aria-selected="true"]:focus-visible {
+  outline-color: var(--on-accent);
 }
 
 .entry-row-icon,
