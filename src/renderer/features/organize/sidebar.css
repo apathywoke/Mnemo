@@ -6,15 +6,35 @@
   grid-template-columns: 168px minmax(220px, 0.8fr) minmax(0, 1.3fr);
 }
 
-/* Vault → sidebar: all items, favorites, types, folders, trash. */
+/* Vault → sidebar: all items, favorites, types, folders, trash; below
+   them, Switch vault and Lock. */
+.vault-sidebar-column {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+}
+
 .vault-sidebar {
   display: flex;
   min-height: 0;
+  flex: 1;
   flex-direction: column;
   gap: 1px;
   overflow: auto;
   padding: 10px 8px 8px 0;
-  border-right: 1px solid var(--line);
+}
+
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.sidebar-footer-item .sidebar-item-icon {
+  color: var(--c-888888);
 }
 
 .sidebar-item {

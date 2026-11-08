@@ -35,6 +35,10 @@
   padding: 10px 8px 8px 10px;
 }
 
+:root[data-platform="mac"] .is-unlocked .sidebar-footer {
+  padding: 6px 8px 10px 10px;
+}
+
 :root[data-platform="mac"] .is-unlocked .entry-browser,
 :root[data-platform="mac"] .is-unlocked .entry-detail-area {
   background: var(--surface);

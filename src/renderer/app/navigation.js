@@ -120,7 +120,7 @@ function bind(ctx) {
   document.addEventListener("keydown", () => ctx.reportActivity(), true);
 
   // Menu bar commands. Lock is handled in main. Nothing happens over another
-  // dialog, and New item and Find need an open vault.
+  // dialog, and New item, Find, and Copy Password need an open vault.
   ctx.api.onMenuCommand((command) => {
     if (ctx.recoveryKey.isOpen || document.querySelector("dialog[open]")) return;
     const unlocked = document.body.classList.contains("is-unlocked");
@@ -130,6 +130,11 @@ function bind(ctx) {
       $("#create-entry-button").click();
     } else if (unlocked && command === "find") {
       $("#entry-search").focus();
+    } else if (unlocked && command === "copy-password") {
+      // The shown login's password (login-actions), copied in main; only
+      // where its copy button is shown.
+      const copy = $("#copy-password-button");
+      if (!copy.closest("[hidden]") && !copy.disabled) copy.click();
     }
   });
 

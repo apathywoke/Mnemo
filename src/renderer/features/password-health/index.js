@@ -9,7 +9,6 @@ import { show as showToast } from "../../shared/ui/toast-notifications.js";
 // names come from the entry list the renderer already has.
 function init(ctx, { getEntry, openEntry, deselect }) {
   const view = $("#reports-view");
-  const button = $("#reports-button");
   const checkButton = $("#reports-check-breaches");
   const breachStatus = $("#report-breach-status");
   const lists = {
@@ -147,7 +146,7 @@ function init(ctx, { getEntry, openEntry, deselect }) {
     deselect();
     for (const id of ["#entry-detail", "#item-detail", "#detail-empty"]) $(id).hidden = true;
     view.hidden = false;
-    button.setAttribute("aria-expanded", "true");
+    ctx.organize?.renderSidebar();
     view.closest(".entry-detail-area").scrollTop = 0;
     void load();
   }
@@ -157,7 +156,7 @@ function init(ctx, { getEntry, openEntry, deselect }) {
     if (view.hidden) return;
     generation += 1;
     view.hidden = true;
-    button.setAttribute("aria-expanded", "false");
+    ctx.organize?.renderSidebar();
   }
 
   function close() {
@@ -174,7 +173,6 @@ function init(ctx, { getEntry, openEntry, deselect }) {
     for (const count of Object.values(counts)) count.textContent = "–";
   }
 
-  button.addEventListener("click", () => (view.hidden ? open() : close()));
   $("#reports-close").addEventListener("click", close);
   $("#reports-refresh").addEventListener("click", () => void load());
   for (const tile of view.querySelectorAll("[data-report-tile]")) {

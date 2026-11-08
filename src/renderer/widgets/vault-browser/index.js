@@ -318,6 +318,10 @@ function create(ctx) {
     if (!reports.isOpen()) reports.open();
     ctx.notices?.expand();
   };
+  ctx.isSecurityOpen = () => reports.isOpen();
+  ctx.closeSecurity = () => {
+    if (reports.isOpen()) reports.close();
+  };
 
   // The detail's rarer actions sit in its "⋯" menu.
   bindMenu($("#entry-more-button"), $("#entry-more-menu"));
@@ -334,6 +338,32 @@ function create(ctx) {
         ?.querySelector(".password-copy-toggle:not(.password-visibility-toggle)"))?.click();
     });
   }
+
+  // ↑ and ↓ select the previous or next item in the list, from the list,
+  // the search field, or anywhere that does not take the arrows itself.
+  // Not over a dialog or an editor, nor in a menu.
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.defaultPrevented) return;
+    if (!document.body.classList.contains("is-unlocked") || document.querySelector("dialog[open]")) return;
+    const target = /** @type {Element} */ (event.target);
+    const search = $("#entry-search");
+    if (target !== search && target.closest("input, textarea, select, [contenteditable], [role='menu']")) return;
+    const rows = /** @type {HTMLElement[]} */ ([...list.querySelectorAll(".entry-row")]);
+    if (rows.length === 0) return;
+    event.preventDefault();
+    const current = rows.findIndex((row) => row.getAttribute("aria-selected") === "true");
+    const next = current === -1
+      ? (event.key === "ArrowDown" ? 0 : rows.length - 1)
+      : Math.min(rows.length - 1, Math.max(0, current + (event.key === "ArrowDown" ? 1 : -1)));
+    if (next !== current) rows[next].click();
+    // The list is drawn again on a selection; keep the focus where it was
+    // typed: the search field, or the selected row.
+    if (target === search) return;
+    const selected = /** @type {HTMLElement | null} */ (list.querySelector(".entry-row[aria-selected='true']"));
+    selected?.focus({ preventScroll: true });
+    selected?.scrollIntoView({ block: "nearest" });
+  });
 
   // "+ New item" opens a menu of item types.
   const newItemButton = $("#create-entry-button");

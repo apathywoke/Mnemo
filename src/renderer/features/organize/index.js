@@ -73,6 +73,7 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
   // A sidebar choice sets both the scope and the type: a type shows that
   // type among all items, anything else shows every type.
   function setScope(scope, typeFilter = "all") {
+    ctx.closeSecurity?.();
     state.scope = scope;
     state.typeFilter = typeFilter;
     updateDock();
@@ -147,6 +148,7 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
       label: t("sidebar.security"),
       count: notices || null,
       icon: ICONS.security,
+      selected: ctx.isSecurityOpen?.() ?? false,
       onSelect: () => ctx.openSecurity?.(),
     });
     withClass(item, "sidebar-item-security");
@@ -158,9 +160,14 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
   }
 
   function renderSidebar() {
-    const { scope, typeFilter } = state;
+    const { typeFilter } = state;
+    // While Security is open it is the one selected item.
+    const scope = ctx.isSecurityOpen?.() ? { kind: "security" } : state.scope;
     const allTypes = typeFilter === "all";
     const live = state.entries.filter((entry) => !entry.deletedAt);
+    const typeCount = (type) => live.filter((entry) => (entry.type ?? "login") === type).length;
+    // Only the types the vault has, and the one being shown.
+    const types = TYPES.filter((type) => typeCount(type) > 0 || (state.scope.kind === "all" && typeFilter === type));
     /** @type {HTMLElement[]} */
     const items = [
       sidebarItem({
@@ -177,10 +184,10 @@ function init(ctx, { getEntry, refreshEntries, renderEntryList, renderEntryDetai
         selected: scope.kind === "favorites",
         onSelect: () => setScope({ kind: "favorites" }),
       }),
-      sidebarHeading(t("sidebar.types")),
-      ...TYPES.map((type) => sidebarItem({
+      ...(types.length ? [sidebarHeading(t("sidebar.types"))] : []),
+      ...types.map((type) => sidebarItem({
         label: typeLabel(type),
-        count: live.filter((entry) => (entry.type ?? "login") === type).length,
+        count: typeCount(type),
         type,
         selected: scope.kind === "all" && typeFilter === type,
         onSelect: () => setScope({ kind: "all" }, type),
