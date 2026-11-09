@@ -23,10 +23,10 @@ const WATCHED = ".vault-panel, .setup-step, .setup-stepper li";
 // height), and how far and how fast it wanders. The speeds have no common
 // beat, so the picture does not visibly repeat.
 const POOLS = [
-  { rgb: [96, 156, 250], alpha: 0.44, x: 0.22, y: 0.2, r: 0.55, ax: 0.16, ay: 0.14, fx: 0.11, fy: 0.083, phase: 0 },
-  { rgb: [120, 116, 248], alpha: 0.4, x: 0.86, y: 0.52, r: 0.5, ax: 0.14, ay: 0.2, fx: 0.071, fy: 0.097, phase: 2.1 },
-  { rgb: [94, 208, 252], alpha: 0.34, x: 0.5, y: 1.0, r: 0.5, ax: 0.26, ay: 0.12, fx: 0.089, fy: 0.061, phase: 4.2 },
-  { rgb: [59, 120, 245], alpha: 0.3, x: 0.36, y: 0.62, r: 0.42, ax: 0.22, ay: 0.18, fx: 0.053, fy: 0.117, phase: 1.3 },
+  { rgb: [96, 156, 250], alpha: 0.17, x: 0.22, y: 0.2, r: 0.55, ax: 0.16, ay: 0.14, fx: 0.11, fy: 0.083, phase: 0 },
+  { rgb: [120, 116, 248], alpha: 0.16, x: 0.86, y: 0.52, r: 0.5, ax: 0.14, ay: 0.2, fx: 0.071, fy: 0.097, phase: 2.1 },
+  { rgb: [94, 208, 252], alpha: 0.13, x: 0.5, y: 1.0, r: 0.5, ax: 0.26, ay: 0.12, fx: 0.089, fy: 0.061, phase: 4.2 },
+  { rgb: [59, 120, 245], alpha: 0.12, x: 0.36, y: 0.62, r: 0.42, ax: 0.22, ay: 0.18, fx: 0.053, fy: 0.117, phase: 1.3 },
 ];
 
 /**
