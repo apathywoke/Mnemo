@@ -18,6 +18,13 @@ function register(ctx) {
     return settings;
   });
 
+  registerHandler("settings:set-menu-bar-icon", async (shown) => {
+    await state.settingsLoaded;
+    const settings = await state.settingsStore.setMenuBarIcon(shown);
+    ctx.updateMenuBar();
+    return settings;
+  });
+
   registerHandler("settings:dismiss-backup-reminder", async () => {
     await state.settingsLoaded;
     return state.settingsStore.setBackupReminder(false);

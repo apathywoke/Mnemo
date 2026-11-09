@@ -238,7 +238,10 @@ passwords until the design has received independent security review.
   (leaving main unlocked behind a fresh page) or open the developer tools:
   its own menu (`src/main/app-menu.js`) has neither in packaged builds. Lock
   (⌘L) runs in the main process; other menu commands reach the page as one
-  of four fixed names. Copy Password (⌘⇧C) only presses the shown login's
+  of four fixed names. The menu bar icon (on unless turned off in
+  Settings → General, `src/main/menu-bar.js`) runs in main too and offers
+  only Open, Lock, and Quit: it shows nothing from the vault and never
+  unlocks it. Copy Password (⌘⇧C) only presses the shown login's
   copy button: main copies the password, the page never receives it, and
   the clipboard is cleared as for any copy.
   `npm run dist:mac` signs with a Developer ID certificate and the hardened

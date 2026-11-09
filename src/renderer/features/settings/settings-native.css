@@ -180,3 +180,71 @@
 .settings-status[data-tone="bad"] {
   --tone: var(--c-e87878);
 }
+
+/* An on/off setting: its name and hint on the left, a switch on the right. */
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+}
+
+/* Not a section title (the rule above for a first label). */
+.settings-section > label.settings-toggle {
+  font-weight: 400;
+}
+
+.settings-toggle .settings-hint {
+  color: var(--muted);
+}
+
+.settings-toggle-text {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-toggle .settings-field-label {
+  color: var(--c-eeeeee);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  margin: 0;
+  border-radius: 10px;
+  appearance: none;
+  background: var(--c-393939);
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.settings-switch::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 30%);
+  content: "";
+  transition: transform 150ms ease;
+}
+
+.settings-switch:checked {
+  background: var(--accent);
+}
+
+.settings-switch:checked::after {
+  transform: translateX(14px);
+}
+
+.settings-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

@@ -16,6 +16,8 @@ function createState(translator) {
     updateTask: null,
     settingsLoaded: Promise.resolve(),
     mainWindow: null,
+    // The menu bar icon (menu-bar.js), while the setting shows it.
+    tray: null,
     vaultStore: null,
     profileManager: null,
     // Copies of snapshots in the folder outside this Mac (outside-copies.js).

@@ -141,6 +141,7 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
     "setUpdateInterval",
     "setLanguage",
     "setTheme",
+    "setMenuBarIcon",
     "unlockVault",
   ].sort());
 
@@ -152,6 +153,7 @@ test("preload exposes only the approved IPC methods and forwards arguments", asy
     ["confirmRecoveryKeySaved", "recovery:confirm-saved", ["AB12"]],
     ["setLanguage", "settings:set-language", ["de"]],
     ["setTheme", "settings:set-theme", ["light"]],
+    ["setMenuBarIcon", "settings:set-menu-bar-icon", [false]],
     ["setUpdateInterval", "settings:set-update-interval", ["6h"]],
     ["getUpdateState", "updates:get-state", []],
     ["checkForUpdates", "updates:check", []],

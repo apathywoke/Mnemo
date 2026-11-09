@@ -213,6 +213,13 @@ test("every main screen and dialog opens without page errors", async (t) => {
       await page.click(`#settings-tab-${tab}`);
       await page.locator(`#settings-pane-${tab}:not([hidden])`).waitFor();
     }
+    // The menu bar icon is on by default; the switch saves the choice.
+    await page.click("#settings-tab-general");
+    assert.equal(await page.isChecked("#settings-menu-bar-icon"), true);
+    await page.click("label[for='settings-menu-bar-icon']");
+    await page.waitForFunction(async () => (await window.vaultApp.getSettings()).menuBarIcon === false);
+    await page.click("label[for='settings-menu-bar-icon']");
+    await page.waitForFunction(async () => (await window.vaultApp.getSettings()).menuBarIcon === true);
     await page.selectOption("#settings-language", "de");
     await page.waitForFunction(() => document.documentElement.lang === "de");
     await page.selectOption("#settings-language", "en");
