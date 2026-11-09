@@ -2,6 +2,7 @@ import * as profileList from "../../entities/vault-profile/ui/profile-list.js";
 import * as profileManagementFeature from "../../features/profile-management/index.js";
 import * as snapshotRestoreFeature from "../../features/snapshot-restore/index.js";
 import * as vaultAccessFeature from "../../features/vault-access/index.js";
+import * as accessGlow from "./glow.js";
 import { $ } from "../../shared/lib/dom.js";
 import { t, errorText, onChange, language } from "../../shared/lib/i18n.js";
 import { show as showToast } from "../../shared/ui/toast-notifications.js";
@@ -260,6 +261,9 @@ function create(ctx) {
   $("#unlock-profiles-button").addEventListener("click", chooseProfiles);
   $("#switch-profile-button").addEventListener("click", chooseProfiles);
   $("#restore-cancel-button").addEventListener("click", () => void cancelRestore());
+
+  const glow = document.querySelector(".access-glow");
+  if (glow) accessGlow.start(glow);
 
   return {
     cancelRecover,

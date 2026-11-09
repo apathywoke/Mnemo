@@ -5,8 +5,10 @@
  * own angle. They are painted once: no blur filter and no endless motion,
  * so the screen costs nothing while it waits. On launch the ribbons fade
  * and settle into place, one after another; with reduced motion they are
- * simply there. While a vault is open the layer is hidden (visibility, not
- * display, so locking again does not replay the launch). */
+ * simply there. When a screen or a setup step changes, or a button is
+ * pressed, glow.js adds a short shimmer on top. While a vault is open the
+ * layer is hidden (visibility, not display, so locking again does not
+ * replay the launch). */
 
 .workspace {
   position: relative;
