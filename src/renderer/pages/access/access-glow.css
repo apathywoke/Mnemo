@@ -1,14 +1,12 @@
 /* Soft colored light behind the access screens. Loaded by styles.css, after
  * access-native.css.
  *
- * Three layers of radial gradients, each a long soft ribbon turned at its
- * own angle. They are painted once: no blur filter and no endless motion,
- * so the screen costs nothing while it waits. On launch the ribbons fade
- * and settle into place, one after another; with reduced motion they are
- * simply there. When a screen or a setup step changes, or a button is
- * pressed, glow.js adds a short shimmer on top. While a vault is open the
- * layer is hidden (visibility, not display, so locking again does not
- * replay the launch). */
+ * glow.js draws pools of light in the app's blues on a tiny canvas (about
+ * 128 pixels wide) and the canvas is stretched over the window: stretching
+ * blurs it for free, so there is no blur filter and little to draw. On
+ * launch the light fades in and settles. While a vault is open the layer is
+ * hidden (visibility, not display, so locking again does not replay the
+ * launch) and glow.js stops drawing. */
 
 .workspace {
   position: relative;
@@ -21,70 +19,32 @@
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  animation: access-glow-in 1800ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .is-unlocked .access-glow {
   visibility: hidden;
 }
 
-.access-glow > span {
-  position: absolute;
-  inset: -25%;
-  animation: access-glow-in 1600ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-/* Blue, low across the left. */
-.access-glow > span:nth-child(1) {
-  background:
-    radial-gradient(ellipse 30% 1.6% at 34% 63.5%, rgb(150 190 255 / 0.55), transparent 70%),
-    radial-gradient(ellipse 46% 9% at 32% 64%, rgb(76 141 246 / 0.5), transparent 70%),
-    radial-gradient(ellipse 30% 22% at 24% 70%, rgb(59 110 246 / 0.22), transparent 70%);
-  transform: rotate(-20deg);
-  --glow-turn: -20deg;
-}
-
-/* Violet into magenta, high on the right. */
-.access-glow > span:nth-child(2) {
-  background:
-    radial-gradient(ellipse 26% 1.4% at 68% 34.5%, rgb(216 180 254 / 0.5), transparent 70%),
-    radial-gradient(ellipse 40% 7% at 70% 34%, rgb(168 85 247 / 0.42), transparent 70%),
-    radial-gradient(ellipse 26% 18% at 76% 30%, rgb(217 70 239 / 0.16), transparent 70%);
-  transform: rotate(28deg);
-  --glow-turn: 28deg;
-  animation-delay: 160ms;
-}
-
-/* A thin cyan thread on the lower right and a warm one at the top left. */
-.access-glow > span:nth-child(3) {
-  background:
-    radial-gradient(ellipse 34% 4% at 70% 72%, rgb(34 211 238 / 0.32), transparent 70%),
-    radial-gradient(ellipse 22% 4% at 30% 28%, rgb(251 113 77 / 0.26), transparent 70%);
-  transform: rotate(-8deg);
-  --glow-turn: -8deg;
-  animation-delay: 320ms;
-}
-
-/* The middle stays calm, so the form reads as on a plain background. */
-.access-glow::after {
+.access-glow > canvas {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 34% 42% at 50% 52%, var(--surface) 30%, transparent 100%);
-  content: "";
-  opacity: 0.75;
+  width: 100%;
+  height: 100%;
 }
 
 @keyframes access-glow-in {
   from {
     opacity: 0;
-    transform: rotate(calc(var(--glow-turn) - 6deg)) scale(1.12);
+    transform: scale(1.12);
   }
   to {
     opacity: 1;
-    transform: rotate(var(--glow-turn)) scale(1);
+    transform: scale(1);
   }
 }
 
 /* On a light page the same light, quieter. */
-:root[data-theme="light"] .access-glow {
-  opacity: 0.55;
+:root[data-theme="light"] .access-glow > canvas {
+  opacity: 0.5;
 }

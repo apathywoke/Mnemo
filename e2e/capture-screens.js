@@ -72,6 +72,9 @@ async function captureTheme(theme, folder) {
   const { app, page } = await launchApp(userDataDir, { chromiumArgs: RENDERING_ARGS });
   const shot = (name, mask) => capture(page, folder, `${theme}-${name}`, mask);
   try {
+    // The light behind the access screens drifts with the clock; with
+    // reduced motion it is one still frame, the same on every run.
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.waitForFunction((expected) => document.documentElement.dataset.theme === expected, theme);
     await page.locator("#setup-panel:not([hidden])").waitFor();
     await shot("01-setup");
