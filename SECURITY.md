@@ -171,7 +171,8 @@ passwords until the design has received independent security review.
   the cloud, which cannot be checked. Items deleted for good, and old
   passwords pushed out of the history, stay in snapshots until those
   snapshots are removed: up to 30 days, or 90 days in a pinned one. Deleting a
-  vault asks in a separate native dialog whether to delete its snapshots too;
+  vault is confirmed in a native dialog (from the profile list as well as
+  from Settings), and a separate one asks whether to delete its snapshots too;
   kept snapshots stay in the folder for a later restore. Copies outside this
   Mac are never deleted with the vault.
 - **Restoring from a snapshot** goes through the same checks as restoring a

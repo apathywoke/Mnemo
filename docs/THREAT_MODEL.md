@@ -359,8 +359,9 @@ must not be used with real vaults on a shared machine.
    - **Accepted:** putting back old copies of both the vault and its record
      together will still go undetected (decision R6). A Keychain item updated
      in place would close this.
-5. **Profile deletion from the profile list** (vault locked) is confirmed
-   only in the renderer; add a native confirmation there too.
+5. **Profile deletion from the profile list.** **Done.** Main asks in a
+   native dialog before deleting a locked profile, in addition to the
+   renderer's type-the-name dialog.
 6. **Favicon decoding.** **Partly done.** Images are decoded in a separate
    `utilityProcess` by plain JavaScript decoders, and main receives only
    pixels (B7). That process runs Node.js without Chromium's sandbox;
@@ -443,7 +444,7 @@ found no Critical or High issues.
 | 1 | Medium | The reveal-password dialog stayed open after auto-lock, screen lock, or sleep | **Fixed.** Vault dialogs use an `AbortController`; `lockVault()` closes them. Covered by a test. |
 | 2 | Medium | A compromised renderer could exfiltrate metadata and the master passphrase through WebRTC (STUN/TURN), which bypasses `webRequest` and CSP `connect-src` | **Fixed.** The preload removes `RTCPeerConnection`, `webkitRTCPeerConnection`, and `RTCDataChannel` (verified in the running app); the IP handling policy is `disable_non_proxied_udp`; the session proxy points to a closed local port; CSP adds `webrtc 'block'`. |
 | 3 | Low | No permission check handler, so checks report "granted" | **Fixed.** Permission checks and device permissions are denied; clipboard reads verified to fail in the running app. |
-| 4 | Low | Restore read the global vault after awaiting dialogs and ignored the lock epoch; profile deletion is confirmed only in the renderer | **Mostly fixed.** Restore binds to the vault and epoch at the start and aborts if either changes. Deleting the open vault from Settings needs its passphrase and a native confirmation. Deleting a locked profile from the profile list still relies on the renderer's type-the-name dialog. |
+| 4 | Low | Restore read the global vault after awaiting dialogs and ignored the lock epoch; profile deletion is confirmed only in the renderer | **Fixed.** Restore binds to the vault and epoch at the start and aborts if either changes. Deleting the open vault from Settings needs its passphrase and a native confirmation. Deleting a locked profile from the profile list needs a native confirmation as well. |
 | 5 | Low | DevTools available in packaged builds (self-XSS through the console) | **Fixed.** `devTools` is disabled when packaged. |
 | 6 | Low/Info | `file://` origin with `GrantFileProtocolExtraPrivileges` makes CSP `'self'` cover any local file | **Fixed.** The page is served from `app://mnemo/`, so `'self'` covers only that origin; the fuse is off. See follow-up 1 in section 7. |
 | 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Fixed.** Images are decoded in a separate `utilityProcess` by plain JavaScript PNG and ICO decoders with a 5-second limit; main receives only pixels and encodes the PNG itself. That process is not sandboxed by Chromium (section 7, item 6). |
