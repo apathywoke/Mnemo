@@ -27,7 +27,10 @@ test("the helper runner sends one request and reads one JSON reply", posixOnly, 
   // Nothing from Electron's environment reaches the helper.
   const environment = await makeScript(t, "printf '{\"count\":%s}' \"$(/usr/bin/env | /usr/bin/wc -l | /usr/bin/tr -d ' ')\"");
   const { count } = await createTouchIdHelper(environment).run({ command: "status" });
-  assert.ok(count <= 3, `the helper saw ${count} environment variables`);
+  // The shell sets up to three of its own. Under `npm run test:coverage`
+  // Node adds NODE_V8_COVERAGE to every child process it starts.
+  const allowed = process.env.NODE_V8_COVERAGE ? 4 : 3;
+  assert.ok(count <= allowed, `the helper saw ${count} environment variables`);
 });
 
 test("a missing, broken, slow, or chatty helper gives an error reply", posixOnly, async (t) => {

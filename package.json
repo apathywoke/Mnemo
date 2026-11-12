@@ -7,6 +7,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test --test-timeout=120000",
+    "test:coverage": "node --test --test-timeout=120000 --experimental-test-coverage \"--test-coverage-include=src/main/vault/**\" --test-coverage-lines=95 --test-coverage-branches=88 --test-coverage-functions=95",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.strict.json",
     "test:durability": "MNEMO_DURABILITY=full node --test --test-timeout=3600000 test/durability.test.js",
