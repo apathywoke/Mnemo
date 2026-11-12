@@ -42,25 +42,44 @@ function normalizeProfileName(value) {
 class ProfileManager {
   /**
    * @param {string} userDataPath
-   * @param {{ onSnapshot?: (vaultPath: string, info: { pinned: boolean }) => void }} [options]
-   *   `onSnapshot`: a vault has a new verified snapshot.
+   * @param {{
+   *   onSnapshot?: (vaultPath: string, info: { pinned: boolean }) => void,
+   *   confirmRevision?: (finding: { kind: string, savedAt: number | null, revision: number, recordRevision: number }) => Promise<boolean>,
+   * }} [options]
+   *   `onSnapshot`: a vault has a new verified snapshot. `confirmRevision`:
+   *   asks the user about a vault that is not the newest revision this Mac
+   *   has seen (vault/store-revisions.js); without it such a vault stays
+   *   closed.
    */
-  constructor(userDataPath, { onSnapshot = () => {} } = {}) {
+  constructor(userDataPath, { onSnapshot = () => {}, confirmRevision = async () => false } = {}) {
     this.userDataPath = userDataPath;
     this.onSnapshot = onSnapshot;
+    this.confirmRevision = confirmRevision;
+    // One record per profile of the newest revision seen (vault/revisions.js).
+    this.revisionDirectory = path.join(userDataPath, "revisions");
     this.registryPath = path.join(userDataPath, "profiles.json");
     this.legacyVaultPath = path.join(userDataPath, "vault.json");
     this.vaultDirectory = path.join(userDataPath, "vaults");
     this.mutationQueue = Promise.resolve();
   }
 
-  // The store for a vault file, with local snapshots on. Every store the app
-  // opens comes from here.
+  // The store for a vault file, with local snapshots and rollback
+  // detection on. Every store the app opens comes from here.
   createStore(vaultPath) {
+    const profileId = vaultPath === this.legacyVaultPath ? LEGACY_PROFILE_ID : path.basename(vaultPath, ".vault");
     return new VaultStore(vaultPath, {
       snapshots: true,
       onSnapshot: (info) => this.onSnapshot(vaultPath, info),
+      revisions: {
+        recordPath: this.getRevisionRecordPath(profileId),
+        profileId,
+        confirm: (finding) => this.confirmRevision(finding),
+      },
     });
+  }
+
+  getRevisionRecordPath(profileId) {
+    return path.join(this.revisionDirectory, `${profileId}.json`);
   }
 
   // At launch: an unverified snapshot of each vault whose last changes may
@@ -232,7 +251,9 @@ class ProfileManager {
   async restoreProfile(name, sourcePath, passphrase, { poolDirectory = null } = {}) {
     return this.enqueueMutation(() =>
       this.createProfileWith(name, (store) =>
-        store.restoreBackup(sourcePath, passphrase, { poolDirectory }),
+        // A vault of its own from now on, with a new ID: two profiles
+        // restored from one backup do not trip each other's checks.
+        store.restoreBackup(sourcePath, passphrase, { poolDirectory, asNewVault: true }),
       ),
     );
   }
@@ -302,6 +323,7 @@ class ProfileManager {
         registryUpdated = true;
         await fs.unlink(stagedPath);
         vaultStaged = false;
+        await fs.unlink(this.getRevisionRecordPath(profile.id)).catch(() => {});
         if (attachmentsStaged) {
           await fs.rm(stagedAttachmentPath, { recursive: true, force: true }).catch(() => {});
         }
@@ -390,6 +412,7 @@ class ProfileManager {
       store.lock();
       if (ownsVaultPath) {
         await fs.unlink(vaultPath).catch(() => {});
+        await fs.unlink(this.getRevisionRecordPath(profile.id)).catch(() => {});
         await fs.rm(VaultStore.attachmentDirectoryFor(vaultPath), { recursive: true, force: true }).catch(() => {});
         await fs.rm(VaultStore.snapshotDirectoryFor(vaultPath), { recursive: true, force: true }).catch(() => {});
       }

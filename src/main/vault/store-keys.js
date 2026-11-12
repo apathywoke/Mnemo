@@ -25,6 +25,7 @@ const {
   getNotesAad,
 } = require("./crypto");
 const { sealedFieldKeys } = require("./entries");
+const { nextRevisionFields } = require("./revisions");
 const {
   headerOf,
   getAad,
@@ -101,6 +102,7 @@ class VaultStoreKeys {
       readAttachment: (attachment) => this.readAttachmentFile(attachment),
       sessionEpoch,
       interrupted: "The vault was locked while saving. Unlock it again.",
+      revisionFloor: this.revisionFloor,
     });
     const oldKey = this.dataKey;
     this.dataKey = rotated.dataKey;
@@ -191,6 +193,8 @@ class VaultStoreKeys {
       }
 
       try {
+        // An older copy is not rekeyed and opened without a word either.
+        const verdict = await this.admitRevision(opened.vaultData);
         // The recovery key has now been typed in, so the vault key it
         // protected is replaced along with it.
         const rotated = await this.rekeyNow({
@@ -200,6 +204,7 @@ class VaultStoreKeys {
           readAttachment: (attachment) => this.readAttachmentFile(attachment),
           sessionEpoch,
           interrupted: "Recovery was interrupted because the vault was locked.",
+          revisionFloor: verdict.recordRevision,
         });
         this.lock();
         this.dataKey = rotated.dataKey;
@@ -233,8 +238,12 @@ class VaultStoreKeys {
   // anything fails before the rename, the new files are removed and the old
   // vault and its files are untouched. Afterwards the caller removes the old
   // files (`replacedAttachmentIds`).
+  //
+  // It is a write like any other: the revision goes up, above
+  // `revisionFloor` (the newest one the record has seen), and the record
+  // follows the file.
   /** @this {Store} */
-  async rekeyNow({ vaultData, oldKey, passphrase, readAttachment, sessionEpoch, interrupted }) {
+  async rekeyNow({ vaultData, oldKey, passphrase, readAttachment, sessionEpoch, interrupted, revisionFloor = 0 }) {
     const newKey = randomBytes(KEY_BYTES);
     const resealed = new Map();
     const reseal = (record, aad) => {
@@ -289,7 +298,7 @@ class VaultStoreKeys {
         }
         entries.push(next);
       }
-      const nextVaultData = { ...vaultData, entries };
+      const nextVaultData = { ...vaultData, entries, ...nextRevisionFields(vaultData, revisionFloor) };
       if (Buffer.byteLength(JSON.stringify(nextVaultData), "utf8") > MAX_VAULT_PLAINTEXT_BYTES) {
         throw new Error("The vault is too large to save.");
       }
@@ -297,6 +306,7 @@ class VaultStoreKeys {
       if (this.sessionEpoch !== sessionEpoch) throw new Error(interrupted);
       await this.writeEnvelope(envelope);
       written = true;
+      await this.writeRevisionRecord(nextVaultData);
       if (this.sessionEpoch !== sessionEpoch) {
         // On disk already; the new files are now the referenced ones.
         throw Object.assign(new Error(interrupted), { written: true });

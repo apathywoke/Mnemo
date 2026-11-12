@@ -14,6 +14,7 @@ const { decodeRecoveryKey } = require("./recovery-key");
 const { openTotp, openPassword, openItemSecret, openNotes } = require("./crypto");
 const { validatePassphrase, validateNewPassphrase, parseEnvelope } = require("./envelope");
 const { ATTACHMENT_OVERHEAD, attachmentsOf } = require("./attachments");
+const { newRevisionFields } = require("./revisions");
 
 /** @typedef {import("./index").Instance} Store */
 
@@ -180,15 +181,42 @@ class VaultStoreBackup {
   // recovery key, available afterwards from takeIssuedRecoveryKey().
   // `poolDirectory`: the source is a snapshot, a plain vault file whose
   // attachment files are in this folder (see snapshots.js).
+  //
+  // An older revision of this profile's own vault is restored only after
+  // the user confirms it (resolves { canceled: true } otherwise), and is
+  // then saved once above the newest revision known, so that the replaced
+  // file can never be taken for a newer copy. `asNewVault`: the backup
+  // becomes a new profile, a vault of its own with a new ID.
   /**
    * @this {Store}
    * @param {string} sourcePath
    * @param {any} credentials
-   * @param {{ poolDirectory?: string | null }} [options]
+   * @param {{ poolDirectory?: string | null, asNewVault?: boolean }} [options]
    */
-  async restoreBackup(sourcePath, credentials, { poolDirectory = null } = {}) {
+  async restoreBackup(sourcePath, credentials, { poolDirectory = null, asNewVault = false } = {}) {
     return this.enqueueMutation(async () => {
       const sessionEpoch = this.sessionEpoch;
+      // Asked once the backup decrypted and before anything is replaced.
+      const confirmRevision = async (opened) => {
+        if (asNewVault) {
+          opened.vaultData = { ...opened.vaultData, ...newRevisionFields() };
+          return { older: false, newest: 0 };
+        }
+        const found = await this.assessRestore(opened.vaultData);
+        if (!found.older) return found;
+        // `older` is only found with these options.
+        const restore = await /** @type {import("./store").RevisionOptions} */ (this.revisionOptions).confirm({
+          kind: "restoreOlder",
+          savedAt: opened.vaultData.savedAt,
+          revision: opened.vaultData.revision,
+          recordRevision: found.newest,
+        });
+        if (this.sessionEpoch !== sessionEpoch) {
+          throw new Error("Restore was interrupted because the vault was locked.");
+        }
+        return restore ? found : null;
+      };
+      let found;
       // The key is handed to the store below; `dataKey` is then set to null.
       /** @type {{ envelope: any, vaultData: any, dataKey: Buffer | null, container: any }} */
       let opened;
@@ -209,12 +237,24 @@ class VaultStoreBackup {
         } finally {
           recoveryKeyBytes.fill(0);
         }
-        if (poolDirectory) opened.container = await this.snapshotPool(opened, poolDirectory);
+        try {
+          if (poolDirectory) opened.container = await this.snapshotPool(opened, poolDirectory);
+          found = await confirmRevision(opened);
+        } catch (error) {
+          opened.dataKey?.fill(0);
+          throw error;
+        }
+        if (!found) {
+          opened.dataKey?.fill(0);
+          return { canceled: true };
+        }
         await this.pinSnapshotBefore("restore");
-        return this.restoreWithNewKey(opened, credentials.newPassphrase, sessionEpoch);
+        return this.restoreWithNewKey(opened, credentials.newPassphrase, sessionEpoch, found.newest);
       }
 
       try {
+        found = await confirmRevision(opened);
+        if (!found) return { canceled: true };
         // The vault being replaced, kept for 90 days (verified when it is
         // open, copied for a later check when it is not).
         await this.pinSnapshotBefore("restore");
@@ -244,6 +284,15 @@ class VaultStoreBackup {
         // Restoring by passphrase keeps the backup's keys and recovery key.
         this.issuedRecoveryKey = null;
         opened.dataKey = null;
+        this.revisionFloor = found.newest;
+        if (found.older || asNewVault) {
+          // The restored state becomes the newest revision (for a new
+          // vault, its first). The backup itself is already in place, so a
+          // failure here is left to the next save.
+          await this.persistVaultData(this.vaultData).catch(() => {});
+        } else {
+          await this.replaceRevisionRecord(this.vaultData);
+        }
         // The replaced vault's files are no longer referenced.
         await this.maintainNow();
         this.queueSnapshotAfterUnlock();
@@ -266,7 +315,7 @@ class VaultStoreBackup {
   // gets a new key. Attachments come straight from the backup, are verified
   // by decrypting them, and are stored under new keys and IDs.
   /** @this {Store} */
-  async restoreWithNewKey(opened, newPassphrase, sessionEpoch) {
+  async restoreWithNewKey(opened, newPassphrase, sessionEpoch, revisionFloor = 0) {
     try {
       if (this.sessionEpoch !== sessionEpoch) {
         throw new Error("Restore was interrupted because the vault was locked.");
@@ -284,6 +333,7 @@ class VaultStoreBackup {
           },
           sessionEpoch,
           interrupted: "Restore was interrupted because the vault was locked.",
+          revisionFloor,
         });
       } catch (error) {
         if (/missing or damaged/.test(error.message)) {

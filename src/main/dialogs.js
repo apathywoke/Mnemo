@@ -3,6 +3,14 @@
 // Windows that show a secret close on their own, like the clipboard clears.
 const REVEAL_DIALOG_MS = 30_000;
 
+// What confirmRevision says about each finding.
+const REVISION_TEXT = Object.freeze({
+  older: { message: "dialog.revisionOlderMessage", detail: "dialog.revisionOlderDetail" },
+  noRecord: { message: "dialog.revisionNoRecordMessage", detail: "dialog.revisionNoRecordDetail" },
+  differentVault: { message: "dialog.revisionDifferentMessage", detail: "dialog.revisionDifferentDetail" },
+  restoreOlder: { message: "dialog.restoreOlderMessage", detail: "dialog.restoreOlderDetail" },
+});
+
 function createDialogs(ctx) {
   const { state, tr } = ctx;
   const { dialog } = ctx.electron;
@@ -87,7 +95,33 @@ function createDialogs(ctx) {
     await state.outsideCopies?.deleteWithOtherKeys(store.filePath, (bytes) => store.isOtherKeyBytes(bytes));
   }
 
-  return { showVaultDialog, showSecretDialog, confirmDeletingSnapshots, offerDeletingOldSnapshots };
+  // A vault, or a backup about to be restored, is not the newest revision
+  // this Mac has seen of it (vault/store-revisions.js). `kind`: "older",
+  // "noRecord", "differentVault", or "restoreOlder". Keeping it closed (or
+  // not restoring) is the default; it closes with a lock, as a refusal.
+  async function confirmRevision({ kind, savedAt, revision, recordRevision }) {
+    const saved = savedAt === null
+      ? tr("dialog.revisionSavedUnknown")
+      : new Date(savedAt).toLocaleString(state.language, { dateStyle: "long", timeStyle: "short" });
+    const params = { saved, revision, newest: recordRevision };
+    const restoring = kind === "restoreOlder";
+    const { response } = await showVaultDialog({
+      type: "warning",
+      title: tr(restoring ? "dialog.restoreOlderTitle" : "dialog.revisionTitle"),
+      message: tr(REVISION_TEXT[kind].message, params),
+      detail: tr(REVISION_TEXT[kind].detail, params),
+      buttons: [
+        tr(restoring ? "common.cancel" : "dialog.revisionClose"),
+        tr(restoring ? "dialog.restoreOlderConfirm" : "dialog.revisionOpen"),
+      ],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    return response === 1;
+  }
+
+  return { showVaultDialog, showSecretDialog, confirmDeletingSnapshots, offerDeletingOldSnapshots, confirmRevision };
 }
 
 module.exports = { createDialogs };

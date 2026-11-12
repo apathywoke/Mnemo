@@ -20,8 +20,11 @@ const RECOVERY_GROUP_SIZE = 4;
 // attachments. Schema 4 seals notes, and a secure note's text, per entry
 // (docs/design-notes-sealing.md), so unlocking decrypts none of them. Older
 // schemas are upgraded in memory on unlock and written as schema 4 on the
-// next save.
-const VAULT_SCHEMA_VERSION = 4;
+// next save. Schema 5 adds what detects a rollback to an older copy
+// (docs/design-rollback.md): a vault ID, a revision counted on every write,
+// the time of that write, and the key of the record kept outside the vault.
+const VAULT_SCHEMA_VERSION = 5;
+const NOTES_SCHEMA_VERSION = 4;
 const ORGANIZED_SCHEMA_VERSION = 3;
 const SEALED_SCHEMA_VERSION = 2;
 const LEGACY_VAULT_SCHEMA_VERSION = 1;
@@ -86,6 +89,7 @@ module.exports = {
   RECOVERY_KEY_CHARACTERS,
   RECOVERY_GROUP_SIZE,
   VAULT_SCHEMA_VERSION,
+  NOTES_SCHEMA_VERSION,
   ORGANIZED_SCHEMA_VERSION,
   SEALED_SCHEMA_VERSION,
   LEGACY_VAULT_SCHEMA_VERSION,

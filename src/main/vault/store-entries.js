@@ -5,6 +5,7 @@ const {
 } = require("node:crypto");
 const { generateTotp, parseTotpInput, toOtpauthUri } = require("../totp");
 const { describeSshKey } = require("../ssh-keys");
+const { revisionFieldsOf } = require("./revisions");
 const { VAULT_SCHEMA_VERSION, MAX_ENTRIES, UUID_PATTERN } = require("./constants");
 const {
   sealTotp,
@@ -425,6 +426,8 @@ class VaultStoreEntries {
       schemaVersion: VAULT_SCHEMA_VERSION,
       entries: changes.entries ?? this.vaultData.entries,
       folders: changes.folders ?? this.vaultData.folders,
+      // persistVaultData sets the revision of the write.
+      ...revisionFieldsOf(this.vaultData),
     };
   }
 

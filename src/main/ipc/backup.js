@@ -234,7 +234,10 @@ function register(ctx) {
     }
     if (isStale()) throw new Error("Restore was interrupted because the vault was locked.");
 
-    await store.restoreBackup(selection.filePaths[0], restoreCredentials);
+    // An older revision of this vault is restored only after a second,
+    // explicit confirmation (vault/store-backup.js).
+    const restored = await store.restoreBackup(selection.filePaths[0], restoreCredentials);
+    if (restored.canceled) return { canceled: true };
     const recoveryKey = store.takeIssuedRecoveryKey();
     // The restored file may use a different vault key than the one stored
     // for Touch ID.

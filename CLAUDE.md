@@ -14,12 +14,15 @@ Mnemo is a password manager: security beats convenience.
   textContent.
 - Keep the vault file format, AAD strings, and crypto
   parameters unless the task says otherwise. Vault data
-  is schema 4: passwords and TOTP (`entry-password:v2`,
+  is schema 5: passwords and TOTP (`entry-password:v2`,
   `entry-totp:v2`), secret item fields
   (`item-secret:v2:<field>`), and notes and `sealed` item
   fields (`entry-notes:v4:<field>`) are sealed per entry.
   A new sealed value takes the label of the schema that
-  adds it; old labels never change. Tests that write an
+  adds it; old labels never change. Every write of the
+  vault file raises `revision` (vault/revisions.js); its
+  record outside the vault is written after the file,
+  never before. Tests that write an
   older schema use plainTextEntries() (support/helpers.js).
 - Follow existing patterns: enqueueMutation; re-check
   sessionEpoch/lockEpoch after every await; zero Buffers

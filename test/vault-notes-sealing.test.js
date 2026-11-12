@@ -70,10 +70,10 @@ function assertFixtureNotes(store) {
   assert.deepEqual(noteVersion.changes, ["body"]);
 }
 
-test("a schema 3 vault opens with every note and is written as schema 4 on the next save", async (t) => {
+test("a schema 3 vault opens with every note and is written as schema 5 on the next save", async (t) => {
   const { store } = await openFixture(t);
   assert.equal((await dataOnDisk(store)).schemaVersion, 3);
-  assert.equal(store.vaultData.schemaVersion, 4);
+  assert.equal(store.vaultData.schemaVersion, 5);
   assertFixtureNotes(store);
 
   // Unlocking sealed the notes in memory; equal text within an entry shares
@@ -87,7 +87,7 @@ test("a schema 3 vault opens with every note and is written as schema 4 on the n
 
   await store.setFavorite(ids.card, true);
   const saved = await dataOnDisk(store);
-  assert.equal(saved.schemaVersion, 4);
+  assert.equal(saved.schemaVersion, 5);
   for (const entry of saved.entries) {
     for (const content of [entry, ...(entry.history ?? [])]) {
       assert.ok(content.notes === "" || isSealed(content.notes), entry.name);
@@ -111,10 +111,10 @@ test("Touch ID and recovery key unlocks read the notes of a schema 3 vault", asy
   await store.unlockWithDataKey(dataKey);
   assertFixtureNotes(store);
 
-  // Recovery replaces the vault key and writes schema 4 at once.
+  // Recovery replaces the vault key and writes schema 5 at once.
   const recovering = new VaultStore((await copyFixture(t)).filePath);
   await recovering.recoverWithKey(fixture.recoveryKey, NEW_PASSPHRASE);
-  assert.equal((await dataOnDisk(recovering)).schemaVersion, 4);
+  assert.equal((await dataOnDisk(recovering)).schemaVersion, 5);
   assertFixtureNotes(recovering);
 });
 
@@ -245,15 +245,15 @@ test("a backup from before the migration restores by passphrase and by recovery 
     await store.restoreBackup(FIXTURE, credentials);
     assertFixtureNotes(store);
     // By passphrase the backup is written as it is and migrated on the next
-    // save; with the recovery key it is rekeyed and written as schema 4.
+    // save; with the recovery key it is rekeyed and written as schema 5.
     const schema = (await dataOnDisk(store)).schemaVersion;
-    assert.equal(schema, typeof credentials === "string" ? 3 : 4);
+    assert.equal(schema, typeof credentials === "string" ? 3 : 5);
     await store.setFavorite(ids.card, true);
-    assert.equal((await dataOnDisk(store)).schemaVersion, 4);
+    assert.equal((await dataOnDisk(store)).schemaVersion, 5);
   }
 });
 
-test("schema 4 accepts only sealed notes and schemas 1–3 only plain ones", async (t) => {
+test("schemas 4 and 5 accept only sealed notes and schemas 1–3 only plain ones", async (t) => {
   const directory = await makeTempDirectory(t);
   const store = new VaultStore(path.join(directory, "vault.json"));
   await store.create(fixture.passphrase);
@@ -273,7 +273,7 @@ test("schema 4 accepts only sealed notes and schemas 1–3 only plain ones", asy
   assert.equal(validateVaultData({ ...current, entries: [login, { ...note, fields: { body: "plain body" } }] }), false);
 
   // Schema 3 data is plain text, and a sealed record there is refused.
-  const plain = { ...current, schemaVersion: 3, entries: plainTextEntries(store) };
+  const plain = { schemaVersion: 3, entries: plainTextEntries(store), folders: current.folders };
   assert.equal(validateVaultData(plain), true);
   assert.equal(validateVaultData({ ...plain, entries: [{ ...plain.entries[0], notes: login.notes }, plain.entries[1]] }), false);
   assert.equal(validateVaultData({ ...plain, entries: [plain.entries[0], { ...plain.entries[1], fields: note.fields }] }), false);

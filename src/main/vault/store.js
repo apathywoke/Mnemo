@@ -33,6 +33,17 @@ const {
 const { ATTACHMENT_OVERHEAD } = require("./attachments");
 const { pruneHistory } = require("./history");
 const { validateVaultData, isFromNewerVersion, upgradeVaultData } = require("./schema");
+const { newRevisionFields, nextRevisionFields } = require("./revisions");
+
+/**
+ * Where the record of the newest revision is kept, and how to ask the user
+ * about a vault that does not match it (store-revisions.js).
+ * @typedef {{
+ *   recordPath: string,
+ *   profileId: string,
+ *   confirm: (finding: { kind: string, savedAt: number | null, revision: number, recordRevision: number }) => Promise<boolean>,
+ * }} RevisionOptions
+ */
 
 // A vault or backup saved by a newer version of Mnemo. Reported as such, not
 // as a wrong passphrase: the passphrase may be right, and the fix is an
@@ -50,12 +61,21 @@ class VaultStore {
   // `snapshots`: keep local snapshots of this vault (store-snapshots.js).
   // The app turns them on; most tests leave them off. `now` is their clock;
   // `onSnapshot` hears of each verified one ({ pinned }), for copies outside.
+  // `revisions`: detect a rollback to an older copy of the file.
   /**
    * @param {string} filePath
-   * @param {{ snapshots?: boolean, now?: () => number, onSnapshot?: (info: { pinned: boolean }) => void }} [options]
+   * @param {{
+   *   snapshots?: boolean,
+   *   now?: () => number,
+   *   onSnapshot?: (info: { pinned: boolean }) => void,
+   *   revisions?: RevisionOptions | null,
+   * }} [options]
    */
-  constructor(filePath, { snapshots = false, now = Date.now, onSnapshot = () => {} } = {}) {
+  constructor(filePath, { snapshots = false, now = Date.now, onSnapshot = () => {}, revisions = null } = {}) {
     this.filePath = filePath;
+    this.revisionOptions = revisions;
+    // The newest revision the record has seen, when the open copy is older.
+    this.revisionFloor = 0;
     this.snapshotOptions = { enabled: snapshots, now, onSnapshot };
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.snapshotTimer = null;
@@ -115,12 +135,18 @@ class VaultStore {
     let dataKey = randomBytes(KEY_BYTES);
 
     try {
-      const vaultData = { schemaVersion: VAULT_SCHEMA_VERSION, entries: [], folders: [] };
+      const vaultData = {
+        schemaVersion: VAULT_SCHEMA_VERSION,
+        entries: [],
+        folders: [],
+        ...nextRevisionFields(newRevisionFields()),
+      };
       const { envelope, recoveryKey } = await makeEnvelope(vaultData, passphrase, dataKey);
       if (this.sessionEpoch !== sessionEpoch) {
         throw new Error("Creation was interrupted because the vault was locked.");
       }
       await this.writeEnvelope(envelope);
+      await this.revisions.writeRevisionRecord(vaultData);
       if (this.sessionEpoch !== sessionEpoch) {
         throw new Error("Creation was interrupted because the vault was locked.");
       }
@@ -149,6 +175,19 @@ class VaultStore {
     const sessionEpoch = this.sessionEpoch;
     await this.mutationQueue;
     const opened = await this.decryptVaultFile(this.filePath, { dataKey });
+    return this.openDecrypted(opened, sessionEpoch);
+  }
+
+  // The rest of an unlock, for every kind of secret: the rollback check,
+  // then the store's state and the housekeeping.
+  async openDecrypted(opened, sessionEpoch) {
+    let verdict;
+    try {
+      verdict = await this.revisions.admitRevision(opened.vaultData);
+    } catch (error) {
+      opened.dataKey.fill(0);
+      throw error;
+    }
     if (this.sessionEpoch !== sessionEpoch) {
       opened.dataKey.fill(0);
       throw new Error("Unlock was interrupted because the vault was locked.");
@@ -158,11 +197,17 @@ class VaultStore {
     this.vaultData = opened.vaultData;
     this.envelope = opened.envelope;
     this.formatOutdated = opened.outdated;
+    await this.revisions.settleRevision(verdict);
     // Before maintainNow, which may save the file in the newer format.
     if (this.formatOutdated) await this.enqueueMutation(() => this.pinSnapshotBeforeNow("upgrade"));
     await this.enqueueMutation(() => this.maintainNow());
     this.queueSnapshotAfterUnlock();
     return this.getStatus();
+  }
+
+  // The methods of store-revisions.js.
+  get revisions() {
+    return /** @type {import("./index").Instance} */ (/** @type {unknown} */ (this));
   }
 
   // A copy of the vault key for Touch ID enrollment.
@@ -176,20 +221,7 @@ class VaultStore {
     await this.mutationQueue;
     validatePassphrase(passphrase);
     const opened = await this.decryptVaultFile(this.filePath, passphrase);
-    if (this.sessionEpoch !== sessionEpoch) {
-      opened.dataKey.fill(0);
-      throw new Error("Unlock was interrupted because the vault was locked.");
-    }
-    this.lock();
-    this.dataKey = opened.dataKey;
-    this.vaultData = opened.vaultData;
-    this.envelope = opened.envelope;
-    this.formatOutdated = opened.outdated;
-    // Before maintainNow, which may save the file in the newer format.
-    if (this.formatOutdated) await this.enqueueMutation(() => this.pinSnapshotBeforeNow("upgrade"));
-    await this.enqueueMutation(() => this.maintainNow());
-    this.queueSnapshotAfterUnlock();
-    return this.getStatus();
+    return this.openDecrypted(opened, sessionEpoch);
   }
 
   // --- Housekeeping -------------------------------------------------------------------
@@ -245,7 +277,11 @@ class VaultStore {
     this.requireUnlocked();
     const sessionEpoch = this.sessionEpoch;
     const dataKey = this.dataKey;
-    let vaultData = nextVaultData;
+    // Every write counts, on top of what is open and what the record saw.
+    // (Older schemas have no revision; only tests write them.)
+    let vaultData = nextVaultData.schemaVersion === VAULT_SCHEMA_VERSION
+      ? { ...nextVaultData, ...nextRevisionFields(this.vaultData, this.revisionFloor) }
+      : nextVaultData;
     let plaintext = Buffer.from(JSON.stringify(vaultData), "utf8");
     // Oldest versions in the history make room before a save is refused.
     while (plaintext.length > MAX_VAULT_PLAINTEXT_BYTES) {
@@ -277,7 +313,8 @@ class VaultStore {
       this.envelope = nextEnvelope;
       this.vaultData = vaultData;
       this.formatOutdated = false;
-      /** @type {import("./index").Instance} */ (/** @type {unknown} */ (this)).scheduleSnapshot();
+      await this.revisions.writeRevisionRecord(vaultData);
+      this.revisions.scheduleSnapshot();
     } finally {
       plaintext.fill(0);
     }
@@ -396,6 +433,7 @@ class VaultStore {
     this.sessionEpoch += 1;
     this.issuedRecoveryKey = null;
     this.formatOutdated = false;
+    this.revisionFloor = 0;
     /** @type {import("./index").Instance} */ (/** @type {unknown} */ (this)).cancelScheduledSnapshot();
     this.dataKey?.fill(0);
     this.dataKey = null;

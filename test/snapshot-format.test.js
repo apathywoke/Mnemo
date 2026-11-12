@@ -51,7 +51,7 @@ test("the fixed snapshot fixture is read and restored", async (t) => {
 test("a 0.2.1 vault restores as a backup and from its pinned pre-upgrade snapshot", async (t) => {
   const asBackup = await emptyStore(t);
   await asBackup.store.restoreBackup(SCHEMA3_VAULT, schema3Fixture.passphrase);
-  assert.equal(asBackup.store.vaultData.schemaVersion, 4);
+  assert.equal(asBackup.store.vaultData.schemaVersion, 5);
   assert.ok(asBackup.store.vaultData.entries.some((entry) => entry.id === schema3Fixture.ids.login));
 
   // Opened with snapshots on: the file is pinned before it is upgraded, and

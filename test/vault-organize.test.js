@@ -44,7 +44,7 @@ async function exists(filePath) {
   }
 }
 
-test("schema 2 vaults open with every sealed value readable and are saved as schema 4", async (t) => {
+test("schema 2 vaults open with every sealed value readable and are saved as schema 5", async (t) => {
   const { store } = await openStore(t);
   const login = await store.saveEntry({ ...makeLogin(), totp: "otpauth://totp/Example?secret=JBSWY3DPEHPK3PXP" });
   const visa = await store.saveItem(card({}));
@@ -52,14 +52,14 @@ test("schema 2 vaults open with every sealed value readable and are saved as sch
   await store.persistVaultData({ schemaVersion: 2, entries: plainTextEntries(store) });
   await reopen(store);
 
-  assert.equal(store.vaultData.schemaVersion, 4);
+  assert.equal(store.vaultData.schemaVersion, 5);
   assert.deepEqual(store.vaultData.folders, []);
   assert.equal(store.revealPassword(login.id), "test-password-value");
   assert.match(store.getTotpCode(login.id).code, /^\d{6}$/);
   assert.equal(store.revealItemSecret(visa.id, "number"), "4242424242424242");
   await store.saveEntry(makeLogin({ id: login.id, name: "Renamed", password: "" }));
   await reopen(store);
-  assert.equal(store.vaultData.schemaVersion, 4);
+  assert.equal(store.vaultData.schemaVersion, 5);
   assert.equal(store.revealText(login.id).notes, "local test data");
   assert.equal(store.revealPassword(login.id), "test-password-value");
 });

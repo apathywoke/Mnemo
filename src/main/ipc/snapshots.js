@@ -47,8 +47,9 @@ function register(ctx) {
     // while nothing else writes to that folder.
     if (source.localName) await store.keepSnapshotForRestore(source.localName);
     const restore = () => store.restoreBackup(source.file, restoreCredentials, { poolDirectory: source.poolDirectory });
-    if (source.localName) await restore();
-    else await state.outsideCopies.enqueue(store.filePath, restore);
+    // An older revision of this vault needs a second, explicit confirmation.
+    const restored = source.localName ? await restore() : await state.outsideCopies.enqueue(store.filePath, restore);
+    if (restored.canceled) return { canceled: true };
 
     const recoveryKey = store.takeIssuedRecoveryKey();
     // The restored file may use a different vault key than the one stored

@@ -1,7 +1,25 @@
 # Design: detecting vault rollback
 
-Status: approved plan (stage 3, task 8), not implemented. The owner
+Status: implemented on 2026-11-12 (`src/main/vault/revisions.js`,
+`store-revisions.js`; tests in `test/vault-revisions.test.js`). The owner
 approved the decisions in section 12 as recommended on 2026-10-31.
+
+Differences from the plan:
+
+- **Schema 5, not 4** (decision R2): schema 4 shipped in 0.3.0 before this
+  change, so the four keys need a schema of their own (section 9). The
+  owner approved this on 2026-11-12.
+- **`savedAt` is a number** (milliseconds), like the other times in the
+  vault data, and `revisionKey` is base64.
+- **A record of another vault whose file is a copy from before this change**
+  (a schema 4 file in a tracked profile's place) gives the "different vault"
+  prompt: such a file has no ID to compare.
+- **The record after "Open"** on another vault follows the opened vault at
+  once when that vault is tracked, and at its first save when it is not.
+- **Restoring over the current profile** also compares with the open
+  vault's own revision when it is open, not only with the record.
+- **The vault keeps `revisionKey` when its key is replaced**, so an older
+  backup of the same vault can still be compared with the record.
 
 ## 1. The problem
 

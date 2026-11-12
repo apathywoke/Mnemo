@@ -76,11 +76,35 @@ passwords until the design has received independent security review.
   page therefore cannot read notes while the user is idle, and gets at most
   one entry per real press. Copying a secure note's text goes from the main
   process to the clipboard without passing through the page.
-- Vaults and backups of schemas 1–3 are upgraded in memory on unlock and
-  written as schema 4 on the next save; until then the file keeps its schema.
-  Earlier versions of Mnemo cannot open a schema 4 vault (0.2.0 and later say
-  that it was saved by a newer version); going back means restoring a backup
-  made before the update.
+- Schema 5 detects a rollback to an older copy of a vault. The vault data
+  holds a vault ID, a revision that goes up on every write, the time of that
+  write, and a key. Outside the vault, one small file per profile
+  (`revisions/<profile ID>.json`) records the newest revision this Mac has
+  seen, with an HMAC-SHA256 under that key, so changing the record needs the
+  vault's key. It is written after the vault file, never before.
+  - Every way to open a vault (passphrase, Touch ID, recovery key) compares
+    the two. A copy older than the record, another vault in the profile's
+    place, or a tracked vault whose record is missing or does not verify
+    opens only after a native dialog; keeping it closed is the default, and
+    then nothing is written. A record that does not verify counts as
+    missing, never as a lower revision.
+  - A copy opened anyway is saved above the newest revision known at its
+    next save, so the counter never goes down.
+  - Restoring a backup or snapshot that is an older revision of the same
+    vault needs a second, explicit confirmation, and the restored vault is
+    then saved once above the newest revision. A backup restored as a new
+    vault gets a new vault ID and key.
+  - **Not detected:** old copies of the vault and of its record put back
+    together (an attacker with the user's file access who saved both, or a
+    restore of Mnemo's whole data folder), and anything on another Mac.
+    Deleting the record leads to the dialog, not to a refusal: the vault
+    always opens after the user confirms. The record reveals a vault ID and
+    how many times the vault was saved.
+- Vaults and backups of schemas 1–4 are upgraded in memory on unlock and
+  written as schema 5 on the next save; until then the file keeps its schema
+  and is not tracked. Earlier versions of Mnemo cannot open a schema 5 vault
+  (0.2.0 and later say that it was saved by a newer version); going back
+  means restoring a backup made before the update.
 - Keys and entry data are cleared from managed buffers and UI fields on lock
   where possible, but JavaScript strings and objects cannot be reliably
   zeroized. The page is cleared at once; for about half a second the lock
