@@ -88,6 +88,11 @@ Mnemo keeps several layers between a mistake or a broken disk and lost data
   the vault file is damaged, or, on another Mac, as a new vault from the
   folder of copies. A snapshot opens with the master passphrase or recovery
   key that was valid when it was taken.
+- **An older copy is noticed:** the vault counts its saves, and Mnemo
+  remembers the newest one it has seen on this Mac. If the vault file is
+  replaced by an older copy (a sync tool, a restored file, someone with
+  access to your files), Mnemo asks before opening it; restoring an older
+  backup of the same vault asks too.
 - **Check the recovery key and passphrase** in Settings → Security without
   changing anything; the vault screen asks you to check the key every 90
   days. If both are lost, nobody, including Mnemo, can open the vault.

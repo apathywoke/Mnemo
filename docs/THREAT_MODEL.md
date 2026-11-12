@@ -5,7 +5,8 @@ work (fuses, metadata-only renderer, signing and notarization). Review it
 again whenever a trigger at the end of this document applies. Updated
 2026-10-28 for in-app updates (B6, A8) and 2026-10-31 for the favicon
 decoder process (B7, A2) and for the risks accepted with the notes and
-rollback designs (section 7, items 2–4), and 2026-11-02 for schema 4,
+rollback designs (section 7, items 2–4), 2026-11-12 for schema 5, which
+detects a rollback to an older copy (A4; section 7, item 4), and 2026-11-02 for schema 4,
 which seals notes per entry (data table, A3, section 7, items 2–3), and
 the same day for revealing notes only after real user input (A3; section 7,
 item 2 done) and for Touch ID backed by the Secure Enclave (B8, "Touch ID
@@ -226,7 +227,7 @@ passphrase replaces the vault key and makes them useless (A1).
 | Brute-force the master passphrase from a vault or backup | scrypt N=2^17, r=8, p=1 with a 16-byte random salt per vault; random 256-bit data key wrapped with AES-256-GCM; a passphrase being set must be at least 12 characters and rated Strong by the built-in estimate, checked in main | The estimate (a port of zxcvbn with English, German, and Russian dictionaries) models known attack strategies; a phrase that is predictable in ways it does not know, such as a quotation outside its dictionaries, can still pass. Vaults from before this rule may still have a 7-character passphrase until it is changed. |
 | Tamper with a vault or backup to plant data or downgrade parameters | AES-GCM with the header (format, version, KDF parameters, salt) as AAD; strict schema and size validation before and after decryption; fixed KDF parameters | None known. |
 | Swap sealed passwords between entries | Each password is sealed with the entry ID in its AAD; a swapped value fails authentication | None known. |
-| Read or alter copies in the folder outside this Mac (a cloud account, a stolen disk) | The copies are the encrypted vault files and attachment files as they are; descriptions hold times, hashes, sizes, and attachment IDs only; the subfolder is named by the profile ID. A copy that does not read back equal to the local one is a failure | Brute-forcing the passphrase of a copy is the same attack as on the vault file (scrypt). Whoever controls the folder can delete copies or put old ones back; a restore checks a copy with the passphrase that was valid then and decrypts every attachment, but an old genuine copy is accepted, and rollback is not detected (section 7, item 4). |
+| Read or alter copies in the folder outside this Mac (a cloud account, a stolen disk) | The copies are the encrypted vault files and attachment files as they are; descriptions hold times, hashes, sizes, and attachment IDs only; the subfolder is named by the profile ID. A copy that does not read back equal to the local one is a failure | Brute-forcing the passphrase of a copy is the same attack as on the vault file (scrypt). Whoever controls the folder can delete copies or put old ones back; a restore checks a copy with the passphrase that was valid then and decrypts every attachment, but an old genuine copy is accepted after the confirmation that restoring an older revision of the same vault needs (section 7, item 4). |
 | Read, alter, or swap attachment files | Each file is AES-256-GCM under its own key with the attachment ID as AAD; the key is sealed with the item and attachment IDs inside the vault data. A changed or swapped file fails to decrypt and is reported by name; backups are verified before they are written and before a restore replaces anything | File sizes and counts are visible. Deleting files is possible (denial of service); the vault then reports them as missing. |
 | Corrupt a backup to damage the vault it is restored into | The container must end exactly after its last file; every referenced attachment is decrypted before anything is written; the vault file is replaced last, in one rename | None known. |
 | Read the vault key from a copied Touch ID key file | The key is wrapped under a Secure Enclave key agreement; the blob opens only in this Mac's Secure Enclave, after Touch ID | Copies of version 1 files from earlier versions (in backups of the home folder) decrypt with the login Keychain and the login password, until a change of credentials replaces the vault key. |
@@ -271,7 +272,7 @@ passphrase replaces the vault key and makes them useless (A1).
 | Modify `app.asar` or plant `Resources/app/` to backdoor the app | `EnableEmbeddedAsarIntegrityValidation` and `OnlyLoadAppFromAsar` fuses on; the asar hash is inside the signed `Info.plist`; Developer ID builds add library validation | An attacker who can rewrite the whole bundle and re-sign it ad hoc produces an app that Gatekeeper does not trust; a quarantined download fails assessment, but a local unquarantined copy may still launch. Install in `/Applications` and keep it owned by an admin. |
 | Load a foreign library: `DYLD_INSERT_LIBRARIES` or another `DYLD_*` variable | Hardened runtime on the app and every helper, without `allow-dyld-environment-variables`; checked with an injected test library (`docs/RELEASING.md`) | None known for injection through the environment. |
 | Load a foreign library by replacing one inside the bundle (for example `Electron Framework`) | Developer ID builds: library validation refuses code from another Team ID | GitHub builds have `disable-library-validation` (an ad-hoc signature has no Team ID to compare), so a replaced, re-signed framework loads. This needs write access to the bundle, which already allows the re-signing attack in the row above. |
-| Replace the vault file or `profiles.json` | AES-GCM authentication; schema validation; registry validation | The attacker can delete or roll back vaults (old encrypted copy). Rollback is not detected. The same holds for snapshots: they can be deleted, and a planted copy that fails verification never counts, but an old genuine copy cannot be told from a new one by its description. |
+| Replace the vault file or `profiles.json` | AES-GCM authentication; schema validation; registry validation | The attacker can delete vaults. An older encrypted copy put in a vault's place is detected on open (schema 5: a revision inside the vault against a record outside it, section 7, item 4) and opens only after a native dialog; an attacker who also puts back an old copy of the record is not detected (accepted). A deleted or altered record leads to the same dialog. Snapshots are not covered by this: they can be deleted, and a planted copy that fails verification never counts, but an old genuine copy cannot be told from a new one by its description. |
 | Read the Touch ID key file and run the helper (or its own CryptoKit code) with its blob | The Secure Enclave performs the agreement only after a touch of a currently enrolled finger; the file is `0600` and bound to its profile ID ("Touch ID helper") | The key is not bound to Mnemo (no keychain access group without a Developer ID): a user who touches the sensor for such a prompt, whose name and reason the attacker chooses, gives away the vault key. |
 | Read clipboard leftovers | Copied values are cleared after 30 s, and on lock, if unchanged | Clipboard managers and Universal Clipboard may keep copies. |
 
@@ -351,14 +352,17 @@ must not be used with real vaults on a shared machine.
    - **Accepted** for schema 4 too: the plain notes parsed from schema 3
      data during the upgrade stay in memory until garbage collection.
    - Once the vault is saved as schema 4, unlocking no longer creates them.
-4. **Rollback.** Replacing a vault with an older encrypted copy is not
-   detected.
-   - **Planned** in `docs/design-rollback.md` (approved, not implemented): a
-     revision counter inside the vault, and a record per profile outside it,
-     authenticated with a key from the vault.
+4. **Rollback.** **Done** (`docs/design-rollback.md`, schema 5).
+   - A revision counter inside the vault, and a record per profile outside
+     it, authenticated with a key from the vault. An older copy, another
+     vault, or a tracked vault without a valid record opens only after a
+     native dialog; restoring an older revision of the same vault needs an
+     explicit confirmation.
    - **Accepted:** putting back old copies of both the vault and its record
-     together will still go undetected (decision R6). A Keychain item updated
+     together still goes undetected (decision R6). A Keychain item updated
      in place would close this.
+   - **Accepted:** a vault that this version has not saved yet (schema 4 or
+     earlier) is not tracked, and versions before this one check nothing.
 5. **Profile deletion from the profile list.** **Done.** Main asks in a
    native dialog before deleting a locked profile, in addition to the
    renderer's type-the-name dialog.
@@ -416,9 +420,8 @@ must not be used with real vaults on a shared machine.
       snapshots still hold an intact wrap.
     - Snapshots are kept and verified on this Mac, copied to a folder the
       user chooses outside it, and restored from the app (steps 3, 4a, 4b).
-      A restore is a deliberate rollback: when revision tracking lands
-      (`docs/design-rollback.md`, section 8) it follows the rules for
-      restoring an older backup.
+      A restore is a deliberate rollback: it follows the rules for
+      restoring an older backup (`docs/design-rollback.md`, section 8).
     - **Accepted:** Mnemo cannot see whether iCloud or another cloud folder
       has uploaded a copy; it checks only that the file is in the folder and
       reads back intact. A folder on this Mac's own disk is allowed, with a
@@ -449,7 +452,7 @@ found no Critical or High issues.
 | 6 | Low/Info | `file://` origin with `GrantFileProtocolExtraPrivileges` makes CSP `'self'` cover any local file | **Fixed.** The page is served from `app://mnemo/`, so `'self'` covers only that origin; the fuse is off. See follow-up 1 in section 7. |
 | 7 | Info | Untrusted favicon images are decoded in the unsandboxed main process | **Fixed.** Images are decoded in a separate `utilityProcess` by plain JavaScript PNG and ICO decoders with a 5-second limit; main receives only pixels and encodes the PNG itself. That process is not sandboxed by Chromium (section 7, item 6). |
 | 8 | Info | Release verification checked entitlements only on the outer app | **Fixed.** Every nested `.app`/`.framework` is checked, and `app.asar.unpacked` is rejected. |
-| 9 | Info | Clipboard text is not marked concealed or transient; vault rollback is not detected; 7-character passphrase minimum | **Partly fixed.** New passphrases need 12 characters and a Strong rating (section 7, item 8). Clipboard and rollback are still open; concealed clipboard types need a small native helper. |
+| 9 | Info | Clipboard text is not marked concealed or transient; vault rollback is not detected; 7-character passphrase minimum | **Partly fixed.** New passphrases need 12 characters and a Strong rating (section 7, item 8). Rollback to an older copy is detected (section 7, item 4). The clipboard is still open; concealed clipboard types need a small native helper. |
 
 The reviewer confirmed: IPC sender checks on every handler, a fixed preload
 surface, input validation, that passwords never reach the renderer, a DOM

@@ -1,6 +1,7 @@
 // Validation and upgrades of the decrypted vault data as a whole.
 const {
   VAULT_SCHEMA_VERSION,
+  NOTES_SCHEMA_VERSION,
   ORGANIZED_SCHEMA_VERSION,
   SEALED_SCHEMA_VERSION,
   LEGACY_VAULT_SCHEMA_VERSION,
@@ -10,14 +11,27 @@ const { hasExactKeys } = require("./records");
 const { sealPassword, sealNotes } = require("./crypto");
 const { isValidItemEntry, isValidLoginEntry, sealedFieldKeys } = require("./entries");
 const { isValidFolderList, splitEntry, isValidEntryMeta } = require("./history");
+const { REVISION_KEYS, isValidRevisionFields, newRevisionFields } = require("./revisions");
+
+const SCHEMA_VERSIONS = [
+  VAULT_SCHEMA_VERSION,
+  NOTES_SCHEMA_VERSION,
+  ORGANIZED_SCHEMA_VERSION,
+  SEALED_SCHEMA_VERSION,
+  LEGACY_VAULT_SCHEMA_VERSION,
+];
 
 function validateVaultData(value) {
   const version = value?.schemaVersion;
   // Schema 3 and later have folders and per-entry metadata.
   const organized = version >= ORGANIZED_SCHEMA_VERSION;
+  // Schema 5 and later count their writes.
+  const tracked = version >= VAULT_SCHEMA_VERSION;
+  const keys = organized ? ["schemaVersion", "entries", "folders"] : ["schemaVersion", "entries"];
   if (
-    !hasExactKeys(value, organized ? ["schemaVersion", "entries", "folders"] : ["schemaVersion", "entries"]) ||
-    ![VAULT_SCHEMA_VERSION, ORGANIZED_SCHEMA_VERSION, SEALED_SCHEMA_VERSION, LEGACY_VAULT_SCHEMA_VERSION].includes(version) ||
+    !hasExactKeys(value, tracked ? [...keys, ...REVISION_KEYS] : keys) ||
+    !SCHEMA_VERSIONS.includes(version) ||
+    (tracked && !isValidRevisionFields(value)) ||
     !Array.isArray(value.entries) ||
     value.entries.length > MAX_ENTRIES ||
     (organized && !isValidFolderList(value.folders))
@@ -101,9 +115,20 @@ function upgradeVaultData(vaultData, dataKey) {
     // JavaScript strings); they are dropped here. The next save writes
     // schema 4, and later unlocks no longer create them.
     upgraded = {
-      schemaVersion: VAULT_SCHEMA_VERSION,
+      schemaVersion: NOTES_SCHEMA_VERSION,
       entries: upgraded.entries.map((entry) => sealEntryText(entry, dataKey)),
       folders: upgraded.folders,
+    };
+  }
+  if (upgraded.schemaVersion === NOTES_SCHEMA_VERSION) {
+    // Revision 0: not tracked until the first save writes revision 1 and
+    // the record outside the vault. The ID and key made here are kept only
+    // if that save happens.
+    upgraded = {
+      schemaVersion: VAULT_SCHEMA_VERSION,
+      entries: upgraded.entries,
+      folders: upgraded.folders,
+      ...newRevisionFields(),
     };
   }
   return upgraded;

@@ -5,6 +5,7 @@ const { isPrivateKey } = require("../ssh-keys");
 const cardTools = require("../../shared/card-tools.js");
 const {
   VAULT_SCHEMA_VERSION,
+  NOTES_SCHEMA_VERSION,
   LEGACY_VAULT_SCHEMA_VERSION,
   MAX_FAVICON_BYTES,
   MAX_FAVICON_BASE64_LENGTH,
@@ -42,13 +43,13 @@ function sealedFieldKeys(type) {
 
 // Notes: plain text up to schema 3; "" or a sealed record from schema 4.
 function isValidNotes(notes, schemaVersion) {
-  return schemaVersion >= VAULT_SCHEMA_VERSION
+  return schemaVersion >= NOTES_SCHEMA_VERSION
     ? isValidSealedText(notes, ENTRY_LIMITS.notes * 3)
     : typeof notes === "string" && notes.length <= ENTRY_LIMITS.notes;
 }
 
 function isValidPlainField(field, value, schemaVersion) {
-  return field.sealed && schemaVersion >= VAULT_SCHEMA_VERSION
+  return field.sealed && schemaVersion >= NOTES_SCHEMA_VERSION
     ? isValidSealedPassword(value, field.max * 3)
     : typeof value === "string" && value.length <= field.max;
 }

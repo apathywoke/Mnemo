@@ -196,14 +196,14 @@ test("schema 1 vaults with plain password fields are upgraded to sealed password
   store.lock();
 
   await store.unlock(PASSPHRASE);
-  assert.equal(store.vaultData.schemaVersion, 4);
+  assert.equal(store.vaultData.schemaVersion, 5);
   assert.equal(typeof store.vaultData.entries[0].password, "object");
   assert.equal(store.revealPassword(id), "test-password-value");
 
   await store.saveEntry(makeLogin({ id, name: "Upgraded", password: "" }));
   store.lock();
   await store.unlock(PASSPHRASE);
-  assert.equal(store.vaultData.schemaVersion, 4);
+  assert.equal(store.vaultData.schemaVersion, 5);
   assert.equal(store.revealText(id).notes, "local test data");
   assert.equal(store.revealPassword(id), "test-password-value");
 });

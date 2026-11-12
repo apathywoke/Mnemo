@@ -195,8 +195,8 @@ file format.
   (`errors.vaultFromNewerVersion`, `errors.backupFromNewerVersion`).
 - **Versions before 0.2.0** report a wrong passphrase instead.
 
-A release that changes the format (such as the planned schema 4, see
-`docs/design-notes-sealing.md` and `docs/design-rollback.md`):
+A release that changes the format (schema 4, see
+`docs/design-notes-sealing.md`; schema 5, see `docs/design-rollback.md`):
 
 1. **Ships after a release that recognizes newer formats** is out. 0.2.0 is
    that release.

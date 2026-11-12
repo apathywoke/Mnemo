@@ -140,6 +140,7 @@ if (launchedWithRemoteDebugging) {
 
     state.profileManager = new ProfileManager(app.getPath("userData"), {
       onSnapshot: (vaultPath, info) => state.outsideCopies?.noteSnapshot(vaultPath, info),
+      confirmRevision: (finding) => ctx.confirmRevision(finding),
     });
     void state.profileManager.removeStaleTemporaryFiles();
     state.vaultStore = state.profileManager.createStore(state.profileManager.legacyVaultPath);

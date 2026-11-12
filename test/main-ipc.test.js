@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
+const fs = require("node:fs/promises");
 const Module = require("node:module");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -565,6 +566,20 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
   assert.equal((await invoke("vault:list-entries")).length, 0);
   await assert.rejects(invoke("profiles:delete", profileId), /Lock the current vault/);
 
+  assert.equal((await invoke("vault:lock")).unlocked, false);
+  // A vault whose record of the newest revision is gone: main asks in a
+  // native dialog before opening it, and keeping it closed is the default.
+  await fs.unlink(path.join(app.getPath("userData"), "revisions", `${profileId}.json`));
+  messageResponse = 0;
+  await assert.rejects(invoke("vault:unlock", "a brand new long passphrase 4"), /\[mnemo:errors\.vaultNotOpened\]/);
+  assert.match(messageBoxes.at(-1).message, /no record of this vault/);
+  assert.equal(messageBoxes.at(-1).defaultId, 0);
+  assert.equal((await invoke("vault:get-status")).unlocked, false);
+  messageResponse = 1;
+  assert.equal((await invoke("vault:unlock", "a brand new long passphrase 4")).unlocked, true);
+  messageResponse = 0;
+  assert.equal((await invoke("vault:lock")).unlocked, false);
+  assert.equal((await invoke("vault:unlock", "a brand new long passphrase 4")).unlocked, true);
   assert.equal((await invoke("vault:lock")).unlocked, false);
   assert.deepEqual(await invoke("profiles:choose").then((profiles) => profiles.map(({ id }) => id)), [profileId]);
   // Deleting from the profile list needs a native confirmation too.
