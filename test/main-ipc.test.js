@@ -567,6 +567,11 @@ test("main IPC enforces trusted frames and coordinates profiles, vault, dialogs,
 
   assert.equal((await invoke("vault:lock")).unlocked, false);
   assert.deepEqual(await invoke("profiles:choose").then((profiles) => profiles.map(({ id }) => id)), [profileId]);
+  // Deleting from the profile list needs a native confirmation too.
+  messageResponse = 0;
+  assert.deepEqual(await invoke("profiles:delete", profileId), { deleted: false });
+  assert.deepEqual(await invoke("profiles:choose").then((profiles) => profiles.map(({ id }) => id)), [profileId]);
+  messageResponse = 1;
   assert.deepEqual(await invoke("profiles:delete", profileId), {
     deleted: true,
     profile: { id: profileId, name: "Primary" },

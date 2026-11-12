@@ -40,7 +40,9 @@ function init(ctx, { onDeleted }) {
     confirmButton.textContent = t("deleteProfile.deleting");
     error.hidden = true;
     try {
-      await ctx.api.deleteProfile(profile.id);
+      // Main asks again in a native dialog; canceling there keeps this one open.
+      const result = await ctx.api.deleteProfile(profile.id);
+      if (!result?.deleted) return;
       close();
       await onDeleted();
       showToast(t("toast.vaultDeleted"));

@@ -24,7 +24,24 @@ function register(ctx) {
       throw new Error("Lock the current vault before deleting a profile.");
     }
     const profile = await state.profileManager.getProfile(profileId);
+    // A native confirmation, so a compromised renderer cannot delete a vault
+    // alone: its own type-the-name dialog is no barrier to it.
+    const epoch = state.lockEpoch;
+    const isStale = () => state.activeProfileId !== null || state.vaultStore?.isUnlocked() || state.lockEpoch !== epoch;
+    const confirmation = await dialog.showMessageBox(state.mainWindow, {
+      type: "warning",
+      title: tr("dialog.deleteVaultTitle"),
+      message: tr("dialog.deleteVaultMessage", { name: profile.name }),
+      detail: tr("dialog.deleteVaultDetail"),
+      buttons: [tr("common.cancel"), tr("dialog.deleteVaultConfirm")],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    if (confirmation.response !== 1) return { deleted: false };
+    if (isStale()) throw new Error("Lock the current vault before deleting a profile.");
     const deleteSnapshots = await confirmDeletingSnapshots(profile);
+    if (isStale()) throw new Error("Lock the current vault before deleting a profile.");
     const deleted = await state.profileManager.deleteProfile(profileId, { deleteSnapshots });
     await state.biometricUnlock.disable(profileId).catch(() => {});
     return deleted;
