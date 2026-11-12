@@ -39,6 +39,7 @@ security updates current.
 
 ```sh
 npm run check            # ESLint, TypeScript checks of the JSDoc types, unit tests
+npm run test:coverage    # the unit tests, failing below 95% of lines in src/main/vault/
 npm run test:e2e         # drives the real app with Playwright (needs Electron's binary)
 npm run test:durability  # kills vault operations at every file change (several minutes)
 ```
