@@ -227,7 +227,8 @@ credentials or adding network access.
 
 Browser autofill, sync between Macs, passkeys, sharing, and apps for other
 systems do not exist yet; sync and anything that adds network access will
-get a design document first. Builds from GitHub are ad-hoc signed, not
+get a design document first. Windows and Linux are planned in
+[docs/design-cross-platform.md](./docs/design-cross-platform.md). Builds from GitHub are ad-hoc signed, not
 notarized. The password strength display is an estimate of known attack
 strategies, not a security guarantee. Do not use this prototype for real
 passwords.
